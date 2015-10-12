@@ -28,14 +28,14 @@ def vsqdistw(v, w):
     """
     |v - w|^2
     """
-    return sum([(v[i] - w[i])**2 for i in range(len(v))])
+    return sum((v[i] - w[i])**2 for i in range(len(v)))
 
 
 def vdotw(v, w):
     """
     Vector-vector dot product
     """
-    return sum([v[i] * w[i] for i in range(len(v))])
+    return sum(v[i] * w[i] for i in range(len(v)))
 
 
 def mdotv(M, v):
