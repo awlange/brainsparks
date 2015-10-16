@@ -1,4 +1,5 @@
 import src.sandbox.linalg as linalg
+import numpy as np
 
 
 class Cost(object):
@@ -10,12 +11,16 @@ class Cost(object):
     def get(name):
         if name == "quadratic":
             return Cost.quadratic
+        if name == "np_quadratic":
+            return Cost.np_quadratic
         return None
 
     @staticmethod
     def get_d(name):
         if name == "quadratic":
             return Cost.d_quadratic
+        if name == "np_quadratic":
+            return Cost.np_d_quadratic
         return None
 
     @staticmethod
@@ -31,3 +36,11 @@ class Cost(object):
         Cost derivative for a single training data
         """
         return linalg.vminw(a, y)
+
+    @staticmethod
+    def np_quadratic(y, a):
+        return np.mean(np.square(np.linalg.norm(a-y, axis=1, ord=2))) * 0.5
+
+    @staticmethod
+    def np_d_quadratic(y, a):
+        return (a - y) / len(y)

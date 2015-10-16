@@ -23,6 +23,7 @@ def main():
 
     print(net.full_cost(train_X, train_Y))
 
+    # TODO: technically need to be divided by N, but since there is only one example, it is implicitly there
     db, dw = net.gradient_single(train_X[0], train_Y[0])
 
     # Finite difference checking
