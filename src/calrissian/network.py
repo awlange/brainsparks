@@ -1,4 +1,4 @@
-from src.calrissian.cost import Cost
+from .cost import Cost
 
 import numpy as np
 
@@ -19,34 +19,34 @@ class Network(object):
         """
         self.layers.append(layer)
 
-    def predict(self, input_data):
+    def predict(self, data_X):
         """
         Pass given input through network to compute the output prediction
 
-        :param input_data:
+        :param data_X:
         :return:
         """
-        a = input_data
+        a = data_X
         for layer in self.layers:
             a = layer.feed_forward(a)
         return a
 
-    def cost(self, input_data, output_expected):
+    def cost(self, data_X, data_Y):
         """
         Compute the cost for all input data corresponding to expected output
 
-        :param input_data:
-        :param output_expected:
+        :param data_X:
+        :param data_Y:
         :return:
         """
-        return self.cost_function(output_expected, self.predict(input_data))
+        return self.cost_function(data_Y, self.predict(data_X))
 
-    def cost_gradient(self, input_data, output_expected):
+    def cost_gradient(self, data_X, data_Y):
         """
         Computes the gradient of the cost with respect to each weight and bias in the network
 
-        :param input_data:
-        :param output_expected:
+        :param data_X:
+        :param data_Y:
         :return:
         """
 
@@ -55,7 +55,7 @@ class Network(object):
         dc_dw = []
 
         sigma_Z = []
-        A = [input_data]
+        A = [data_X]
         for l, layer in enumerate(self.layers):
             z = layer.compute_z(A[l])
             A.append(layer.compute_a(z))
@@ -65,10 +65,10 @@ class Network(object):
             dc_db.append(np.zeros(layer.b.shape))
             dc_dw.append(np.zeros(layer.w.shape))
 
-        delta_L = self.cost_d_function(output_expected, A[-1]) * sigma_Z[-1]
+        delta_L = self.cost_d_function(data_Y, A[-1]) * sigma_Z[-1]
 
         # For each training case
-        for i in range(len(input_data)):
+        for i in range(len(data_X)):
             prev_delta = delta_L[i]
             dc_db[-1] += prev_delta
             dc_dw[-1] += np.outer(A[-2][i], prev_delta)
@@ -82,3 +82,13 @@ class Network(object):
 
         return dc_db, dc_dw
 
+    def fit(self, data_X, data_Y, optimizer):
+        """
+        Run the optimizer for specified number of epochs
+
+        :param data_X:
+        :param data_Y:
+        :return:
+        """
+
+        optimizer.optimize(self, data_X, data_Y)

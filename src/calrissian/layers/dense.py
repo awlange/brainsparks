@@ -1,5 +1,5 @@
-from src.calrissian.layers.layer import Layer
-from src.calrissian.activation import Activation
+from .layer import Layer
+from ..activation import Activation
 
 import numpy as np
 
