@@ -19,6 +19,8 @@ class Activation(object):
             return Activation.tanh
         if nl == "softmax":
             return Activation.softmax
+        if nl == "softplus":
+            return Activation.softplus
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -35,6 +37,8 @@ class Activation(object):
             return Activation.d_tanh
         if nl == "softmax":
             return Activation.d_softmax
+        if nl == "softplus":
+            return Activation.d_softplus
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -62,7 +66,7 @@ class Activation(object):
 
     @staticmethod
     def relu(x):
-        return np.piecewise(x, [x < 0.0, x >= 0.0], [0.0, lambda z: z])
+        return np.maximum(0, x)
 
     @staticmethod
     def d_relu(x):
@@ -76,7 +80,8 @@ class Activation(object):
 
     @staticmethod
     def d_tanh(x):
-        return 1.0 - np.tanh(x)*np.tanh(x)
+        tx = np.tanh(x)
+        return 1.0 - tx*tx
 
     # SoftMax
 
@@ -92,3 +97,13 @@ class Activation(object):
     def d_softmax(x):
         # Note: not actually used. So, just echo input to maintain interface.
         return x
+
+    # Softplus
+
+    @staticmethod
+    def softplus(x):
+        return np.log(1.0 + np.exp(x))
+
+    @staticmethod
+    def d_softplus(x):
+        return Activation.sigmoid(x)

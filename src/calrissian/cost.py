@@ -55,6 +55,8 @@ class Cost(object):
         diff = a - y
         return (np.piecewise(diff, [diff < 0, diff >= 0], [-1, 1]) * z) / len(y)
 
+    # Categorical cross entropy
+
     @staticmethod
     def categorical_cross_entropy(y, a):
         return np.mean(-np.sum(y * np.log(a), axis=1))
@@ -64,6 +66,8 @@ class Cost(object):
         # z not used but here to maintain common interface
         # Note: only valid when used in combination with softmax activation in final layer
         return (a - y) / len(y)
+
+    # Binary cross entropy
 
     @staticmethod
     def binary_cross_entropy(y, a):
