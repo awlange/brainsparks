@@ -82,7 +82,11 @@ class Activation(object):
 
     @staticmethod
     def softmax(x):
-        return np.exp(x) / np.sum(np.exp(x))
+        ex = np.exp(x)
+        denoms = np.sum(ex, axis=1)
+        for i in range(len(ex)):
+            ex[i] /= denoms[i]
+        return ex
 
     @staticmethod
     def d_softmax(x):

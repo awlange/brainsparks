@@ -57,13 +57,13 @@ class Cost(object):
 
     @staticmethod
     def categorical_cross_entropy(y, a):
-        return -np.sum(y * np.log(a))
+        return np.mean(-np.sum(y * np.log(a), axis=1))
 
     @staticmethod
     def d_categorical_cross_entropy(y, a, z):
         # z not used but here to maintain common interface
         # Note: only valid when used in combination with softmax activation in final layer
-        return a - y
+        return (a - y) / len(y)
 
     @staticmethod
     def binary_cross_entropy(y, a):
