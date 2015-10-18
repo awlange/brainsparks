@@ -65,7 +65,7 @@ class Network(object):
             dc_db.append(np.zeros(layer.b.shape))
             dc_dw.append(np.zeros(layer.w.shape))
 
-        delta_L = self.cost_d_function(data_Y, A[-1]) * sigma_Z[-1]
+        delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
 
         # For each training case
         for i in range(len(data_X)):

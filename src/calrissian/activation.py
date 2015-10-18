@@ -11,12 +11,14 @@ class Activation(object):
         nl = name.lower()
         if nl == "sigmoid":
             return Activation.sigmoid
-        elif nl == "linear":
+        if nl == "linear":
             return Activation.linear
-        elif nl == "relu":
+        if nl == "relu":
             return Activation.relu
-        elif nl == "tanh":
+        if nl == "tanh":
             return Activation.tanh
+        if nl == "softmax":
+            return Activation.softmax
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -25,12 +27,14 @@ class Activation(object):
         nl = name.lower()
         if nl == "sigmoid":
             return Activation.d_sigmoid
-        elif nl == "linear":
+        if nl == "linear":
             return Activation.d_linear
-        elif nl == "relu":
+        if nl == "relu":
             return Activation.d_relu
-        elif nl == "tanh":
+        if nl == "tanh":
             return Activation.d_tanh
+        if nl == "softmax":
+            return Activation.d_softmax
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -73,3 +77,14 @@ class Activation(object):
     @staticmethod
     def d_tanh(x):
         return 1.0 - np.tanh(x)*np.tanh(x)
+
+    # SoftMax
+
+    @staticmethod
+    def softmax(x):
+        return np.exp(x) / np.sum(np.exp(x))
+
+    @staticmethod
+    def d_softmax(x):
+        # Note: not actually used. So, just echo input to maintain interface.
+        return x
