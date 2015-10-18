@@ -50,9 +50,9 @@ def main3():
 
 
 def fd():
-    net = Network(cost="mae")
+    net = Network(cost="mse")
     net.append(Dense(2, 5))
-    net.append(Dense(5, 3))
+    net.append(Dense(5, 3, activation="relu"))
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])

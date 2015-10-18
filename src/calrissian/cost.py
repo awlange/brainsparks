@@ -13,8 +13,10 @@ class Cost(object):
             return Cost.quadratic
         if nl == "l1" or nl == "mean_absolute_error" or nl == "mae":
             return Cost.mae
-        if nl == "cross_entropy":
-            return Cost.cross_entropy
+        if nl == "categorical_cross_entropy":
+            return Cost.categorical_cross_entropy
+        if nl == "binary_cross_entropy":
+            return Cost.binary_cross_entropy
 
         raise NameError("Cost function name {} is not implemented.".format(name))
 
@@ -25,8 +27,10 @@ class Cost(object):
             return Cost.d_quadratic
         if nl == "l1" or nl == "mean_absolute_error" or nl == "mae":
             return Cost.d_mae
-        if nl == "cross_entropy":
-            return Cost.d_cross_entropy
+        if nl == "categorical_cross_entropy":
+            return Cost.d_categorical_cross_entropy
+        if nl == "binary_cross_entropy":
+            return Cost.d_binary_cross_entropy
 
         raise NameError("Cost function name {} is not implemented.".format(name))
 
@@ -52,11 +56,21 @@ class Cost(object):
         return (np.piecewise(diff, [diff < 0, diff >= 0], [-1, 1]) * z) / len(y)
 
     @staticmethod
-    def cross_entropy(y, a):
-        return np.nan_to_num(np.sum(-y * np.log(a) - (1.0 - y) * np.log(1.0 - a)))
+    def categorical_cross_entropy(y, a):
+        return -np.sum(y * np.log(a))
 
     @staticmethod
-    def d_cross_entropy(y, a, z):
+    def d_categorical_cross_entropy(y, a, z):
         # z not used but here to maintain common interface
-        # TODO: not sure if this true always or just when the softmax function is applied
+        # Note: only valid when used in combination with softmax activation in final layer
+        return a - y
+
+    @staticmethod
+    def binary_cross_entropy(y, a):
+        return np.sum(-(y * np.log(a) + (1.0 - y) * np.log(1.0 - a)))
+
+    @staticmethod
+    def d_binary_cross_entropy(y, a, z):
+        # z not used but here to maintain common interface
+        # Not to be used with softmax. This gradient is wrong for that... would probably need to compute Jacobian...
         return a - y

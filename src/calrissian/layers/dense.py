@@ -10,6 +10,7 @@ class Dense(Layer):
         super().__init__("Dense")
         self.input_size = input_size
         self.output_size = output_size
+        self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
 
