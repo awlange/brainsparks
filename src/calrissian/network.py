@@ -75,7 +75,7 @@ class Network(object):
 
             if self.layers[-1].has_gradient:
                 dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_final_layer(prev_delta, A[-2][i])
-                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_update(dc_db_l, dc_dw_l, A[-2][i])
+                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_update(dc_db_l, dc_dw_l)
                 dc_db[-1] += dc_db_l
                 dc_dw[-1] += dc_dw_l
 

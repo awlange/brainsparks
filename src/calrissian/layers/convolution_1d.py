@@ -68,7 +68,7 @@ class Convolution1D(Layer):
 
         return dc_db, dc_dw
 
-    def compute_gradient_update(self, dc_db, dc_dw, A):
+    def compute_gradient_update(self, dc_db, dc_dw):
         """
         Need to take mean across filters
 

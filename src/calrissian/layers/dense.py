@@ -40,5 +40,5 @@ class Dense(Layer):
         dc_dw = np.outer(A, prev_delta)
         return dc_db, dc_dw
 
-    def compute_gradient_update(self, dc_db, dc_dw, A=None):
+    def compute_gradient_update(self, dc_db, dc_dw):
         return dc_db, dc_dw
