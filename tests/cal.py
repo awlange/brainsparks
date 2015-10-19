@@ -115,5 +115,5 @@ def fd():
 
 if __name__ == "__main__":
     # main()
-    main3()
-    # fd()
+    # main3()
+    fd()

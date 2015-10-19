@@ -7,7 +7,7 @@ import numpy as np
 class Dense(Layer):
 
     def __init__(self, input_size=0, output_size=0, activation="sigmoid"):
-        super().__init__("Dense")
+        super().__init__("Dense", True)
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -31,11 +31,14 @@ class Dense(Layer):
         return self.d_activation(z)
 
     def compute_gradient(self, prev_delta, sigma_Z, A):
-        """
-        Computes this layer's weight and bias gradients for a single input data pass
-
-        :return:
-        """
         dc_db = self.w.dot(prev_delta) * sigma_Z
         dc_dw = np.outer(A, dc_db)
+        return dc_db, dc_dw
+
+    def compute_gradient_final_layer(self, prev_delta, A):
+        dc_db = prev_delta
+        dc_dw = np.outer(A, prev_delta)
+        return dc_db, dc_dw
+
+    def compute_gradient_update(self, dc_db, dc_dw, A=None):
         return dc_db, dc_dw

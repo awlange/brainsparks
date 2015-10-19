@@ -10,7 +10,7 @@ class Autoencoder(Layer):
     """
 
     def __init__(self, input_size=0, output_size=0, activation="sigmoid", symmetric_weights=False, freeze=False):
-        super().__init__("Autoencoder")
+        super().__init__("Autoencoder", True)
         self.input_size = input_size
         self.output_size = output_size
         self.activation = Activation.get(activation)

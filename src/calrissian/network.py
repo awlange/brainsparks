@@ -70,15 +70,26 @@ class Network(object):
         # For each training case
         for i in range(len(data_X)):
             prev_delta = delta_L[i]
-            dc_db[-1] += prev_delta
-            dc_dw[-1] += np.outer(A[-2][i], prev_delta)
+            dc_db_l = None
+            dc_dw_l = None
+
+            if self.layers[-1].has_gradient:
+                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_final_layer(prev_delta, A[-2][i])
+                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_update(dc_db_l, dc_dw_l, A[-2][i])
+                dc_db[-1] += dc_db_l
+                dc_dw[-1] += dc_dw_l
 
             for l in range(len(self.layers)-2, -1, -1):
                 layer = self.layers[l+1]
-                dc_db_l, dc_dw_l = layer.compute_gradient(prev_delta, sigma_Z[l][i], A[l][i])
-                dc_db[l] += dc_db_l
-                dc_dw[l] += dc_dw_l
-                prev_delta = dc_db_l
+                if layer.has_gradient:
+                    dc_db_l, dc_dw_l = layer.compute_gradient(prev_delta, sigma_Z[l][i], A[l][i])
+
+                if self.layers[l].has_gradient:
+                    # Note: if false, these get sent back until needed
+                    dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l)
+                    dc_db[l] += dc_db_l
+                    dc_dw[l] += dc_dw_l
+                    prev_delta = dc_db_l
 
         return dc_db, dc_dw
 
@@ -91,4 +102,4 @@ class Network(object):
         :return:
         """
 
-        optimizer.optimize(self, data_X, data_Y)
+        return optimizer.optimize(self, data_X, data_Y)
