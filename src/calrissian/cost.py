@@ -2,6 +2,9 @@ import numpy as np
 
 
 class Cost(object):
+    """
+    Note: for multidimensional Y, we sum the cost over the dimensions in the outermost summation in the cost functions
+    """
 
     def __init__(self):
         pass
@@ -38,7 +41,14 @@ class Cost(object):
 
     @staticmethod
     def quadratic(y, a):
-        return 0.5 * np.mean(np.sum(np.square(a - y), axis=1))
+        """
+        Supports multidimensional Y
+
+        :param y:
+        :param a:
+        :return:
+        """
+        return 0.5 * np.sum(np.mean(np.sum(np.square(a - y), axis=1), axis=0))
 
     @staticmethod
     def d_quadratic(y, a, z):
@@ -48,7 +58,14 @@ class Cost(object):
 
     @staticmethod
     def mae(y, a):
-        return np.mean(np.sum(np.abs(a - y), axis=1))
+        """
+        Supports multidimensional Y
+
+        :param y:
+        :param a:
+        :return:
+        """
+        return np.sum(np.mean(np.sum(np.abs(a - y), axis=1), axis=0))
 
     @staticmethod
     def d_mae(y, a, z):
@@ -59,7 +76,7 @@ class Cost(object):
 
     @staticmethod
     def categorical_cross_entropy(y, a):
-        return np.mean(-np.sum(y * np.log(a), axis=1))
+        return np.mean(-np.sum(y * np.log(a), axis=1), axis=0)
 
     @staticmethod
     def d_categorical_cross_entropy(y, a, z):

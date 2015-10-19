@@ -65,7 +65,11 @@ class Network(object):
             dc_db.append(np.zeros(layer.b.shape))
             dc_dw.append(np.zeros(layer.w.shape))
 
-        delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
+        final_l = -1
+        while not self.layers[final_l].has_gradient:
+            final_l -= 1
+
+        delta_L = self.cost_d_function(data_Y, A[final_l], sigma_Z[final_l])
 
         # For each training case
         for i in range(len(data_X)):
@@ -73,13 +77,13 @@ class Network(object):
             dc_db_l = None
             dc_dw_l = None
 
-            if self.layers[-1].has_gradient:
-                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_final_layer(prev_delta, A[-2][i])
-                dc_db_l, dc_dw_l = self.layers[-1].compute_gradient_update(dc_db_l, dc_dw_l)
-                dc_db[-1] += dc_db_l
-                dc_dw[-1] += dc_dw_l
+            dc_db_l, dc_dw_l = self.layers[final_l].compute_gradient_final_layer(prev_delta, A[final_l-1][i])
+            dc_db_l, dc_dw_l = self.layers[final_l].compute_gradient_update(dc_db_l, dc_dw_l)
+            dc_db[final_l] += dc_db_l
+            dc_dw[final_l] += dc_dw_l
 
-            for l in range(len(self.layers)-2, -1, -1):
+            l = final_l - 1
+            while l >= 0:
                 layer = self.layers[l+1]
                 if layer.has_gradient:
                     dc_db_l, dc_dw_l = layer.compute_gradient(prev_delta, sigma_Z[l][i], A[l][i])
@@ -90,6 +94,8 @@ class Network(object):
                     dc_db[l] += dc_db_l
                     dc_dw[l] += dc_dw_l
                     prev_delta = dc_db_l
+
+                l -= 1
 
         return dc_db, dc_dw
 

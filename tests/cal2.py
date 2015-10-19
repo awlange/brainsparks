@@ -32,10 +32,14 @@ def main():
 def fd():
     net = Network(cost="mse")
     net.append(Convolution1D(input_size=4, filter_size=2, n_filters=1, stride_length=1, activation="linear"))
+    net.append(Flatten())
 
     train_X = np.asarray([[0.2, -0.3, 0.5, 0.5]])
-    train_Y = np.asarray([[[0.0, 0.0,  1.0]]])
+    # train_Y = np.asarray([[[0.0, 0.0, 1.0]]])
+    train_Y = np.asarray([[0.0, 0.0, 1.0]])
+
     # train_Y = np.asarray([[[0.0, 0.0,  1.0], [0.5, 0.5, 0.5]]])
+    # train_Y = np.asarray([[0.0, 0.0, 1.0, 0.5, 0.5, 0.5]])
 
     # train_X = np.asarray([[0.2, -0.3, 0.5, 0.5], [0.1, 0.7, 0.8, -0.5]])
     # train_Y = np.asarray([[[0.0, 0.0,  1.0]], [[0.0, 0.0, 1.0]]])
@@ -50,6 +54,7 @@ def fd():
     # Finite difference checking
 
     print(net.predict(train_X))
+    print(net.cost(train_X, train_Y))
 
     db, dw = net.cost_gradient(train_X, train_Y)
 
@@ -91,7 +96,8 @@ def fd():
     print(fd_b)
 
     print("analytic w")
-    for x in dw:
+    for i, x in enumerate(dw):
+        print(i)
         for n in x:
             print(n)
 
@@ -112,7 +118,8 @@ def fd():
         fd_w.append(lw)
 
     print("numerical w")
-    for x in fd_w:
+    for i, x in enumerate(fd_w):
+        print(i)
         for n in x:
             print(n)
 

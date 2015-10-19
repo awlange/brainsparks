@@ -75,7 +75,7 @@ class Convolution1D(Layer):
         :param dc_dw:
         :return:
         """
-        delta_b = np.mean(dc_db.reshape((self.n_filters, self.n_fields)), axis=1)
-        delta_w = np.transpose(np.mean(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2))
+        delta_b = np.sum(dc_db.reshape((self.n_filters, self.n_fields)), axis=1)
+        delta_w = np.transpose(np.sum(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2))
 
         return delta_b, delta_w
