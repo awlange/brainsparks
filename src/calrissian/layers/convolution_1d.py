@@ -55,16 +55,13 @@ class Convolution1D(Layer):
     def compute_gradient_final_layer(self, prev_delta, A):
         dc_db = prev_delta  # correct
 
-        z = []
         # For each filter, convolve the input left to right
-        for filter in range(self.n_filters):
-            convolution = []
-            i = 0
-            for field in range(self.n_fields):
-                convolution.append(np.outer(A[i:(i+self.filter_size)], prev_delta[filter][field]))
-                i += self.stride_length
-            z.append(np.transpose(convolution))
-        dc_dw = np.asarray(z)
+        convolution = []
+        i = 0
+        for field in range(self.n_fields):
+            convolution.append(np.outer(A[i:(i+self.filter_size)], prev_delta.transpose()[field]))
+            i += self.stride_length
+        dc_dw = np.transpose(convolution)
 
         return dc_db, dc_dw
 
@@ -79,6 +76,6 @@ class Convolution1D(Layer):
         :return:
         """
         delta_b = np.mean(dc_db.reshape((self.n_filters, self.n_fields)), axis=1)
-        delta_w = np.transpose(np.mean(dc_dw.reshape((self.filter_size, self.n_filters, self.n_fields)), axis=2))
+        delta_w = np.transpose(np.mean(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2))
 
         return delta_b, delta_w

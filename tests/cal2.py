@@ -31,7 +31,7 @@ def main():
 
 def fd():
     net = Network(cost="mse")
-    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=2, stride_length=1, activation="linear"))
+    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=1, stride_length=1, activation="linear"))
 
     train_X = np.asarray([[0.2, -0.3, 0.5, 0.5]])
     train_Y = np.asarray([[[0.0, 0.0,  1.0]]])
@@ -49,7 +49,7 @@ def fd():
 
     # Finite difference checking
 
-    # print(net.predict(train_X))
+    print(net.predict(train_X))
 
     db, dw = net.cost_gradient(train_X, train_Y)
 
