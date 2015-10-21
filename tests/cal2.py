@@ -31,25 +31,20 @@ def main():
 
 def fd():
     net = Network(cost="mse")
-    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=1, stride_length=1, activation="linear"))
-    net.append(Flatten())
+    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=3, stride_length=1,
+                             activation="linear", flatten_output=True))
+    net.append(Dense(9, 2))
 
-    train_X = np.asarray([[0.2, -0.3, 0.5, 0.5]])
+    # train_X = np.asarray([[0.2, -0.3, 0.5, 0.6, 0.2]])
     # train_Y = np.asarray([[[0.0, 0.0, 1.0]]])
-    train_Y = np.asarray([[0.0, 0.0, 1.0]])
+    # train_Y = np.asarray([[0.0, 0.0, 1.0]])
 
-    # train_Y = np.asarray([[[0.0, 0.0,  1.0], [0.5, 0.5, 0.5]]])
-    # train_Y = np.asarray([[0.0, 0.0, 1.0, 0.5, 0.5, 0.5]])
+    # train_Y = np.asarray([[[0.0, 0.0, 1.0], [0.5, 0.5, 0.5]]])
+    # train_Y = np.asarray([[[0.0, 0.0, 1.0, 0.5, 0.5, 0.5]]])
 
-    # train_X = np.asarray([[0.2, -0.3, 0.5, 0.5], [0.1, 0.7, 0.8, -0.5]])
-    # train_Y = np.asarray([[[0.0, 0.0,  1.0]], [[0.0, 0.0, 1.0]]])
+    train_X = np.asarray([[0.2, 0.3, 0.4, 0.7]])
+    train_Y = np.asarray([[0.0, 1.0]])
 
-    # train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.7, 0.8, 0.9]])
-    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
-
-    # train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.7, 0.8, 0.9],
-    #                       [-0.1, -0.5, -0.5, 0.4, 0.4, 0.1, 0.2, 0.2]])
-    # train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
     # Finite difference checking
 
@@ -66,30 +61,15 @@ def fd():
     fd_b = []
     for l in range(len(net.layers)):
         lb = []
-        if net.layers[l].has_gradient:
-
-            if net.layers[l].type == "Convolution1D":
-                # Not sure if this is needed
-                for c in range(len(net.layers[l].b)):
-                    for b in range(len(net.layers[l].b[c])):
-                        orig = net.layers[l].b[c][b]
-                        net.layers[l].b[c][b] += h
-                        fp = net.cost(train_X, train_Y)
-                        net.layers[l].b[c][b] -= 2*h
-                        fm = net.cost(train_X, train_Y)
-                        lb.append((fp - fm) / (2*h))
-                        net.layers[l].b[c][b] = orig
-
-            else:
-                for c in range(len(net.layers[l].b)):
-                    for b in range(len(net.layers[l].b[c])):
-                        orig = net.layers[l].b[c][b]
-                        net.layers[l].b[c][b] += h
-                        fp = net.cost(train_X, train_Y)
-                        net.layers[l].b[c][b] -= 2*h
-                        fm = net.cost(train_X, train_Y)
-                        lb.append((fp - fm) / (2*h))
-                        net.layers[l].b[c][b] = orig
+        for c in range(len(net.layers[l].b)):
+            for b in range(len(net.layers[l].b[c])):
+                orig = net.layers[l].b[c][b]
+                net.layers[l].b[c][b] += h
+                fp = net.cost(train_X, train_Y)
+                net.layers[l].b[c][b] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lb.append((fp - fm) / (2*h))
+                net.layers[l].b[c][b] = orig
 
             fd_b.append(lb)
     print("numerical b")

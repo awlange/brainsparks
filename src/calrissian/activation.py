@@ -60,7 +60,7 @@ class Activation(object):
 
     @staticmethod
     def d_linear(x):
-        return 1.0
+        return np.ones(x.shape)
 
     # ReLU
 

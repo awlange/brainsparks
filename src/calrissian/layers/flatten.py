@@ -1,4 +1,5 @@
 from .layer import Layer
+from ..activation import Activation
 
 import numpy as np
 
@@ -10,6 +11,8 @@ class Flatten(Layer):
 
     def __init__(self):
         super().__init__("Flatten", False)
+        self.activation = Activation.get("linear")
+        self.d_activation = Activation.get_d("linear")
 
     def feed_forward(self, a_in):
         return self.compute_a(self.compute_z(a_in))
@@ -21,7 +24,12 @@ class Flatten(Layer):
         return np.asarray(result)
 
     def compute_a(self, z):
-        return z
+        return self.activation(z)
 
     def compute_da(self, z):
-        return z
+        return self.d_activation(z)
+
+    def compute_gradient(self, prev_delta, A, sigma_Z=None, dc_dw_l=None):
+        dc_db = prev_delta.reshape(sigma_Z.shape) * sigma_Z
+        dc_dw = np.outer(A, dc_db)
+        return dc_db, dc_dw

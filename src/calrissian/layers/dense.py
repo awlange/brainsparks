@@ -15,8 +15,11 @@ class Dense(Layer):
         self.d_activation = Activation.get_d(activation)
 
         # Params
-        self.b = np.asarray([[0.05*o for o in range(output_size)]])
-        self.w = np.transpose(np.asarray([[0.01*(i+o) for i in range(input_size)] for o in range(output_size)]))
+        #self.b = np.asarray([[0.05*o for o in range(output_size)]])
+        #self.w = np.transpose(np.asarray([[0.01*(i+o) for i in range(input_size)] for o in range(output_size)]))
+
+        self.b = np.asarray([[0.5 for o in range(output_size)]])
+        self.w = np.transpose(np.asarray([[0.1*(i+1) for i in range(input_size)] for o in range(output_size)]))
 
     def feed_forward(self, a_in):
         return self.compute_a(self.compute_z(a_in))
@@ -30,15 +33,18 @@ class Dense(Layer):
     def compute_da(self, z):
         return self.d_activation(z)
 
-    def compute_gradient(self, prev_delta, sigma_Z, A):
-        dc_db = self.w.dot(prev_delta) * sigma_Z
+    def compute_gradient(self, prev_delta, A, sigma_Z=None, dc_dw_l=None):
+        dc_db = prev_delta if sigma_Z is None else self.w.dot(prev_delta) * sigma_Z
         dc_dw = np.outer(A, dc_db)
         return dc_db, dc_dw
 
-    def compute_gradient_final_layer(self, prev_delta, A):
-        dc_db = prev_delta
-        dc_dw = np.outer(A, prev_delta)
-        return dc_db, dc_dw
+    def compute_gradient_update(self, dc_db, dc_dw, **kwargs):
+        """
+        Ensure shape ?
 
-    def compute_gradient_update(self, dc_db, dc_dw):
+        :param dc_db:
+        :param dc_dw:
+        :return:
+        """
+        # return np.reshape(dc_db, self.b.shape), np.reshape(dc_dw, self.w.shape)
         return dc_db, dc_dw
