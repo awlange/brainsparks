@@ -5,6 +5,7 @@ Script entry point
 from src.calrissian.network import Network
 from src.calrissian.layers.dense import Dense
 from src.calrissian.layers.convolution_1d import Convolution1D
+from src.calrissian.layers.max_pool_1d import MaxPool1D
 from src.calrissian.layers.flatten import Flatten
 from src.calrissian.optimizers.sgd import SGD
 
@@ -13,27 +14,22 @@ import numpy as np
 
 def main():
     net = Network(cost="mse")
-    net.append(Convolution1D(input_size=8, filter_size=3, n_filters=3, stride_length=2, activation="sigmoid"))
-    net.append(Flatten())
-    net.append(Dense(9, 3))
+    net.append(Convolution1D(input_size=5, filter_size=3, n_filters=1, stride_length=1, activation="sigmoid"))
+    net.append(MaxPool1D(input_size=3, pool_size=2))
 
-    # train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.7, 0.8, 0.9]])
-    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
-
-    train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.7, 0.8, 0.9],
-                          [-0.1, -0.5, -0.5, 0.4, 0.4, 0.1, 0.2, 0.2]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
     sigma = net.predict(train_X)
     print(sigma)
-    print(net.cost(train_X, train_Y))
+    # print(net.cost(train_X, train_Y))
 
 
 def fd():
     net = Network(cost="mse")
-    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=3, stride_length=1,
-                             activation="linear", flatten_output=True))
-    net.append(Dense(9, 2))
+    net.append(Convolution1D(input_size=4, filter_size=2, n_filters=3, stride_length=2,
+                             activation="relu", flatten_output=True))
+    net.append(Dense(6, 2))
 
     # train_X = np.asarray([[0.2, -0.3, 0.5, 0.6, 0.2]])
     # train_Y = np.asarray([[[0.0, 0.0, 1.0]]])
@@ -45,6 +41,8 @@ def fd():
     train_X = np.asarray([[0.2, 0.3, 0.4, 0.7]])
     train_Y = np.asarray([[0.0, 1.0]])
 
+    train_X = np.asarray([[0.2, 0.3, 0.4, 0.7], [0.1, -0.5, -0.9, 0.3]])
+    train_Y = np.asarray([[0.0, 1.0], [1.0, 0.0]])
 
     # Finite difference checking
 
@@ -104,5 +102,5 @@ def fd():
             print(n)
 
 if __name__ == "__main__":
-    # main()
-    fd()
+    main()
+    # fd()
