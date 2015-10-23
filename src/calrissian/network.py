@@ -132,10 +132,13 @@ class Network(object):
 
         sigma_Z = []
         A = [data_X]  # Note: A has one more element than sigma_Z
+        prev_a = data_X
         for l, layer in enumerate(self.layers):
             z = layer.compute_z(A[l])
-            A.append(layer.compute_a(z))
-            sigma_Z.append(layer.compute_da(z))
+            a = layer.compute_a(z)
+            A.append(a)
+            sigma_Z.append(layer.compute_da(z, a=prev_a))
+            prev_a = a
 
             # Initialize
             dc_db.append(np.zeros(layer.b.shape))
@@ -147,14 +150,14 @@ class Network(object):
         for i in range(len(data_X)):
             l = -1
             dc_db_l, dc_dw_l = self.layers[l].compute_gradient(delta_L[i], A[l-1][i])
-            dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l, convolve=False)
+            dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l, A=A[l-1][i], convolve=False)
             dc_db[l] += dc_db_l
             dc_dw[l] += dc_dw_l
 
             while -l < len(self.layers):
                 l -= 1
                 dc_db_l, dc_dw_l = self.layers[l+1].compute_gradient(dc_db_l, A[l-1][i], sigma_Z[l][i], dc_dw_l)
-                dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l)
+                dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l, A=A[l-1][i])
                 dc_db[l] += dc_db_l
                 dc_dw[l] += dc_dw_l
 

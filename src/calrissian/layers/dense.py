@@ -30,7 +30,7 @@ class Dense(Layer):
     def compute_a(self, z):
         return self.activation(z)
 
-    def compute_da(self, z):
+    def compute_da(self, z, **kwargs):
         return self.d_activation(z)
 
     def compute_gradient(self, prev_delta, A, sigma_Z=None, dc_dw_l=None):
@@ -39,12 +39,4 @@ class Dense(Layer):
         return dc_db, dc_dw
 
     def compute_gradient_update(self, dc_db, dc_dw, **kwargs):
-        """
-        Ensure shape ?
-
-        :param dc_db:
-        :param dc_dw:
-        :return:
-        """
-        # return np.reshape(dc_db, self.b.shape), np.reshape(dc_dw, self.w.shape)
         return dc_db, dc_dw

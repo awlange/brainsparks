@@ -7,7 +7,7 @@ import numpy as np
 class Convolution1D(Layer):
 
     def __init__(self, input_size=0, n_filters=0, filter_size=0, activation="sigmoid", stride_length=1,
-                 flatten_output=False):
+                 flatten_output=False, max_pool=False, pool_size=0, pool_stride_length=1):
         super().__init__("Convolution1D", True)
         self.input_size = input_size
         self.n_filters = n_filters
@@ -18,9 +18,13 @@ class Convolution1D(Layer):
         self.d_activation = Activation.get_d(activation)
 
         self.flatten_output = flatten_output
+        self.max_pool = max_pool
+        self.pool_size = pool_size
+        self.pool_stride_length = pool_stride_length
 
         # Number of fields in convolution
         self.n_fields = 1 + (self.input_size - self.filter_size) // self.stride_length
+        self.n_pool_fields = 1 + (self.n_fields - self.pool_size) // self.pool_stride_length
 
         # Params
         # self.b = np.asarray([[1.05*(o+1) for o in range(n_filters)]])
@@ -44,20 +48,43 @@ class Convolution1D(Layer):
                 convolution.append((a_in[i_data][i:(i+self.filter_size)].dot(self.w) + self.b)[0])
                 i += self.stride_length
             z.append(np.transpose(convolution))
-
-        z = np.asarray(z)
-        if self.flatten_output:
-            return Convolution1D.flatten(z)
-        return z
+        return np.asarray(z)
 
     def compute_a(self, z):
-        return self.activation(z)
+        a = self.activation(z)
+        if self.max_pool:
+            a = self.apply_max_pool(a)
 
-    def compute_da(self, z):
-        return self.d_activation(z)
+        if self.flatten_output:
+            return Convolution1D.flatten(a)
+        return a
+
+    def compute_da(self, z, a=None):
+        d_a = self.d_activation(z)
+
+        if self.max_pool and a is not None:
+            # Compute non-pooled activations (some redundant work, I know...)
+            non_pooled_a = self.activation(self.compute_z(a))
+            # Get argmax indexes
+            argmaxes = self.apply_max_pool(non_pooled_a, argmax=True)
+            # Pluck out only the argmax gradients
+            result = []
+            for i_data in range(len(z)):
+                result_filter = []
+                for filter in range(self.n_filters):
+                    result_field = []
+                    for field in range(self.n_pool_fields):
+                        result_field.append(d_a[i_data][filter][argmaxes[i_data][filter][field]])
+                    result_filter.append(result_field)
+                result.append(result_filter)
+            d_a = np.asarray(result)
+
+        if self.flatten_output:
+            return Convolution1D.flatten(d_a)
+        return d_a
 
     def compute_gradient(self, prev_delta, A, sigma_Z=None):
-        # For max pooling, we'll only need to compute the gradient w/r to the max field
+        # TODO: For max pooling, we'll only need to compute the gradient w/r to the max field
 
         # Ensure shape
         prev_delta = prev_delta.reshape((self.n_filters, -1))
@@ -74,7 +101,7 @@ class Convolution1D(Layer):
 
         return dc_db, dc_dw
 
-    def compute_gradient_update(self, dc_db, dc_dw, convolve=True):
+    def compute_gradient_update(self, dc_db, dc_dw, A=None, convolve=True):
         """
         Need to take sum across fields
 
@@ -84,28 +111,86 @@ class Convolution1D(Layer):
         :param dc_dw:
         :return:
         """
-        delta_b = np.sum(dc_db.reshape((self.n_filters, self.n_fields)), axis=1)
+        delta_b = None
         delta_w = None
-        if not convolve:
-            delta_w = np.sum(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2)
+
+        if self.max_pool:
+            delta_b, delta_w = self.max_pool_gradient_update(
+                dc_db.reshape((self.n_filters, self.n_fields)), dc_dw, A, convolve)
         else:
-            dc_dw_t = dc_dw.transpose()
-            delta_w = np.zeros_like(self.w.transpose())
-            for filter in range(self.n_filters):
-                i = 0
-                for field in range(self.n_fields):
-                    delta_w[filter] += dc_dw_t[field + filter*self.n_fields][i:(i+self.filter_size)]
-                    i += self.stride_length
+            # Sum across the fields
+            delta_b = np.sum(dc_db.reshape((self.n_filters, self.n_fields)), axis=1)
+            if not convolve:
+                delta_w = np.sum(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2)
+            else:
+                # Need to convolve the gradients per field for each filter
+                dc_dw_t = dc_dw.transpose()
+                delta_w = np.zeros_like(self.w.transpose())
+                for filter in range(self.n_filters):
+                    i = 0
+                    for field in range(self.n_fields):
+                        delta_w[filter] += dc_dw_t[field + filter*self.n_fields][i:(i+self.filter_size)]
+                        i += self.stride_length
 
         return delta_b, delta_w.transpose()
 
-    def convolve_input(self, a_in):
-        convolution = []
-        i = 0
-        for field in range(self.n_fields):
-            convolution.append(a_in[i:(i+self.filter_size)])
-            i += self.stride_length
-        return np.transpose(convolution)
+    def max_pool_gradient_update(self, dc_db, dc_dw, A, convolve):
+        """
+        For max pooling, just pluck out the argmax field gradients
+
+        :param dc_db:
+        :param dc_dw:
+        :param convolve:
+        :return:
+        """
+
+        # Get argmax indexes from A
+        argmaxes = self.convolve_max_pool(A)
+
+        delta_b = np.zeros_like(self.b)
+        delta_w = np.zeros_like(self.w)
+
+        for filter in range(self.n_filters):
+            for field in range(self.n_pool_fields):
+                delta_b[0][filter] += dc_db[0][argmaxes[filter][field]]
+
+        # if not convolve:
+        #     delta_w = np.sum(dc_dw.reshape((self.n_filters, self.filter_size, self.n_fields)), axis=2)
+        # else:
+        #     dc_dw_t = dc_dw.transpose()
+        #     delta_w = np.zeros_like(self.w.transpose())
+        #     for filter in range(self.n_filters):
+        #         i = 0
+        #         for field in range(self.n_fields):
+        #             delta_w[filter] += dc_dw_t[field + filter*self.n_fields][i:(i+self.filter_size)]
+        #             i += self.stride_length
+
+        return delta_b, delta_w
+
+    def apply_max_pool(self, a, argmax=False):
+        """
+        Given activation, max pool it
+        :param a:
+        :return:
+        """
+        a_pool = []
+        for i_data in range(len(a)):
+            a_pool.append(self.convolve_max_pool(a[i_data], argmax))
+        return np.asarray(a_pool)
+
+    def convolve_max_pool(self, a, argmax=False):
+        # Choose if we want the values or the indexes
+        max_func = np.argmax if argmax else np.max
+        # For each filter, convolve the input left to right
+        a_filter = []
+        for filter in range(self.n_filters):
+            convolution = []
+            i = 0
+            for field in range(self.n_pool_fields):
+                convolution.append(max_func(a[filter][i:(i+self.pool_size)]))
+                i += self.pool_stride_length
+            a_filter.append(convolution)
+        return a_filter
 
     @staticmethod
     def flatten(x):

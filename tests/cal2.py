@@ -14,15 +14,20 @@ import numpy as np
 
 def main():
     net = Network(cost="mse")
-    net.append(Convolution1D(input_size=5, filter_size=3, n_filters=1, stride_length=1, activation="sigmoid"))
-    net.append(MaxPool1D(input_size=3, pool_size=2))
+    net.append(Convolution1D(input_size=6, filter_size=3, n_filters=1, stride_length=1,
+                             activation="sigmoid", max_pool=True, pool_size=2, pool_stride_length=2))
 
-    train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0]])
+    train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.3]])
+    train_Y = np.asarray([[[0.0, 1.0]]])
 
     sigma = net.predict(train_X)
     print(sigma)
-    # print(net.cost(train_X, train_Y))
+    print(net.cost(train_X, train_Y))
+
+    db, dw = net.cost_gradient(train_X, train_Y)
+
+    print("analytic b")
+    print(db)
 
 
 def fd():
