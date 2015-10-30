@@ -56,8 +56,7 @@ class Network(object):
         c = self.cost_function(data_Y, self.predict(data_X))
 
         if self.regularizer is not None:
-            for l, layer in enumerate(self.layers):
-                c += self.regularizer.cost(layer.b) + self.regularizer.cost(layer.w)
+            c += self.regularizer.cost(self.layers)
 
         return c
 
@@ -171,9 +170,7 @@ class Network(object):
 
         # Perform weight regularization if needed
         if self.regularizer is not None:
-            for l, layer in enumerate(self.layers):
-                dc_db[l] += self.regularizer.cost_gradient(layer.b)
-                dc_dw[l] += self.regularizer.cost_gradient(layer.w)
+            dc_db, dc_dw = self.regularizer.cost_gradient(self.layers, dc_db, dc_dw)
 
         return dc_db, dc_dw
 

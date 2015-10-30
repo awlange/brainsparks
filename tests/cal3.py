@@ -8,13 +8,19 @@ from src.calrissian.optimizers.sgd import SGD
 
 from src.calrissian.regularization.regularize_l1 import RegularizeL1
 from src.calrissian.regularization.regularize_l2 import RegularizeL2
+from src.calrissian.regularization.bias_couple_l1 import BiasCoupleL1
+from src.calrissian.regularization.bias_couple_l2 import BiasCoupleL2
 
 import numpy as np
 
 
 def main():
 
-    net = Network(cost="quadratic", regularizer=RegularizeL2(coeff_lambda=0.25))
+    bias_couplings = [
+        ((0, 0), (1, 1))
+    ]
+
+    net = Network(cost="quadratic", regularizer=BiasCoupleL2(coeff_lambda=0.25, couplings=bias_couplings))
     net.append(Dense(2, 5))
     net.append(Dense(5, 3))
 
@@ -29,9 +35,13 @@ def main():
 
 
 def fd():
-    net = Network(cost="categorical_cross_entropy", regularizer=RegularizeL1(coeff_lambda=0.25))
-    net.append(Dense(2, 5, activation="tanh"))
-    net.append(Dense(5, 3, activation="softmax"))
+    bias_couplings = [
+        ((0, 0), (1, 2))
+    ]
+
+    net = Network(cost="quadratic", regularizer=BiasCoupleL1(coeff_lambda=0.25, couplings=bias_couplings))
+    net.append(Dense(2, 5))
+    net.append(Dense(5, 3))
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])

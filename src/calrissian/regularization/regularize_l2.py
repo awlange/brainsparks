@@ -9,8 +9,15 @@ class RegularizeL2(object):
     def __init__(self, coeff_lambda=0.0):
         self.coeff_lambda = coeff_lambda
 
-    def cost(self, w):
-        return self.coeff_lambda * np.sum(w * w)
+    def cost(self, layers):
+        c = 0.0
+        for layer in layers:
+            c += np.sum(layer.b * layer.b) + np.sum(layer.w * layer.w)
+        return self.coeff_lambda * c
 
-    def cost_gradient(self, w):
-        return 2.0 * self.coeff_lambda * w
+    def cost_gradient(self, layers, dc_db, dc_dw):
+        two_lambda = 2.0 * self.coeff_lambda
+        for l, layer in enumerate(layers):
+            dc_db[l] += two_lambda * layer.b
+            dc_dw[l] += two_lambda * layer.w
+        return dc_db, dc_dw

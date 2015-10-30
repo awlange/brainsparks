@@ -18,7 +18,7 @@ class Dense(Layer):
         #self.b = np.asarray([[0.05*o for o in range(output_size)]])
         #self.w = np.transpose(np.asarray([[0.01*(i+o) for i in range(input_size)] for o in range(output_size)]))
 
-        self.b = np.asarray([[0.5 for o in range(output_size)]])
+        self.b = np.asarray([[0.5*(o+1) for o in range(output_size)]])
         self.w = np.transpose(np.asarray([[0.1*(i+1) for i in range(input_size)] for o in range(output_size)]))
 
     def feed_forward(self, a_in):
