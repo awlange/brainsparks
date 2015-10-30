@@ -12,6 +12,7 @@ The main neural network code. Makes heavy use of NumPy.
 - Common activation functions: sigmoid, tanh, ReLU, linear
 - Common cost/error functions: MSE, MAE, cross-entropy
 - Stochastic gradient descent optimizer
+- L1 and L2 regularizers
 
 ### In the works
 - 1-D convolution layer, optional max pooling (gradient nearly done)
