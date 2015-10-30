@@ -5,6 +5,9 @@ import numpy as np
 
 
 class Convolution1D(Layer):
+    """
+    TODO: refactor everything to take advantage of numpy's convolve function
+    """
 
     def __init__(self, input_size=0, n_filters=0, filter_size=0, activation="sigmoid", stride_length=1,
                  flatten_output=False, max_pool=False, pool_size=0, pool_stride_length=1):
@@ -86,6 +89,9 @@ class Convolution1D(Layer):
     def compute_gradient(self, prev_delta, A, sigma_Z=None):
         # TODO: For max pooling, we'll only need to compute the gradient w/r to the max field
 
+        if self.max_pool:
+            return self.compute_gradient_max_pool(prev_delta, A)
+
         # Ensure shape
         prev_delta = prev_delta.reshape((self.n_filters, -1))
 
@@ -101,6 +107,32 @@ class Convolution1D(Layer):
 
         return dc_db, dc_dw
 
+    def compute_gradient_max_pool(self, prev_delta, A, sigma_Z=None):
+        # Ensure shape
+        prev_delta = prev_delta.reshape((self.n_filters, -1))
+
+        dc_db = prev_delta if sigma_Z is None else self.w.dot(prev_delta) * sigma_Z
+
+        # Get argmax indexes from A
+        argmaxes = self.convolve_max_pool(A, argmax=True, by_filter=True)
+
+        delta_b = np.zeros_like(self.b)
+        delta_w = np.zeros_like(self.w)
+
+        for filter in range(self.n_filters):
+            for field in range(self.n_pool_fields):
+                delta_b[0][filter] += dc_db[0][argmaxes[filter][field]]
+
+        # For each filter, convolve the input left to right
+        convolution = []
+        i = 0
+        for field in range(self.n_fields):
+            convolution.append(np.outer(A[i:(i+self.filter_size)], delta_b.transpose()[field]))
+            i += self.stride_length
+        dc_dw = np.transpose(convolution)
+
+        return delta_b, dc_dw
+
     def compute_gradient_update(self, dc_db, dc_dw, A=None, convolve=True):
         """
         Need to take sum across fields
@@ -115,7 +147,7 @@ class Convolution1D(Layer):
         delta_w = None
 
         if self.max_pool:
-            delta_b, delta_w = self.max_pool_gradient_update(
+            delta_b, delta_w = self.gradient_update_max_pool(
                 dc_db.reshape((self.n_filters, self.n_fields)), dc_dw, A, convolve)
         else:
             # Sum across the fields
@@ -134,7 +166,7 @@ class Convolution1D(Layer):
 
         return delta_b, delta_w.transpose()
 
-    def max_pool_gradient_update(self, dc_db, dc_dw, A, convolve):
+    def gradient_update_max_pool(self, dc_db, dc_dw, A, convolve):
         """
         For max pooling, just pluck out the argmax field gradients
 
@@ -145,7 +177,7 @@ class Convolution1D(Layer):
         """
 
         # Get argmax indexes from A
-        argmaxes = self.convolve_max_pool(A)
+        argmaxes = self.convolve_max_pool(A, True)
 
         delta_b = np.zeros_like(self.b)
         delta_w = np.zeros_like(self.w)
@@ -178,19 +210,27 @@ class Convolution1D(Layer):
             a_pool.append(self.convolve_max_pool(a[i_data], argmax))
         return np.asarray(a_pool)
 
-    def convolve_max_pool(self, a, argmax=False):
+    def convolve_max_pool(self, a, argmax=False, by_filter=True):
         # Choose if we want the values or the indexes
         max_func = np.argmax if argmax else np.max
-        # For each filter, convolve the input left to right
-        a_filter = []
-        for filter in range(self.n_filters):
+
+        if by_filter:
+            a_filter = []
+            for filter in range(self.n_filters):
+                convolution = []
+                i = 0
+                for field in range(self.n_pool_fields):
+                    convolution.append(max_func(a[filter][i:(i+self.pool_size)]))
+                    i += self.pool_stride_length
+                a_filter.append(convolution)
+            return a_filter
+        else:
             convolution = []
             i = 0
             for field in range(self.n_pool_fields):
-                convolution.append(max_func(a[filter][i:(i+self.pool_size)]))
+                convolution.append(max_func(a[i:(i+self.pool_size)]))
                 i += self.pool_stride_length
-            a_filter.append(convolution)
-        return a_filter
+            return convolution
 
     @staticmethod
     def flatten(x):

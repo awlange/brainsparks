@@ -5,11 +5,12 @@ import numpy as np
 
 class Network(object):
 
-    def __init__(self, cost="quadratic"):
+    def __init__(self, cost="quadratic", regularizer=None):
         self.layers = []
         self.cost_function = Cost.get(cost)
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
+        self.regularizer = regularizer
 
     def append(self, layer):
         """
@@ -52,7 +53,13 @@ class Network(object):
         :param data_Y:
         :return:
         """
-        return self.cost_function(data_Y, self.predict(data_X))
+        c = self.cost_function(data_Y, self.predict(data_X))
+
+        if self.regularizer is not None:
+            for l, layer in enumerate(self.layers):
+                c += self.regularizer.cost(layer.b) + self.regularizer.cost(layer.w)
+
+        return c
 
     def cost_gradient_hold(self, data_X, data_Y):
         """
@@ -161,7 +168,24 @@ class Network(object):
                 dc_db[l] += dc_db_l
                 dc_dw[l] += dc_dw_l
 
+
+        # Perform weight regularization if needed
+        if self.regularizer is not None:
+            for l, layer in enumerate(self.layers):
+                dc_db[l] += self.regularizer.cost_gradient(layer.b)
+                dc_dw[l] += self.regularizer.cost_gradient(layer.w)
+
         return dc_db, dc_dw
+
+    def cost_gradient_new(self, data_X, data_Y):
+        """
+        TODO: Generalize the gradient
+
+        :param data_X:
+        :param data_Y:
+        :return:
+        """
+        pass
 
     def fit(self, data_X, data_Y, optimizer):
         """

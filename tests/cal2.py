@@ -15,7 +15,8 @@ import numpy as np
 def main():
     net = Network(cost="mse")
     net.append(Convolution1D(input_size=6, filter_size=3, n_filters=1, stride_length=1,
-                             activation="sigmoid", max_pool=True, pool_size=2, pool_stride_length=2))
+                             activation="sigmoid"))
+    net.append(MaxPool1D(input_size=4, n_filters=1, pool_size=2, stride_length=2))
 
     train_X = np.asarray([[0.2, -0.3, 0.5, 0.5, 0.6, 0.3]])
     train_Y = np.asarray([[[0.0, 1.0]]])
@@ -26,8 +27,8 @@ def main():
 
     db, dw = net.cost_gradient(train_X, train_Y)
 
-    print("analytic b")
-    print(db)
+    # print("analytic b")
+    # print(db)
 
 
 def fd():

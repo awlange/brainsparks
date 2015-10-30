@@ -40,3 +40,9 @@ class Dense(Layer):
 
     def compute_gradient_update(self, dc_db, dc_dw, **kwargs):
         return dc_db, dc_dw
+
+    def forward_pass(self, a_in):
+        return self.activation(a_in.dot(self.w) + self.b)
+
+    def backward_pass(self):
+        pass
