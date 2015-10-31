@@ -12,7 +12,7 @@ class SGD(Optimizer):
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=10, verbosity=2, weight_update="sd"):
         """
         :param alpha: learning rate
-        :param beta: momentum scalar
+        :param beta: momentum damping (viscosity)
         """
         super().__init__()
         self.alpha = alpha
