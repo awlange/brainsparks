@@ -18,16 +18,11 @@ class Dense(Layer):
         if weight_init == "glorot":
             # Sample from uniform distribution [-s, s]
             s = np.sqrt(6.0 / (input_size + output_size))
-            self.b = np.asarray([[Dense.uniform_sample(-s, s) for o in range(output_size)]])
-            self.w = np.transpose(np.asarray([[Dense.uniform_sample(-s, s) for i in range(input_size)] for o in range(output_size)]))
+            self.b = np.random.uniform(-s, s, (1, output_size))
+            self.w = np.random.uniform(-s, s, (input_size, output_size))
         else:
             self.b = np.asarray([[0.5*(o+1) for o in range(output_size)]])
             self.w = np.transpose(np.asarray([[0.1*(i+1) for i in range(input_size)] for o in range(output_size)]))
-
-    @staticmethod
-    def uniform_sample(a, b):
-        # TODO: probably move this to a utils class
-        return (b - a) * np.random.random_sample() + a
 
     def feed_forward(self, a_in):
         return self.compute_a(self.compute_z(a_in))

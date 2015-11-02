@@ -39,15 +39,17 @@ def fd():
         ((0, 0), (1, 2))
     ]
 
-    net = Network(cost="quadratic", regularizer=BiasCoupleL1(coeff_lambda=0.25, couplings=bias_couplings))
-    net.append(Dense(2, 5))
-    net.append(Dense(5, 3))
+    # net = Network(cost="quadratic", regularizer=BiasCoupleL1(coeff_lambda=0.25, couplings=bias_couplings))
+    net = Network(cost="categorical_cross_entropy")
+    net.append(Dense(2, 5, activation="sigmoid"))
+    net.append(Dense(5, 5, activation="sigmoid"))
+    net.append(Dense(5, 3, activation="softmax"))
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    train_X = np.asarray([[0.2, -0.3], [0.6, -0.2], [0.8, 0.9], [0.1, 0.1]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+    # train_X = np.asarray([[0.2, -0.3], [0.6, -0.2], [0.8, 0.9], [0.1, 0.1]])
+    # train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
 
     # Finite difference checking
 

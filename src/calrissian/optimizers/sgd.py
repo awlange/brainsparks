@@ -27,6 +27,10 @@ class SGD(Optimizer):
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
 
+        # Weight gradients, to keep around for a step
+        self.dc_db = None
+        self.dc_dw = None
+
         # Velocities
         self.vel_b = None
         self.vel_w = None
@@ -57,10 +61,10 @@ class SGD(Optimizer):
                 mini_Y = np.asarray([data_Y[i] for i in mini_batch_indexes])
 
                 # Compute gradient for mini-batch
-                dc_db, dc_dw = network.cost_gradient(mini_X, mini_Y)
+                self.dc_db, self.dc_dw = network.cost_gradient(mini_X, mini_Y)
 
                 # Update weights and biases
-                self.weight_update_func(network, dc_db, dc_dw)
+                self.weight_update_func(network, self.dc_db, self.dc_dw)
 
                 if self.verbosity > 1:
                     c = network.cost(data_X, data_Y)
