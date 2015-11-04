@@ -80,13 +80,14 @@ class AtomicNetwork(object):
         dc_dr = []  # position gradient, a bit trickier
 
         # Initialize
+        dc_dr.append(np.zeros((len(self.atomic_input.r), 3)))
         for l, layer in enumerate(self.layers):
             dc_db.append(np.zeros(layer.b.shape))
             dc_dq.append(np.zeros(layer.q.shape))
             dc_dr.append(np.zeros((len(layer.q), 3)))
 
         # For each piece of data
-        for i, data in enumerate(data_X):
+        for di, data in enumerate(data_X):
             sigma_Z = []
             A = [data]  # Note: A has one more element than sigma_Z
             R = [self.atomic_input.r]
@@ -124,13 +125,13 @@ class AtomicNetwork(object):
                     dy = ri_y - rj_y
                     dz = ri_z - rj_z
                     dij = np.sqrt(dx*dx + dy*dy + dz*dz)
-                    tmp = qj * A[l-1][i] * np.exp(-dij) / dij
+                    tmp = (qj * A[l-1][i] * np.exp(-dij) / dij) * delta[0][j]
+                    dc_dr[l-1][i][0] += -tmp * dx
+                    dc_dr[l-1][i][1] += -tmp * dy
+                    dc_dr[l-1][i][2] += -tmp * dz
                     dc_dr[l][j][0] += tmp * dx
                     dc_dr[l][j][1] += tmp * dy
                     dc_dr[l][j][2] += tmp * dz
-                dc_dr[l][j][0] *= delta[0][j]
-                dc_dr[l][j][1] *= delta[0][j]
-                dc_dr[l][j][2] *= delta[0][j]
 
             while -l < len(self.layers):
                 l -= 1
@@ -139,20 +140,43 @@ class AtomicNetwork(object):
                 prev_delta = delta
                 next_layer = self.layers[l+1]
                 layer = self.layers[l]
+                prev_layer = None
+                if l-1 < 0:
+                    prev_layer = self.atomic_input
+                else:
+                    prev_layer = self.layers[l-1]
 
                 # Delta and bias gradient
                 w = next_layer.build_weight_matrix(R[l])
                 delta = prev_delta.dot(w) * sigma_Z[l]
+                dc_db[l] += delta[0]
 
                 # Charge gradient
                 K = layer.build_kernel_matrix(R[l-1])
                 dc_dq_l = K.dot(A[l-1]) * delta
-
-                # Update
-                dc_db[l] += delta[0]
                 dc_dq[l] += dc_dq_l[0]
 
-
+                # Position gradient, w/r to previous
+                for j in range(len(layer.r)):
+                    rj_x = layer.r[j].x
+                    rj_y = layer.r[j].y
+                    rj_z = layer.r[j].z
+                    qj = layer.q[j]
+                    for i in range(len(prev_layer.r)):
+                        ri_x = prev_layer.r[i].x
+                        ri_y = prev_layer.r[i].y
+                        ri_z = prev_layer.r[i].z
+                        dx = ri_x - rj_x
+                        dy = ri_y - rj_y
+                        dz = ri_z - rj_z
+                        dij = np.sqrt(dx*dx + dy*dy + dz*dz)
+                        tmp = (qj * A[l-1][i] * np.exp(-dij) / dij) * delta[0][j]
+                        dc_dr[l-1][i][0] += -tmp * dx
+                        dc_dr[l-1][i][1] += -tmp * dy
+                        dc_dr[l-1][i][2] += -tmp * dz
+                        dc_dr[l][j][0] += tmp * dx
+                        dc_dr[l][j][1] += tmp * dy
+                        dc_dr[l][j][2] += tmp * dz
 
         return dc_db, dc_dq, dc_dr
 
