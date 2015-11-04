@@ -99,29 +99,38 @@ class AtomicNetwork(object):
 
             l = -1
             layer = self.layers[l]
+            prev_layer = self.layers[l-1]
 
             # Delta and bias gradient
             delta = self.cost_d_function(data_Y, A[l], sigma_Z[l])
+            dc_db[l] += delta[0]
 
             # Charge gradient
             K = layer.build_kernel_matrix(R[l-1])
-            KdotA = K.dot(A[l-1])
-            dc_dq_l = KdotA * delta
+            dc_dq_l = K.dot(A[l-1]) * delta
+            dc_dq[l] += dc_dq_l[0]
 
             # Position gradient
-            D = layer.build_distance_matrix(R[l-1])
-
-            da_dx = 0.0
-            rj_x = layer.r[0].x
-            for i in range(len(D[0])):
-                tmp = layer.q[0] * A[l-1][i] * np.exp(-D[0][i]) / D[0][i]
-                diff_x = self.layers[l-1].r[i].x - rj_x
-                da_dx += tmp * diff_x
-            da_dx *= delta[0][0]
-            
-
-            dc_db[l] += delta[0]
-            dc_dq[l] += dc_dq_l[0]
+            for j in range(len(layer.r)):
+                rj_x = layer.r[j].x
+                rj_y = layer.r[j].y
+                rj_z = layer.r[j].z
+                qj = layer.q[j]
+                for i in range(len(prev_layer.r)):
+                    ri_x = prev_layer.r[i].x
+                    ri_y = prev_layer.r[i].y
+                    ri_z = prev_layer.r[i].z
+                    dx = ri_x - rj_x
+                    dy = ri_y - rj_y
+                    dz = ri_z - rj_z
+                    dij = np.sqrt(dx*dx + dy*dy + dz*dz)
+                    tmp = qj * A[l-1][i] * np.exp(-dij) / dij
+                    dc_dr[l][j][0] += tmp * dx
+                    dc_dr[l][j][1] += tmp * dy
+                    dc_dr[l][j][2] += tmp * dz
+                dc_dr[l][j][0] *= delta[0][j]
+                dc_dr[l][j][1] *= delta[0][j]
+                dc_dr[l][j][2] *= delta[0][j]
 
             while -l < len(self.layers):
                 l -= 1
@@ -145,7 +154,7 @@ class AtomicNetwork(object):
 
 
 
-        return dc_db, dc_dq
+        return dc_db, dc_dq, dc_dr
 
     def fit(self, data_X, data_Y, optimizer):
         """

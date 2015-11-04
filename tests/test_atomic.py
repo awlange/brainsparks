@@ -36,7 +36,7 @@ def fd():
 
     net.cost(train_X, train_Y)
 
-    db, dq = net.cost_gradient(train_X, train_Y)
+    db, dq, dr = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
