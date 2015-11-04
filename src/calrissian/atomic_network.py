@@ -76,8 +76,7 @@ class AtomicNetwork(object):
 
         # Output gradients
         dc_db = []
-
-        dc_dq = []  # charge gradient, much like the weight gradient
+        dc_dq = []  # charge gradient
         dc_dr = []  # position gradient, a bit trickier
 
         # Initialize
@@ -99,12 +98,27 @@ class AtomicNetwork(object):
                 sigma_Z.append(layer.compute_da(z))
 
             l = -1
+            layer = self.layers[l]
+
             # Delta and bias gradient
             delta = self.cost_d_function(data_Y, A[l], sigma_Z[l])
 
             # Charge gradient
-            K = self.layers[l].build_kernel_matrix(R[l-1])
-            dc_dq_l = K.dot(A[l-1]) * delta
+            K = layer.build_kernel_matrix(R[l-1])
+            KdotA = K.dot(A[l-1])
+            dc_dq_l = KdotA * delta
+
+            # Position gradient
+            D = layer.build_distance_matrix(R[l-1])
+
+            da_dx = 0.0
+            rj_x = layer.r[0].x
+            for i in range(len(D[0])):
+                tmp = layer.q[0] * A[l-1][i] * np.exp(-D[0][i]) / D[0][i]
+                diff_x = self.layers[l-1].r[i].x - rj_x
+                da_dx += tmp * diff_x
+            da_dx *= delta[0][0]
+            
 
             dc_db[l] += delta[0]
             dc_dq[l] += dc_dq_l[0]

@@ -56,26 +56,6 @@ class Atomic(object):
         return self.compute_a(self.compute_z(a_in, r_in)), self.r
 
     def compute_z(self, a_in, r_in):
-        # z = None
-        # if include_bias:
-        #     z = np.copy(self.b)
-        # else:
-        #     z = np.zeros_like(self.b)
-        #
-        # for j in range(len(self.q)):
-        #     q_j = self.q[j]
-        #     r_j = self.r[j]
-        #     tmp = 0.0
-        #     for i in range(len(a_in)):
-        #         q_i = a_in[i]
-        #         d_ij = Point.distance(r_in[i], r_j)
-        #         tmp += q_i * np.exp(-d_ij)  # exponential pairwise kernel
-        #     if include_qj:
-        #         z[j] += q_j * tmp
-        #     else:
-        #         z[j] += tmp
-        # return np.asarray(z)
-
         # More explicitly build the weight matrix in terms of charges and positions
         w = self.build_weight_matrix(r_in)
         return (w.dot(a_in) + self.b)[0]  # TODO... meh
@@ -131,3 +111,14 @@ class Atomic(object):
                 d_ij = Point.distance(r_in[i], r_j)
                 K[j][i] = np.exp(-d_ij)  # exponential pairwise kernel
         return K
+
+    def build_distance_matrix(self, r_in):
+        """
+        For convenience in comparison to dense layer
+        """
+        D = np.zeros((self.output_size, self.input_size))
+        for j in range(len(self.q)):
+            r_j = self.r[j]
+            for i in range(len(r_in)):
+                D[j][i] = Point.distance(r_in[i], r_j)
+        return D

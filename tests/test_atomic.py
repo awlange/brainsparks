@@ -80,6 +80,54 @@ def fd():
     for x in fd_q:
         print(x)
 
+    fd_r_x = []
+    fd_r_y = []
+    fd_r_z = []
+    for layer in net.layers:
+        lr_x = []
+        lr_y = []
+        lr_z = []
+        for i in range(len(layer.r)):
+            # x
+            orig = layer.r[i].x
+            layer.r[i].x += h
+            fp = net.cost(train_X, train_Y)
+            layer.r[i].x -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lr_x.append((fp - fm) / (2*h))
+            layer.r[i].x = orig
+
+            # y
+            orig = layer.r[i].y
+            layer.r[i].y += h
+            fp = net.cost(train_X, train_Y)
+            layer.r[i].y -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lr_y.append((fp - fm) / (2*h))
+            layer.r[i].y = orig
+
+            # z
+            orig = layer.r[i].z
+            layer.r[i].z += h
+            fp = net.cost(train_X, train_Y)
+            layer.r[i].z -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lr_z.append((fp - fm) / (2*h))
+            layer.r[i].z = orig
+
+        fd_r_x.append(lr_x)
+        fd_r_y.append(lr_y)
+        fd_r_z.append(lr_z)
+
+    print("numerical r x")
+    for f in fd_r_x:
+        print(f)
+    print("numerical r y")
+    for f in fd_r_y:
+        print(f)
+    print("numerical r z")
+    for f in fd_r_z:
+        print(f)
 
 if __name__ == "__main__":
 
