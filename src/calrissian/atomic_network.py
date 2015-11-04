@@ -76,48 +76,62 @@ class AtomicNetwork(object):
 
         # Output gradients
         dc_db = []
-        dc_dw = []  # won't be used here
 
-        dc_dq = []
-        dc_dr = []
+        dc_dq = []  # charge gradient, much like the weight gradient
+        dc_dr = []  # position gradient, a bit trickier
 
-        sigma_Z = []
-        A = [data_X]  # Note: A has one more element than sigma_Z
-        prev_a = data_X
+        # Initialize
         for l, layer in enumerate(self.layers):
-            z = layer.compute_z(A[l])
-            a = layer.compute_a(z)
-            A.append(a)
-            sigma_Z.append(layer.compute_da(z, a=prev_a))
-            prev_a = a
-
-            # Initialize
             dc_db.append(np.zeros(layer.b.shape))
-            dc_dw.append(np.zeros(layer.w.shape))
+            dc_dq.append(np.zeros(layer.q.shape))
+            dc_dr.append(np.zeros((len(layer.q), 3)))
 
-        delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
+        # For each piece of data
+        for i, data in enumerate(data_X):
+            sigma_Z = []
+            A = [data]  # Note: A has one more element than sigma_Z
+            R = [self.atomic_input.r]
+            for l, layer in enumerate(self.layers):
+                z = layer.compute_z(A[l], R[l])
+                a = layer.compute_a(z)
+                A.append(a)
+                R.append(layer.r)
+                sigma_Z.append(layer.compute_da(z))
 
-        # For each training case
-        for i in range(len(data_X)):
             l = -1
-            dc_db_l, dc_dw_l = self.layers[l].compute_gradient(delta_L[i], A[l-1][i])
-            dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l, A=A[l-1][i], convolve=False)
-            dc_db[l] += dc_db_l
-            dc_dw[l] += dc_dw_l
+            # Delta and bias gradient
+            delta = self.cost_d_function(data_Y, A[l], sigma_Z[l])
+
+            # Charge gradient
+            K = self.layers[l].build_kernel_matrix(R[l-1])
+            dc_dq_l = K.dot(A[l-1]) * delta
+
+            dc_db[l] += delta[0]
+            dc_dq[l] += dc_dq_l[0]
 
             while -l < len(self.layers):
                 l -= 1
-                dc_db_l, dc_dw_l = self.layers[l+1].compute_gradient(dc_db_l, A[l-1][i], sigma_Z[l][i], dc_dw_l)
-                dc_db_l, dc_dw_l = self.layers[l].compute_gradient_update(dc_db_l, dc_dw_l, A=A[l-1][i])
-                dc_db[l] += dc_db_l
-                dc_dw[l] += dc_dw_l
+
+                # Gradient computation
+                prev_delta = delta
+                next_layer = self.layers[l+1]
+                layer = self.layers[l]
+
+                # Delta and bias gradient
+                w = next_layer.build_weight_matrix(R[l])
+                delta = prev_delta.dot(w) * sigma_Z[l]
+
+                # Charge gradient
+                K = layer.build_kernel_matrix(R[l-1])
+                dc_dq_l = K.dot(A[l-1]) * delta
+
+                # Update
+                dc_db[l] += delta[0]
+                dc_dq[l] += dc_dq_l[0]
 
 
-        # Perform weight regularization if needed
-        if self.regularizer is not None:
-            dc_db, dc_dw = self.regularizer.cost_gradient(self.layers, dc_db, dc_dw)
 
-        return dc_db, dc_dw
+        return dc_db, dc_dq
 
     def fit(self, data_X, data_Y, optimizer):
         """

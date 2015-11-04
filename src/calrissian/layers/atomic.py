@@ -41,7 +41,7 @@ class Atomic(object):
 
         # Weight initialization
         s = 0.1
-        self.b = np.random.uniform(-s, s, output_size)
+        self.b = np.random.uniform(-s, s, (1, output_size))
 
         # Charges
         self.q = np.random.uniform(-s, s, output_size)
@@ -56,17 +56,29 @@ class Atomic(object):
         return self.compute_a(self.compute_z(a_in, r_in)), self.r
 
     def compute_z(self, a_in, r_in):
-        z = np.copy(self.b)
-        for j in range(len(self.q)):
-            q_j = self.q[j]
-            r_j = self.r[j]
-            tmp = 0.0
-            for i in range(len(a_in)):
-                q_i = a_in[i]
-                d_ij = Point.distance(r_in[i], r_j)
-                tmp += q_i * np.exp(-d_ij)  # exponential pairwise kernel
-            z[j] += q_j * tmp
-        return np.asarray(z)
+        # z = None
+        # if include_bias:
+        #     z = np.copy(self.b)
+        # else:
+        #     z = np.zeros_like(self.b)
+        #
+        # for j in range(len(self.q)):
+        #     q_j = self.q[j]
+        #     r_j = self.r[j]
+        #     tmp = 0.0
+        #     for i in range(len(a_in)):
+        #         q_i = a_in[i]
+        #         d_ij = Point.distance(r_in[i], r_j)
+        #         tmp += q_i * np.exp(-d_ij)  # exponential pairwise kernel
+        #     if include_qj:
+        #         z[j] += q_j * tmp
+        #     else:
+        #         z[j] += tmp
+        # return np.asarray(z)
+
+        # More explicitly build the weight matrix in terms of charges and positions
+        w = self.build_weight_matrix(r_in)
+        return (w.dot(a_in) + self.b)[0]  # TODO... meh
 
     def compute_a(self, z):
         return self.activation(z)
@@ -74,16 +86,48 @@ class Atomic(object):
     def compute_da(self, z):
         return self.d_activation(z)
 
-    def compute_gradient(self, prev_delta, A, sigma_Z=None, dc_dw_l=None):
-        dc_db = prev_delta if sigma_Z is None else self.w.dot(prev_delta) * sigma_Z
+    def compute_gradient(self, prev_delta, A, r_in, sigma_Z=None):
+        dc_db = None
+        delta_q = None
+        if sigma_Z is None:
+            dc_db = prev_delta
+            delta_q = dc_db  # not sure about this...
+        else:
+            w = self.build_weight_matrix(r_in)
+            dc_db = prev_delta.dot(w) * sigma_Z
+
+            # K = self.build_kernel_matrix(r_in)
+            # dot_k = K.dot(A[1])
+            # delta_q = K.sum(axis=0) * sigma_Z
+
+        # TODO
+
+        # dc_dq = np.outer(A, delta_q)
         dc_dw = np.outer(A, dc_db)
+
         return dc_db, dc_dw
 
-    def compute_gradient_update(self, dc_db, dc_dw):
-        return dc_db, dc_dw
+    def build_weight_matrix(self, r_in):
+        """
+        For convenience in comparison to dense layer
+        """
+        w = np.zeros((self.output_size, self.input_size))
+        for j in range(len(self.q)):
+            q_j = self.q[j]
+            r_j = self.r[j]
+            for i in range(len(r_in)):
+                d_ij = Point.distance(r_in[i], r_j)
+                w[j][i] = q_j * np.exp(-d_ij)  # exponential pairwise kernel
+        return w
 
-    def forward_pass(self, a_in):
-        return self.activation(a_in.dot(self.w) + self.b)
-
-    def backward_pass(self):
-        pass
+    def build_kernel_matrix(self, r_in):
+        """
+        For convenience in comparison to dense layer
+        """
+        K = np.zeros((self.output_size, self.input_size))
+        for j in range(len(self.q)):
+            r_j = self.r[j]
+            for i in range(len(r_in)):
+                d_ij = Point.distance(r_in[i], r_j)
+                K[j][i] = np.exp(-d_ij)  # exponential pairwise kernel
+        return K
