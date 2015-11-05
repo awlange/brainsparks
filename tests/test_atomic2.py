@@ -23,7 +23,7 @@ def main():
     print(net.cost(train_X, train_Y))
     print(net.cost_gradient(train_X, train_Y))
 
-    net.fit(train_X, train_Y, AtomicSGD(n_epochs=10))
+    net.fit(train_X, train_Y, AtomicSGD(mini_batch_size=1, n_epochs=10))
 
 if __name__ == "__main__":
 

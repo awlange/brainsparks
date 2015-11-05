@@ -28,20 +28,20 @@ def fd():
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
+    net = AtomicNetwork(cost="mse", atomic_input=AtomicInput(2))
+    net.append(Atomic(2, 5, activation="sigmoid"))
+    net.append(Atomic(5, 4, activation="sigmoid"))
+    net.append(Atomic(4, 3, activation="sigmoid"))
+
     # net = AtomicNetwork(cost="mse", atomic_input=AtomicInput(2))
     # net.append(Atomic(2, 5, activation="linear"))
-    # net.append(Atomic(5, 4, activation="linear"))
-    # net.append(Atomic(4, 3, activation="linear"))
-
-    net = AtomicNetwork(cost="mse", atomic_input=AtomicInput(2))
-    net.append(Atomic(2, 5, activation="linear"))
-    net.append(Atomic(5, 3, activation="linear"))
+    # net.append(Atomic(5, 3, activation="linear"))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr, dp = net.cost_gradient(train_X, train_Y)
+    db, dq, dr = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -177,9 +177,6 @@ def fd():
     for f in fd_r_z:
         print(f)
 
-    print("analytic p")
-    for x in dp:
-        print(x)
 
 if __name__ == "__main__":
 
