@@ -52,7 +52,8 @@ def main3():
 def fd():
     net = Network(cost="categorical_cross_entropy")
     net.append(Dense(2, 5, activation="tanh"))
-    net.append(Dense(5, 3, activation="softmax"))
+    net.append(Dense(5, 3, activation="linear"))
+    net.append(Dense(3, 3, activation="softmax"))
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
@@ -114,6 +115,6 @@ def fd():
             print(n)
 
 if __name__ == "__main__":
-    main()
+    # main()
     # main3()
-    # fd()
+    fd()
