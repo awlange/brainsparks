@@ -133,42 +133,54 @@ class ParticleNetwork(object):
                     dc_dr[l][j][1] += tmp * dy
                     dc_dr[l][j][2] += tmp * dz
 
+        # Store matrices. Surely not the best option, but avoid recomputing every time.
+        W = []
+        for l in range(len(self.layers)):
+            W.append(self.layers[l].build_weight_matrix(R[l]))
+
+        deltas = [[[] for x in range(len(data_X))] for _ in range(len(self.layers))]
+
         for di, data in enumerate(data_X):
-            delta = delta_L[di]
             l = -1
+            delta = delta_L[di]
+            deltas[l][di] = delta
             while -l < len(self.layers):
                 l -= 1
-
-                # Gradient computation
-                prev_delta = delta
-                next_layer = self.layers[l+1]
-                layer = self.layers[l]
-                prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
-
-                # TODO: probably can combine this with below and push the data loop to innermost
                 # Delta and bias gradient
-                w = next_layer.build_weight_matrix(R[l])
-                delta = prev_delta.dot(w) * sigma_Z[l][di]
+                prev_delta = delta
+                delta = prev_delta.dot(W[l+1]) * sigma_Z[l][di]
+                deltas[l][di] = delta
                 dc_db[l] += delta
 
-                # Position gradient
-                for j in range(len(layer.r)):
-                    rj_x = layer.r[j][0]
-                    rj_y = layer.r[j][1]
-                    rj_z = layer.r[j][2]
-                    qj = layer.q[j]
-                    for i in range(len(prev_layer.r)):
-                        dx = prev_layer.r[i][0] - rj_x
-                        dy = prev_layer.r[i][1] - rj_y
-                        dz = prev_layer.r[i][2] - rj_z
-                        dij = np.sqrt(dx*dx + dy*dy + dz*dz)
-                        exp_dij = math.exp(-dij)
+        l = -1
+        while -l < len(self.layers):
+            l -= 1
+            # Gradient computation
+            layer = self.layers[l]
+            prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
+
+            # Position gradient
+            for j in range(len(layer.r)):
+                rj_x = layer.r[j][0]
+                rj_y = layer.r[j][1]
+                rj_z = layer.r[j][2]
+                qj = layer.q[j]
+                for i in range(len(prev_layer.r)):
+                    dx = prev_layer.r[i][0] - rj_x
+                    dy = prev_layer.r[i][1] - rj_y
+                    dz = prev_layer.r[i][2] - rj_z
+                    dij = np.sqrt(dx*dx + dy*dy + dz*dz)
+                    exp_dij = math.exp(-dij)
+                    tmp_qj_over_dij = qj / dij
+
+                    for di, data in enumerate(data_X):
+                        dq = A[l-1][di][i] * exp_dij * deltas[l][di][j]
 
                         # Charge
-                        dc_dq[l][j] += A[l-1][di][i] * exp_dij * delta[j]
+                        dc_dq[l][j] += dq
 
                         # Position
-                        tmp = (qj * A[l-1][di][i] * exp_dij / dij) * delta[j]
+                        tmp = tmp_qj_over_dij * dq
                         dc_dr[l-1][i][0] += -tmp * dx
                         dc_dr[l-1][i][1] += -tmp * dy
                         dc_dr[l-1][i][2] += -tmp * dz

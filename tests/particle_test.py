@@ -14,7 +14,7 @@ def main():
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = ParticleNetwork(cost="mse", atomic_input=ParticleInput(2))
+    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
     net.append(Particle(2, 5, activation="sigmoid"))
     net.append(Particle(5, 3, activation="sigmoid"))
 
@@ -28,10 +28,13 @@ def fd():
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = ParticleNetwork(cost="mse", atomic_input=ParticleInput(2))
+    # train_X = np.asarray([[0.2, -0.3]])
+    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
+
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2))
     net.append(Particle(2, 5, activation="sigmoid"))
     net.append(Particle(5, 4, activation="sigmoid"))
-    net.append(Particle(4, 3, activation="sigmoid"))
+    net.append(Particle(4, 3, activation="softmax"))
 
     # Finite difference checking
 
@@ -90,7 +93,7 @@ def fd():
     fd_r_z = []
 
     # input first
-    layer = net.atomic_input
+    layer = net.particle_input
     lr_x = []
     lr_y = []
     lr_z = []
