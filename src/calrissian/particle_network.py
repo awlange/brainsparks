@@ -6,13 +6,13 @@ import math
 
 class ParticleNetwork(object):
 
-    def __init__(self, atomic_input=None, cost="mse", regularizer=None):
+    def __init__(self, particle_input=None, cost="mse", regularizer=None):
         self.layers = []
         self.cost_function = Cost.get(cost)
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
         self.regularizer = regularizer
-        self.atomic_input = atomic_input
+        self.particle_input = particle_input
 
     def append(self, layer):
         """
@@ -43,7 +43,7 @@ class ParticleNetwork(object):
         :return:
         """
         a = data_X
-        r = self.atomic_input.r
+        r = self.particle_input.r
         for layer in self.layers:
             a, r = layer.feed_forward(a, r)
         return a
@@ -75,7 +75,7 @@ class ParticleNetwork(object):
         # Output gradients
         dc_db = []
         dc_dq = []  # charge gradient
-        dc_dr = [np.zeros((len(self.atomic_input.r), 3))]  # position gradient, a bit trickier
+        dc_dr = [np.zeros((len(self.particle_input.r), 3))]  # position gradient, a bit trickier
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -85,7 +85,7 @@ class ParticleNetwork(object):
 
         sigma_Z = []
         A = [data_X]  # Note: A has one more element than sigma_Z
-        R = [self.atomic_input.r]
+        R = [self.particle_input.r]
         for l, layer in enumerate(self.layers):
             z = layer.compute_z(A[l], R[l])
             a = layer.compute_a(z)
@@ -143,7 +143,7 @@ class ParticleNetwork(object):
                 prev_delta = delta
                 next_layer = self.layers[l+1]
                 layer = self.layers[l]
-                prev_layer = self.atomic_input if -(l-1) > len(self.layers) else self.layers[l-1]
+                prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
 
                 # TODO: probably can combine this with below and push the data loop to innermost
                 # Delta and bias gradient

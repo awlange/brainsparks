@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 
-class AtomicSGD(Optimizer):
+class ParticleSGD(Optimizer):
     """
     Stochastic gradient descent optimization for Atomic layers
     """
@@ -96,7 +96,7 @@ class AtomicSGD(Optimizer):
                 layer.r[i][0] -= self.alpha * self.dc_dr[l+1][i][0]
                 layer.r[i][1] -= self.alpha * self.dc_dr[l+1][i][1]
                 layer.r[i][2] -= self.alpha * self.dc_dr[l+1][i][2]
-        for i in range(len(network.atomic_input.r)):
+        for i in range(len(network.particle_input.r)):
             network.particle_input.r[i][0] -= self.alpha * self.dc_dr[0][i][0]
             network.particle_input.r[i][1] -= self.alpha * self.dc_dr[0][i][1]
             network.particle_input.r[i][2] -= self.alpha * self.dc_dr[0][i][2]
