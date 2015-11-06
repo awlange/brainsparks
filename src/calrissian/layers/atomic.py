@@ -44,10 +44,11 @@ class Atomic(object):
         self.b = np.random.uniform(-s, s, (1, output_size))
 
         # Charges
+        s = 1.0
         self.q = np.random.uniform(-s, s, output_size)
 
         # Positions
-        s = 3.0
+        s = 1.0
         self.r = []
         for i in range(output_size):
             self.r.append(Point(np.random.uniform(-s, s), np.random.uniform(-s, s), np.random.uniform(-s, s)))

@@ -63,7 +63,7 @@ class AtomicSGD(Optimizer):
                 mini_Y = np.asarray([data_Y[i] for i in mini_batch_indexes])
 
                 # Compute gradient for mini-batch
-                self.dc_db, self.dc_dq, self.dc_dr, _ = network.cost_gradient(mini_X, mini_Y)
+                self.dc_db, self.dc_dq, self.dc_dr = network.cost_gradient(mini_X, mini_Y)
 
                 # Update weights and biases
                 self.weight_update_func(network)

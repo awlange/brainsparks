@@ -21,6 +21,8 @@ class Activation(object):
             return Activation.softmax
         if nl == "softplus":
             return Activation.softplus
+        if nl == "atomic_softmax":
+            return Activation.atomic_softmax
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -35,7 +37,7 @@ class Activation(object):
             return Activation.d_relu
         if nl == "tanh":
             return Activation.d_tanh
-        if nl == "softmax":
+        if nl == "softmax" or "atomic_softmax":
             return Activation.d_softmax
         if nl == "softplus":
             return Activation.d_softplus
@@ -97,6 +99,12 @@ class Activation(object):
     def d_softmax(x):
         # Note: not actually used. So, just echo input to maintain interface.
         return x
+
+    @staticmethod
+    def atomic_softmax(x):
+        ex = np.exp(x)
+        denom = np.sum(ex)
+        return ex / denom
 
     # Softplus
 

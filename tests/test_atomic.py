@@ -28,10 +28,10 @@ def fd():
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = AtomicNetwork(cost="mse", atomic_input=AtomicInput(2))
+    net = AtomicNetwork(cost="categorical_cross_entropy", atomic_input=AtomicInput(2))
     net.append(Atomic(2, 5, activation="sigmoid"))
-    net.append(Atomic(5, 4, activation="sigmoid"))
-    net.append(Atomic(4, 3, activation="sigmoid"))
+    net.append(Atomic(5, 4, activation="tanh"))
+    net.append(Atomic(4, 3, activation="atomic_softmax"))
 
     # net = AtomicNetwork(cost="mse", atomic_input=AtomicInput(2))
     # net.append(Atomic(2, 5, activation="linear"))
