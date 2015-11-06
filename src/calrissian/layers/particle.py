@@ -2,34 +2,19 @@ from .layer import Layer
 from ..activation import Activation
 
 import numpy as np
+import math
 
 
-class Point(object):
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    @staticmethod
-    def distance(p1, p2):
-        dx = p1.x - p2.x
-        dy = p1.y - p2.y
-        dz = p1.z - p2.z
-        return np.sqrt(dx*dx + dy*dy + dz*dz)
-
-
-class AtomicInput(object):
+class ParticleInput(object):
     def __init__(self, size):
-        self.output_size = size
+        self.size = size
 
         # Positions
-        s = 3.0
-        self.r = []
-        for i in range(size):
-            self.r.append(Point(np.random.uniform(-s, s), np.random.uniform(-s, s), np.random.uniform(-s, s)))
+        s = 1.0
+        self.r = np.random.uniform(-s, s, (size, 3))
 
 
-class Atomic(object):
+class Particle(object):
 
     def __init__(self, input_size=0, output_size=0, activation="sigmoid"):
         # super().__init__("Atomic", True)
@@ -49,44 +34,33 @@ class Atomic(object):
 
         # Positions
         s = 1.0
-        self.r = []
-        for i in range(output_size):
-            self.r.append(Point(np.random.uniform(-s, s), np.random.uniform(-s, s), np.random.uniform(-s, s)))
+        self.r = np.random.uniform(-s, s, (output_size, 3))
 
     def feed_forward(self, a_in, r_in):
         return self.compute_a(self.compute_z(a_in, r_in)), self.r
 
     def compute_z(self, a_in, r_in):
-        # More explicitly build the weight matrix in terms of charges and positions
-        w = self.build_weight_matrix(r_in)
-        return (w.dot(a_in) + self.b)[0]  # TODO... meh
+        z = np.zeros((len(a_in), self.output_size))
+        for j in range(self.output_size):
+            for k, a in enumerate(a_in):
+                z[k][j] = self.b[0][j]
+            q_j = self.q[j]
+            r_j = self.r[j]
+            for i in range(len(r_in)):
+                dx = r_in[i][0] - r_j[0]
+                dy = r_in[i][1] - r_j[1]
+                dz = r_in[i][2] - r_j[2]
+                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
+                w_ji = q_j * np.exp(-d_ij)  # exponential pairwise kernel
+                for k, a in enumerate(a_in):
+                    z[k][j] += w_ji * a[i]
+        return z
 
     def compute_a(self, z):
         return self.activation(z)
 
     def compute_da(self, z):
         return self.d_activation(z)
-
-    def compute_gradient(self, prev_delta, A, r_in, sigma_Z=None):
-        dc_db = None
-        delta_q = None
-        if sigma_Z is None:
-            dc_db = prev_delta
-            delta_q = dc_db  # not sure about this...
-        else:
-            w = self.build_weight_matrix(r_in)
-            dc_db = prev_delta.dot(w) * sigma_Z
-
-            # K = self.build_kernel_matrix(r_in)
-            # dot_k = K.dot(A[1])
-            # delta_q = K.sum(axis=0) * sigma_Z
-
-        # TODO
-
-        # dc_dq = np.outer(A, delta_q)
-        dc_dw = np.outer(A, dc_db)
-
-        return dc_db, dc_dw
 
     def build_weight_matrix(self, r_in):
         """
@@ -97,7 +71,10 @@ class Atomic(object):
             q_j = self.q[j]
             r_j = self.r[j]
             for i in range(len(r_in)):
-                d_ij = Point.distance(r_in[i], r_j)
+                dx = r_in[i][0] - r_j[0]
+                dy = r_in[i][1] - r_j[1]
+                dz = r_in[i][2] - r_j[2]
+                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
                 w[j][i] = q_j * np.exp(-d_ij)  # exponential pairwise kernel
         return w
 
@@ -109,8 +86,11 @@ class Atomic(object):
         for j in range(len(self.q)):
             r_j = self.r[j]
             for i in range(len(r_in)):
-                d_ij = Point.distance(r_in[i], r_j)
-                K[j][i] = np.exp(-d_ij)  # exponential pairwise kernel
+                dx = r_in[i][0] - r_j[0]
+                dy = r_in[i][1] - r_j[1]
+                dz = r_in[i][2] - r_j[2]
+                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
+                K[j][i] = math.exp(-d_ij)  # exponential pairwise kernel
         return K
 
     def build_distance_matrix(self, r_in):
@@ -121,5 +101,8 @@ class Atomic(object):
         for j in range(len(self.q)):
             r_j = self.r[j]
             for i in range(len(r_in)):
-                D[j][i] = Point.distance(r_in[i], r_j)
+                dx = r_in[i][0] - r_j[0]
+                dy = r_in[i][1] - r_j[1]
+                dz = r_in[i][2] - r_j[2]
+                D[j][i] = math.sqrt(dx*dx + dy*dy + dz*dz)
         return D
