@@ -173,6 +173,7 @@ class ParticleNetwork(object):
                 prev_delta = delta
                 delta = prev_delta.dot(W[l+1]) * sigma_Z[l][di]
                 deltas[l][di] = delta
+                dc_db[l] += delta
 
         l = -1
         while -l < len(self.layers):

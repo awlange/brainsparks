@@ -41,11 +41,11 @@ def main2():
 
 def fd():
 
-    train_X = np.asarray([[0.2, -0.3]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0]])
-
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
     net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2),
                           regularizer=ParticleRegularize(0.25))
