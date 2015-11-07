@@ -233,6 +233,10 @@ class ParticleNetwork(object):
                 dc_dr[l][j][1] += dc_dr_lj_y
                 dc_dr[l][j][2] += dc_dr_lj_z
 
+        # Perform charge regularization if needed
+        if self.regularizer is not None:
+            dc_dq = self.regularizer.cost_gradient(self.layers, dc_dq)
+
         return dc_db, dc_dq, dc_dr
 
     def fit(self, data_X, data_Y, optimizer):

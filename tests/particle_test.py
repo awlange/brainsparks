@@ -6,6 +6,7 @@ from src.calrissian.particle_network import ParticleNetwork
 from src.calrissian.layers.particle import Particle
 from src.calrissian.layers.particle import ParticleInput
 from src.calrissian.optimizers.particle_sgd import ParticleSGD
+from src.calrissian.regularization.particle_regularize import ParticleRegularize
 
 import numpy as np
 
@@ -46,7 +47,8 @@ def fd():
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2))
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2),
+                          regularizer=ParticleRegularize(0.25))
     net.append(Particle(2, 5, activation="sigmoid"))
     net.append(Particle(5, 4, activation="sigmoid"))
     net.append(Particle(4, 3, activation="softmax"))
@@ -198,5 +200,5 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    main2()
-    # fd()
+    # main2()
+    fd()
