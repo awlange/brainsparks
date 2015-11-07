@@ -103,12 +103,20 @@ class ParticleNetwork(object):
         layer = self.layers[l]
         prev_layer = self.layers[l-1]
 
+        Al = A[l-1]
+        Al_trans = Al.transpose()
+
         # Position gradient
         for j in range(len(layer.r)):
             rj_x = layer.r[j][0]
             rj_y = layer.r[j][1]
             rj_z = layer.r[j][2]
             qj = layer.q[j]
+
+            dc_dr_lj_x = 0.0
+            dc_dr_lj_y = 0.0
+            dc_dr_lj_z = 0.0
+
             for i in range(len(prev_layer.r)):
                 dx = prev_layer.r[i][0] - rj_x
                 dy = prev_layer.r[i][1] - rj_y
@@ -117,21 +125,36 @@ class ParticleNetwork(object):
                 exp_dij = math.exp(-dij)
                 tmp_qj_over_dij = qj / dij
 
+                Al_trans_i = Al_trans[i]
+                dc_dr_lm1_i_x = 0.0
+                dc_dr_lm1_i_y = 0.0
+                dc_dr_lm1_i_z = 0.0
                 for di in range(len(data_X)):
                     delta = delta_L[di]
-                    dq = A[l-1][di][i] * exp_dij * delta[j]
+                    dq = Al_trans_i[di] * exp_dij * delta[j]
 
                     # Charge
                     dc_dq[l][j] += dq
 
                     # Position
                     tmp = tmp_qj_over_dij * dq
-                    dc_dr[l-1][i][0] -= tmp * dx
-                    dc_dr[l-1][i][1] -= tmp * dy
-                    dc_dr[l-1][i][2] -= tmp * dz
-                    dc_dr[l][j][0] += tmp * dx
-                    dc_dr[l][j][1] += tmp * dy
-                    dc_dr[l][j][2] += tmp * dz
+                    tx = tmp * dx
+                    ty = tmp * dy
+                    tz = tmp * dz
+
+                    dc_dr_lm1_i_x -= tx
+                    dc_dr_lm1_i_y -= ty
+                    dc_dr_lm1_i_z -= tz
+                    dc_dr_lj_x += tx
+                    dc_dr_lj_y += ty
+                    dc_dr_lj_z += tz
+
+                dc_dr[l-1][i][0] += dc_dr_lm1_i_x
+                dc_dr[l-1][i][1] += dc_dr_lm1_i_y
+                dc_dr[l-1][i][2] += dc_dr_lm1_i_z
+            dc_dr[l][j][0] += dc_dr_lj_x
+            dc_dr[l][j][1] += dc_dr_lj_y
+            dc_dr[l][j][2] += dc_dr_lj_z
 
         # Store matrices. Surely not the best option, but avoid recomputing every time.
         W = []
@@ -150,7 +173,6 @@ class ParticleNetwork(object):
                 prev_delta = delta
                 delta = prev_delta.dot(W[l+1]) * sigma_Z[l][di]
                 deltas[l][di] = delta
-                dc_db[l] += delta
 
         l = -1
         while -l < len(self.layers):
@@ -159,34 +181,57 @@ class ParticleNetwork(object):
             layer = self.layers[l]
             prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
 
+            Al = A[l-1]
+            Al_trans = Al.transpose()
+
             # Position gradient
             for j in range(len(layer.r)):
                 rj_x = layer.r[j][0]
                 rj_y = layer.r[j][1]
                 rj_z = layer.r[j][2]
                 qj = layer.q[j]
+
+                dc_dr_lj_x = 0.0
+                dc_dr_lj_y = 0.0
+                dc_dr_lj_z = 0.0
+
                 for i in range(len(prev_layer.r)):
                     dx = prev_layer.r[i][0] - rj_x
                     dy = prev_layer.r[i][1] - rj_y
                     dz = prev_layer.r[i][2] - rj_z
-                    dij = np.sqrt(dx*dx + dy*dy + dz*dz)
+                    dij = math.sqrt(dx*dx + dy*dy + dz*dz)
                     exp_dij = math.exp(-dij)
                     tmp_qj_over_dij = qj / dij
 
-                    for di, data in enumerate(data_X):
-                        dq = A[l-1][di][i] * exp_dij * deltas[l][di][j]
+                    Al_trans_i = Al_trans[i]
+                    dc_dr_lm1_i_x = 0.0
+                    dc_dr_lm1_i_y = 0.0
+                    dc_dr_lm1_i_z = 0.0
+                    for di in range(len(data_X)):
+                        dq = Al_trans_i[di] * exp_dij * deltas[l][di][j]
 
                         # Charge
                         dc_dq[l][j] += dq
 
                         # Position
                         tmp = tmp_qj_over_dij * dq
-                        dc_dr[l-1][i][0] += -tmp * dx
-                        dc_dr[l-1][i][1] += -tmp * dy
-                        dc_dr[l-1][i][2] += -tmp * dz
-                        dc_dr[l][j][0] += tmp * dx
-                        dc_dr[l][j][1] += tmp * dy
-                        dc_dr[l][j][2] += tmp * dz
+                        tx = tmp * dx
+                        ty = tmp * dy
+                        tz = tmp * dz
+
+                        dc_dr_lm1_i_x -= tx
+                        dc_dr_lm1_i_y -= ty
+                        dc_dr_lm1_i_z -= tz
+                        dc_dr_lj_x += tx
+                        dc_dr_lj_y += ty
+                        dc_dr_lj_z += tz
+
+                    dc_dr[l-1][i][0] += dc_dr_lm1_i_x
+                    dc_dr[l-1][i][1] += dc_dr_lm1_i_y
+                    dc_dr[l-1][i][2] += dc_dr_lm1_i_z
+                dc_dr[l][j][0] += dc_dr_lj_x
+                dc_dr[l][j][1] += dc_dr_lj_y
+                dc_dr[l][j][2] += dc_dr_lj_z
 
         return dc_db, dc_dq, dc_dr
 

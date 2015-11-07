@@ -18,19 +18,19 @@ raw_data_train = pd.read_csv("/Users/alange/programming/MNIST/data/mnist_train.c
 print("data loaded")
 
 # Prepare data
-X = np.asarray(raw_data_train.ix[:,1:] / 256.0)  # scaled values in range [0-1]
+X = np.asarray(raw_data_train.ix[:, 1:] / 256.0)  # scaled values in range [0-1]
 # length ten categorical vector
 Y = []
-for val in raw_data_train.ix[:,0]:
+for val in raw_data_train.ix[:, 0]:
     y = np.zeros(10)
     y[val] = 1.0
     Y.append(y)
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 500
-X_sub = X[:n_sub,:]
-Y_sub = Y[:n_sub,:]
+n_sub = 100
+X_sub = X[:n_sub, :]
+Y_sub = Y[:n_sub, :]
 
 net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(784))
 net.append(Particle(784, 32, activation="relu"))
@@ -41,7 +41,9 @@ times = []
 nt = 1
 for _ in range(nt):
     ts = time.time()
-    c = net.cost(X_sub, Y_sub)
+    # c = net.cost(X_sub, Y_sub)
+    c = 1.0
+    net.cost_gradient(X_sub, Y_sub)
     t = time.time() - ts
     print("Cost: {} time: {}".format(c, t))
     times.append(t)

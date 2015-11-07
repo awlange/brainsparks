@@ -73,11 +73,13 @@ class Particle(object):
         w = np.zeros((self.output_size, self.input_size))
         for j in range(len(self.q)):
             q_j = self.q[j]
-            r_j = self.r[j]
+            r_jx = self.r[j][0]
+            r_jy = self.r[j][1]
+            r_jz = self.r[j][2]
             for i in range(len(r_in)):
-                dx = r_in[i][0] - r_j[0]
-                dy = r_in[i][1] - r_j[1]
-                dz = r_in[i][2] - r_j[2]
+                dx = r_in[i][0] - r_jx
+                dy = r_in[i][1] - r_jy
+                dz = r_in[i][2] - r_jz
                 d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
                 w[j][i] = q_j * np.exp(-d_ij)  # exponential pairwise kernel
         return w
@@ -103,10 +105,12 @@ class Particle(object):
         """
         D = np.zeros((self.output_size, self.input_size))
         for j in range(len(self.q)):
-            r_j = self.r[j]
+            r_jx = self.r[j][0]
+            r_jy = self.r[j][1]
+            r_jz = self.r[j][2]
             for i in range(len(r_in)):
-                dx = r_in[i][0] - r_j[0]
-                dy = r_in[i][1] - r_j[1]
-                dz = r_in[i][2] - r_j[2]
+                dx = r_in[i][0] - r_jx
+                dy = r_in[i][1] - r_jy
+                dz = r_in[i][2] - r_jz
                 D[j][i] = math.sqrt(dx*dx + dy*dy + dz*dz)
         return D
