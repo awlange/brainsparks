@@ -106,16 +106,22 @@ class ParticleSGD(Optimizer):
         Update weights and biases according to steepest descent
         TODO
         """
-        # # Initialize velocities to zero for momentum
-        # if self.vel_b is None or self.vel_w is None:
-        #     self.vel_b = []
-        #     self.vel_w = []
-        #     for l, layer in enumerate(network.layers):
-        #         self.vel_b.append(np.zeros(layer.b.shape))
-        #         self.vel_w.append(np.zeros(layer.w.shape))
-        #
-        # for l, layer in enumerate(network.layers):
-        #     self.vel_b[l] = -self.alpha * dc_db[l] + self.beta * self.vel_b[l]
-        #     self.vel_w[l] = -self.alpha * dc_dw[l] + self.beta * self.vel_w[l]
-        #     layer.b += self.vel_b[l]
-        #     layer.w += self.vel_w[l]
+        # Initialize velocities to zero for momentum
+        if self.vel_b is None or self.vel_q is None or self.vel_r is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_r = [np.zeros(network.particle_input.r.shape)]
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.zeros(layer.b.shape))
+                self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_r.append(np.zeros(layer.r.shape))
+
+        for l, layer in enumerate(network.layers):
+            self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
+            self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
+            self.vel_r[l+1] = -self.alpha * self.dc_dr[l+1] + self.beta * self.vel_r[l+1]
+            layer.b += self.vel_b[l]
+            layer.q += self.vel_q[l]
+            layer.r += self.vel_r[l+1]
+        self.vel_r[0] = -self.alpha * self.dc_dr[0] + self.beta * self.vel_r[0]
+        network.particle_input.r += self.vel_r[0]

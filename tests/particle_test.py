@@ -5,6 +5,7 @@ Script entry point
 from src.calrissian.particle_network import ParticleNetwork
 from src.calrissian.layers.particle import Particle
 from src.calrissian.layers.particle import ParticleInput
+from src.calrissian.optimizers.particle_sgd import ParticleSGD
 
 import numpy as np
 
@@ -21,6 +22,20 @@ def main():
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
     print(net.cost_gradient(train_X, train_Y))
+
+
+def main2():
+
+    sgd = ParticleSGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="momentum", beta=0.5)
+
+    train_X = np.asarray([[0.2, -0.3]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0]])
+
+    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
+    net.append(Particle(2, 5, activation="sigmoid"))
+    net.append(Particle(5, 3, activation="sigmoid"))
+
+    sgd.optimize(net, train_X, train_Y)
 
 
 def fd():
@@ -183,4 +198,5 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    fd()
+    main2()
+    # fd()
