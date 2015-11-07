@@ -10,7 +10,7 @@ class ParticleInput(object):
         self.size = size
 
         # Positions
-        s = 3.0
+        s = 2.0
         self.r = np.random.uniform(-s, s, (size, 3))
 
 
@@ -33,28 +33,32 @@ class Particle(object):
         self.q = np.random.uniform(-s, s, output_size)
 
         # Positions
-        s = 3.0
+        s = 2.0
         self.r = np.random.uniform(-s, s, (output_size, 3))
 
     def feed_forward(self, a_in, r_in):
         return self.compute_a(self.compute_z(a_in, r_in)), self.r
 
     def compute_z(self, a_in, r_in):
-        z = np.zeros((len(a_in), self.output_size))
+        atrans = a_in.transpose()
+        z = np.zeros((self.output_size, len(a_in)))
         for j in range(self.output_size):
+            zj = z[j]
+            bj = self.b[0][j]
             for k, a in enumerate(a_in):
-                z[k][j] = self.b[0][j]
+                zj[k] = bj
             q_j = self.q[j]
-            r_j = self.r[j]
+            r_jx = self.r[j][0]
+            r_jy = self.r[j][1]
+            r_jz = self.r[j][2]
             for i in range(len(r_in)):
-                dx = r_in[i][0] - r_j[0]
-                dy = r_in[i][1] - r_j[1]
-                dz = r_in[i][2] - r_j[2]
+                dx = r_in[i][0] - r_jx
+                dy = r_in[i][1] - r_jy
+                dz = r_in[i][2] - r_jz
                 d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                w_ji = q_j * np.exp(-d_ij)  # exponential pairwise kernel
-                for k, a in enumerate(a_in):
-                    z[k][j] += w_ji * a[i]
-        return z
+                w_ji = q_j * math.exp(-d_ij)  # exponential pairwise kernel
+                zj += w_ji * atrans[i]
+        return z.transpose()
 
     def compute_a(self, z):
         return self.activation(z)

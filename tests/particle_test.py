@@ -182,5 +182,5 @@ if __name__ == "__main__":
     # Ensure same seed
     np.random.seed(100)
 
-    # main()
-    fd()
+    main()
+    # fd()
