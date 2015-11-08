@@ -110,7 +110,6 @@ class ParticleNetwork(object):
         for sz in sigma_Z:
             trans_sigma_Z.append(np.asarray(sz).transpose())
 
-        # next_delta = np.zeros((len(data_X), len(prev_layer.r)))
         next_delta = np.zeros((len(prev_layer.r), len(data_X)))
 
         # Position gradient
@@ -139,32 +138,22 @@ class ParticleNetwork(object):
                 trans_sigma_Z_i = trans_sigma_Z[l-1][i]
                 next_delta[i] += w_ij * trans_delta_L_j * trans_sigma_Z_i
 
-                Al_trans_i = Al_trans[i]
-                dc_dr_lm1_i_x = 0.0
-                dc_dr_lm1_i_y = 0.0
-                dc_dr_lm1_i_z = 0.0
-                for di in range(len(data_X)):
-                    dq = Al_trans_i[di] * exp_dij * trans_delta_L_j[di]
+                # Charge gradient
+                dq = exp_dij * Al_trans[i] * trans_delta_L_j
+                dc_dq[l][j] += np.sum(dq)
 
-                    # Charge
-                    dc_dq[l][j] += dq
+                # Position gradient
+                tmp = tmp_qj_over_dij * dq
+                tx = np.sum(tmp * dx)
+                ty = np.sum(tmp * dy)
+                tz = np.sum(tmp * dz)
+                dc_dr_lj_x += tx
+                dc_dr_lj_y += ty
+                dc_dr_lj_z += tz
 
-                    # Position
-                    tmp = tmp_qj_over_dij * dq
-                    tx = tmp * dx
-                    ty = tmp * dy
-                    tz = tmp * dz
-
-                    dc_dr_lm1_i_x -= tx
-                    dc_dr_lm1_i_y -= ty
-                    dc_dr_lm1_i_z -= tz
-                    dc_dr_lj_x += tx
-                    dc_dr_lj_y += ty
-                    dc_dr_lj_z += tz
-
-                dc_dr[l-1][i][0] += dc_dr_lm1_i_x
-                dc_dr[l-1][i][1] += dc_dr_lm1_i_y
-                dc_dr[l-1][i][2] += dc_dr_lm1_i_z
+                dc_dr[l-1][i][0] -= tx
+                dc_dr[l-1][i][1] -= ty
+                dc_dr[l-1][i][2] -= tz
             dc_dr[l][j][0] += dc_dr_lj_x
             dc_dr[l][j][1] += dc_dr_lj_y
             dc_dr[l][j][2] += dc_dr_lj_z
@@ -216,32 +205,23 @@ class ParticleNetwork(object):
                     trans_sigma_Z_i = trans_sigma_Z_l[i] if trans_sigma_Z_l is not None else data_ones
                     next_delta[i] += w_ij * this_delta_j * trans_sigma_Z_i
 
-                    Al_trans_i = Al_trans[i]
-                    dc_dr_lm1_i_x = 0.0
-                    dc_dr_lm1_i_y = 0.0
-                    dc_dr_lm1_i_z = 0.0
-                    for di in range(len(data_X)):
-                        dq = Al_trans_i[di] * exp_dij * this_delta_j[di]
+                    # Charge gradient
+                    dq = exp_dij * Al_trans[i] * this_delta_j
+                    dc_dq[l][j] += np.sum(dq)
 
-                        # Charge
-                        dc_dq[l][j] += dq
+                    # Position gradient
+                    tmp = tmp_qj_over_dij * dq
+                    tx = np.sum(tmp * dx)
+                    ty = np.sum(tmp * dy)
+                    tz = np.sum(tmp * dz)
+                    dc_dr_lj_x += tx
+                    dc_dr_lj_y += ty
+                    dc_dr_lj_z += tz
 
-                        # Position
-                        tmp = tmp_qj_over_dij * dq
-                        tx = tmp * dx
-                        ty = tmp * dy
-                        tz = tmp * dz
+                    dc_dr[l-1][i][0] -= tx
+                    dc_dr[l-1][i][1] -= ty
+                    dc_dr[l-1][i][2] -= tz
 
-                        dc_dr_lm1_i_x -= tx
-                        dc_dr_lm1_i_y -= ty
-                        dc_dr_lm1_i_z -= tz
-                        dc_dr_lj_x += tx
-                        dc_dr_lj_y += ty
-                        dc_dr_lj_z += tz
-
-                    dc_dr[l-1][i][0] += dc_dr_lm1_i_x
-                    dc_dr[l-1][i][1] += dc_dr_lm1_i_y
-                    dc_dr[l-1][i][2] += dc_dr_lm1_i_z
                 dc_dr[l][j][0] += dc_dr_lj_x
                 dc_dr[l][j][1] += dc_dr_lj_y
                 dc_dr[l][j][2] += dc_dr_lj_z
