@@ -118,6 +118,7 @@ class ParticleNetwork(object):
             rj_y = layer.r[j][1]
             rj_z = layer.r[j][2]
             qj = layer.q[j]
+            qj2 = 2.0 * qj
 
             dc_dr_lj_x = 0.0
             dc_dr_lj_y = 0.0
@@ -129,9 +130,8 @@ class ParticleNetwork(object):
                 dx = prev_layer.r[i][0] - rj_x
                 dy = prev_layer.r[i][1] - rj_y
                 dz = prev_layer.r[i][2] - rj_z
-                dij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                exp_dij = math.exp(-dij)
-                tmp_qj_over_dij = qj / dij
+                d2 = dx*dx + dy*dy + dz*dz
+                exp_dij = math.exp(-d2)
 
                 # Next delta
                 w_ij = qj * exp_dij
@@ -143,7 +143,7 @@ class ParticleNetwork(object):
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
-                tmp = tmp_qj_over_dij * dq
+                tmp = qj2 * dq
                 tx = np.sum(tmp * dx)
                 ty = np.sum(tmp * dy)
                 tz = np.sum(tmp * dz)
@@ -185,6 +185,7 @@ class ParticleNetwork(object):
                 rj_y = layer.r[j][1]
                 rj_z = layer.r[j][2]
                 qj = layer.q[j]
+                qj2 = 2.0 * qj
 
                 dc_dr_lj_x = 0.0
                 dc_dr_lj_y = 0.0
@@ -196,9 +197,8 @@ class ParticleNetwork(object):
                     dx = prev_layer.r[i][0] - rj_x
                     dy = prev_layer.r[i][1] - rj_y
                     dz = prev_layer.r[i][2] - rj_z
-                    dij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                    exp_dij = math.exp(-dij)
-                    tmp_qj_over_dij = qj / dij
+                    d2 = dx*dx + dy*dy + dz*dz
+                    exp_dij = math.exp(-d2)
 
                     # Next delta
                     w_ij = qj * exp_dij
@@ -210,7 +210,7 @@ class ParticleNetwork(object):
                     dc_dq[l][j] += np.sum(dq)
 
                     # Position gradient
-                    tmp = tmp_qj_over_dij * dq
+                    tmp = qj2 * dq
                     tx = np.sum(tmp * dx)
                     ty = np.sum(tmp * dy)
                     tz = np.sum(tmp * dz)

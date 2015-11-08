@@ -66,8 +66,9 @@ class Particle(object):
                 dx = r_in[i][0] - r_jx
                 dy = r_in[i][1] - r_jy
                 dz = r_in[i][2] - r_jz
-                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                w_ji = q_j * math.exp(-d_ij)  # exponential pairwise kernel
+                d2 = dx*dx + dy*dy + dz*dz
+                # d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
+                w_ji = q_j * math.exp(-d2)  # gaussian pairwise kernel
                 zj += w_ji * atrans[i]
         return z.transpose()
 
@@ -77,51 +78,51 @@ class Particle(object):
     def compute_da(self, z):
         return self.d_activation(z)
 
-    def build_weight_matrix(self, r_in):
-        """
-        For convenience in comparison to dense layer
-        """
-        w = np.zeros((self.output_size, self.input_size))
-        for j in range(len(self.q)):
-            q_j = self.q[j]
-            r_jx = self.r[j][0]
-            r_jy = self.r[j][1]
-            r_jz = self.r[j][2]
-            for i in range(len(r_in)):
-                dx = r_in[i][0] - r_jx
-                dy = r_in[i][1] - r_jy
-                dz = r_in[i][2] - r_jz
-                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                w[j][i] = q_j * np.exp(-d_ij)  # exponential pairwise kernel
-        return w
-
-    def build_kernel_matrix(self, r_in):
-        """
-        For convenience in comparison to dense layer
-        """
-        K = np.zeros((self.output_size, self.input_size))
-        for j in range(len(self.q)):
-            r_j = self.r[j]
-            for i in range(len(r_in)):
-                dx = r_in[i][0] - r_j[0]
-                dy = r_in[i][1] - r_j[1]
-                dz = r_in[i][2] - r_j[2]
-                d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                K[j][i] = math.exp(-d_ij)  # exponential pairwise kernel
-        return K
-
-    def build_distance_matrix(self, r_in):
-        """
-        For convenience in comparison to dense layer
-        """
-        D = np.zeros((self.output_size, self.input_size))
-        for j in range(len(self.q)):
-            r_jx = self.r[j][0]
-            r_jy = self.r[j][1]
-            r_jz = self.r[j][2]
-            for i in range(len(r_in)):
-                dx = r_in[i][0] - r_jx
-                dy = r_in[i][1] - r_jy
-                dz = r_in[i][2] - r_jz
-                D[j][i] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        return D
+    # def build_weight_matrix(self, r_in):
+    #     """
+    #     For convenience in comparison to dense layer
+    #     """
+    #     w = np.zeros((self.output_size, self.input_size))
+    #     for j in range(len(self.q)):
+    #         q_j = self.q[j]
+    #         r_jx = self.r[j][0]
+    #         r_jy = self.r[j][1]
+    #         r_jz = self.r[j][2]
+    #         for i in range(len(r_in)):
+    #             dx = r_in[i][0] - r_jx
+    #             dy = r_in[i][1] - r_jy
+    #             dz = r_in[i][2] - r_jz
+    #             d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
+    #             w[j][i] = q_j * np.exp(-d_ij)  # exponential pairwise kernel
+    #     return w
+    #
+    # def build_kernel_matrix(self, r_in):
+    #     """
+    #     For convenience in comparison to dense layer
+    #     """
+    #     K = np.zeros((self.output_size, self.input_size))
+    #     for j in range(len(self.q)):
+    #         r_j = self.r[j]
+    #         for i in range(len(r_in)):
+    #             dx = r_in[i][0] - r_j[0]
+    #             dy = r_in[i][1] - r_j[1]
+    #             dz = r_in[i][2] - r_j[2]
+    #             d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
+    #             K[j][i] = math.exp(-d_ij)  # exponential pairwise kernel
+    #     return K
+    #
+    # def build_distance_matrix(self, r_in):
+    #     """
+    #     For convenience in comparison to dense layer
+    #     """
+    #     D = np.zeros((self.output_size, self.input_size))
+    #     for j in range(len(self.q)):
+    #         r_jx = self.r[j][0]
+    #         r_jy = self.r[j][1]
+    #         r_jz = self.r[j][2]
+    #         for i in range(len(r_in)):
+    #             dx = r_in[i][0] - r_jx
+    #             dy = r_in[i][1] - r_jy
+    #             dz = r_in[i][2] - r_jz
+    #             D[j][i] = math.sqrt(dx*dx + dy*dy + dz*dz)
+    #     return D
