@@ -106,6 +106,8 @@ class ParticleNetwork(object):
         Al = A[l-1]
         Al_trans = Al.transpose()
 
+        next_delta = np.zeros((len(data_X), len(prev_layer.r)))
+
         # Position gradient
         for j in range(len(layer.r)):
             rj_x = layer.r[j][0]
@@ -125,6 +127,8 @@ class ParticleNetwork(object):
                 exp_dij = math.exp(-dij)
                 tmp_qj_over_dij = qj / dij
 
+                w_ij = qj * exp_dij
+
                 Al_trans_i = Al_trans[i]
                 dc_dr_lm1_i_x = 0.0
                 dc_dr_lm1_i_y = 0.0
@@ -132,6 +136,9 @@ class ParticleNetwork(object):
                 for di in range(len(data_X)):
                     delta = delta_L[di]
                     dq = Al_trans_i[di] * exp_dij * delta[j]
+
+                    # Next delta
+                    next_delta[di][i] += w_ij * delta[j] * sigma_Z[l-1][di][i]
 
                     # Charge
                     dc_dq[l][j] += dq
@@ -156,27 +163,6 @@ class ParticleNetwork(object):
             dc_dr[l][j][1] += dc_dr_lj_y
             dc_dr[l][j][2] += dc_dr_lj_z
 
-        # Store matrices. Surely not the best option, but avoid recomputing every time.
-        W = []
-        for l in range(len(self.layers)):
-            W.append(self.layers[l].build_weight_matrix(R[l]))
-
-        deltas = [[[] for x in range(len(data_X))] for _ in range(len(self.layers)+1)]
-
-        for di, data in enumerate(data_X):
-            l = -1
-            delta = delta_L[di]
-            deltas[l][di] = delta
-            while -l < len(self.layers):
-                l -= 1
-                # Delta and bias gradient
-                prev_delta = delta
-                delta = prev_delta.dot(W[l+1]) * sigma_Z[l][di]
-                deltas[l][di] = delta
-                dc_db[l] += delta
-            # Input delta
-            deltas[0][di] = delta.dot(W[0])
-
         l = -1
         while -l < len(self.layers):
             l -= 1
@@ -186,6 +172,13 @@ class ParticleNetwork(object):
 
             Al = A[l-1]
             Al_trans = Al.transpose()
+
+            this_delta = next_delta
+            next_delta = np.zeros((len(data_X), len(prev_layer.r)))
+
+            # Bias gradient
+            for di, data in enumerate(data_X):
+                dc_db[l] += this_delta[di]
 
             # Position gradient
             for j in range(len(layer.r)):
@@ -206,12 +199,18 @@ class ParticleNetwork(object):
                     exp_dij = math.exp(-dij)
                     tmp_qj_over_dij = qj / dij
 
+                    w_ij = qj * exp_dij
+
                     Al_trans_i = Al_trans[i]
                     dc_dr_lm1_i_x = 0.0
                     dc_dr_lm1_i_y = 0.0
                     dc_dr_lm1_i_z = 0.0
                     for di in range(len(data_X)):
-                        dq = Al_trans_i[di] * exp_dij * deltas[l][di][j]
+                        dq = Al_trans_i[di] * exp_dij * this_delta[di][j]
+
+                        # Next delta
+                        if -(l-1) <= len(self.layers):
+                            next_delta[di][i] += w_ij * this_delta[di][j] * sigma_Z[l-1][di][i]
 
                         # Charge
                         dc_dq[l][j] += dq
@@ -236,13 +235,12 @@ class ParticleNetwork(object):
                 dc_dr[l][j][1] += dc_dr_lj_y
                 dc_dr[l][j][2] += dc_dr_lj_z
 
-        # Input layer charge gradient
-        Al_trans = data_X.transpose()
-        for j in range(len(self.particle_input.r)):
-            Al_trans_i = Al_trans[j]
-            for di in range(len(data_X)):
-                dc_dq[0][j] += Al_trans_i[di] * deltas[0][di][j]
-
+        # # Input layer charge gradient
+        # Al_trans = data_X.transpose()
+        # for j in range(len(self.particle_input.r)):
+        #     Al_trans_i = Al_trans[j]
+        #     for di in range(len(data_X)):
+        #         dc_dq[0][j] += Al_trans_i[di] * deltas[0][di][j]
 
         # Perform charge regularization if needed
         if self.regularizer is not None:
