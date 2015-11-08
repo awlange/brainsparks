@@ -91,12 +91,13 @@ class ParticleSGD(Optimizer):
         """
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
-            layer.q -= self.alpha * self.dc_dq[l]
+            layer.q -= self.alpha * self.dc_dq[l+1]
             for i in range(len(layer.r)):
                 layer.r[i][0] -= self.alpha * self.dc_dr[l+1][i][0]
                 layer.r[i][1] -= self.alpha * self.dc_dr[l+1][i][1]
                 layer.r[i][2] -= self.alpha * self.dc_dr[l+1][i][2]
         for i in range(len(network.particle_input.r)):
+            network.particle_input.q[i][0] -= self.alpha * self.dc_dq[0][i][0]
             network.particle_input.r[i][0] -= self.alpha * self.dc_dr[0][i][0]
             network.particle_input.r[i][1] -= self.alpha * self.dc_dr[0][i][1]
             network.particle_input.r[i][2] -= self.alpha * self.dc_dr[0][i][2]
@@ -109,7 +110,7 @@ class ParticleSGD(Optimizer):
         # Initialize velocities to zero for momentum
         if self.vel_b is None or self.vel_q is None or self.vel_r is None:
             self.vel_b = []
-            self.vel_q = []
+            self.vel_q = [np.zeros(network.particle_input.q.shape)]
             self.vel_r = [np.zeros(network.particle_input.r.shape)]
             for l, layer in enumerate(network.layers):
                 self.vel_b.append(np.zeros(layer.b.shape))
@@ -118,10 +119,12 @@ class ParticleSGD(Optimizer):
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
-            self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
+            self.vel_q[l+1] = -self.alpha * self.dc_dq[l+1] + self.beta * self.vel_q[l+1]
             self.vel_r[l+1] = -self.alpha * self.dc_dr[l+1] + self.beta * self.vel_r[l+1]
             layer.b += self.vel_b[l]
-            layer.q += self.vel_q[l]
+            layer.q += self.vel_q[l+1]
             layer.r += self.vel_r[l+1]
+        # self.vel_q[0] = -self.alpha * self.dc_dq[0] + self.beta * self.vel_q[0]
         self.vel_r[0] = -self.alpha * self.dc_dr[0] + self.beta * self.vel_r[0]
         network.particle_input.r += self.vel_r[0]
+        # network.particle_input.q += self.vel_q[0]
