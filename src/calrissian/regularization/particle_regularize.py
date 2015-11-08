@@ -9,8 +9,8 @@ class ParticleRegularize(object):
     def __init__(self, coeff_lambda=0.0):
         self.coeff_lambda = coeff_lambda
 
-    def cost(self, layers):
-        c = 0.0
+    def cost(self, particle_input, layers):
+        c = np.sum(particle_input.q * particle_input.q)
         for layer in layers:
             # c += np.sum(layer.q * layer.q) + np.sum(layer.b * layer.b)
             c += np.sum(layer.q * layer.q)

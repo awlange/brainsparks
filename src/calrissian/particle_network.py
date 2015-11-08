@@ -58,7 +58,7 @@ class ParticleNetwork(object):
         c = self.cost_function(data_Y, self.predict(data_X))
 
         if self.regularizer is not None:
-            c += self.regularizer.cost(self.layers)
+            c += self.regularizer.cost(self.particle_input, self.layers)
 
         return c
 
