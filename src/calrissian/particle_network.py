@@ -42,8 +42,7 @@ class ParticleNetwork(object):
         :param data_X:
         :return:
         """
-        a = data_X
-        r = self.particle_input.r
+        a, r = self.particle_input.feed_forward(data_X)
         for layer in self.layers:
             a, r = layer.feed_forward(a, r)
         return a
@@ -74,7 +73,7 @@ class ParticleNetwork(object):
 
         # Output gradients
         dc_db = []
-        dc_dq = []  # charge gradient
+        dc_dq = [np.zeros(self.particle_input.q.shape)]  # charge gradient
         dc_dr = [np.zeros((len(self.particle_input.r), 3))]  # position gradient, a bit trickier
 
         # Initialize
@@ -84,7 +83,8 @@ class ParticleNetwork(object):
             dc_dr.append(np.zeros((len(layer.q), 3)))
 
         sigma_Z = []
-        A = [data_X]  # Note: A has one more element than sigma_Z
+        A_scaled, _ = self.particle_input.feed_forward(data_X)
+        A = [A_scaled]  # Note: A has one more element than sigma_Z
         R = [self.particle_input.r]
         for l, layer in enumerate(self.layers):
             z = layer.compute_z(A[l], R[l])
@@ -161,7 +161,7 @@ class ParticleNetwork(object):
         for l in range(len(self.layers)):
             W.append(self.layers[l].build_weight_matrix(R[l]))
 
-        deltas = [[[] for x in range(len(data_X))] for _ in range(len(self.layers))]
+        deltas = [[[] for x in range(len(data_X))] for _ in range(len(self.layers)+1)]
 
         for di, data in enumerate(data_X):
             l = -1
@@ -174,6 +174,8 @@ class ParticleNetwork(object):
                 delta = prev_delta.dot(W[l+1]) * sigma_Z[l][di]
                 deltas[l][di] = delta
                 dc_db[l] += delta
+            # Input delta
+            deltas[0][di] = delta.dot(W[0])
 
         l = -1
         while -l < len(self.layers):
@@ -234,9 +236,17 @@ class ParticleNetwork(object):
                 dc_dr[l][j][1] += dc_dr_lj_y
                 dc_dr[l][j][2] += dc_dr_lj_z
 
+        # Input layer charge gradient
+        Al_trans = data_X.transpose()
+        for j in range(len(self.particle_input.r)):
+            Al_trans_i = Al_trans[j]
+            for di in range(len(data_X)):
+                dc_dq[0][j] += Al_trans_i[di] * deltas[0][di][j]
+
+
         # Perform charge regularization if needed
         if self.regularizer is not None:
-            dc_dq = self.regularizer.cost_gradient(self.layers, dc_dq)
+            dc_dq, dc_db = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db)
 
         return dc_db, dc_dq, dc_dr
 

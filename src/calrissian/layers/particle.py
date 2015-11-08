@@ -10,8 +10,18 @@ class ParticleInput(object):
         self.size = size
 
         # Positions
-        s = 1.0
+        s = 0.5
         self.r = np.random.uniform(-s, s, (size, 3))
+
+        # Charges
+        s = 1.0
+        self.q = np.random.uniform(-s, s, size)
+
+    def feed_forward(self, a_in):
+        """
+        Just scales the input by the charges
+        """
+        return a_in * self.q, self.r
 
 
 class Particle(object):
@@ -25,15 +35,15 @@ class Particle(object):
         self.d_activation = Activation.get_d(activation)
 
         # Weight initialization
-        s = 1.0
+        s = 0.2
         self.b = np.random.uniform(-s, s, (1, output_size))
 
         # Charges
-        s = 0.1
+        s = 0.2
         self.q = np.random.uniform(-s, s, output_size)
 
         # Positions
-        s = 1.0
+        s = 0.5
         self.r = np.random.uniform(-s, s, (output_size, 3))
 
     def feed_forward(self, a_in, r_in):

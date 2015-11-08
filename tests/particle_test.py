@@ -13,8 +13,11 @@ import numpy as np
 
 def main():
 
-    train_X = np.asarray([[0.2, -0.3]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0]])
+    # train_X = np.asarray([[0.2, -0.3]])
+    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
     net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
     net.append(Particle(2, 5, activation="sigmoid"))
@@ -47,8 +50,8 @@ def fd():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2),
-                          regularizer=ParticleRegularize(0.25))
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2))
+    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(0.25))
     net.append(Particle(2, 5, activation="sigmoid"))
     net.append(Particle(5, 4, activation="sigmoid"))
     net.append(Particle(4, 3, activation="softmax"))
@@ -85,6 +88,16 @@ def fd():
         print(x)
 
     fd_q = []
+    lq = []
+    for i in range(len(net.particle_input.q)):
+        orig = net.particle_input.q[i]
+        net.particle_input.q[i] += h
+        fp = net.cost(train_X, train_Y)
+        net.particle_input.q[i] -= 2*h
+        fm = net.cost(train_X, train_Y)
+        lq.append((fp - fm) / (2*h))
+        net.particle_input.q[i] = orig
+    fd_q.append(lq)
     for l in range(len(net.layers)):
         lq = []
         for i in range(len(net.layers[l].q)):
