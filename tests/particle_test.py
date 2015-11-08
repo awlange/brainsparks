@@ -42,6 +42,25 @@ def main2():
     sgd.optimize(net, train_X, train_Y)
 
 
+def main3():
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
+    net.append(Particle(2, 5, activation="sigmoid"))
+    net.append(Particle(5, 3, activation="sigmoid"))
+
+    print(net.predict(train_X))
+
+    with open("/Users/alange/network.json", "w") as f:
+        net.write_to_json(f)
+
+    with open("/Users/alange/network.json", "r") as f:
+        new_net = ParticleNetwork.read_from_json(f)
+        print(new_net.predict(train_X))
+
+
 def fd():
 
     # train_X = np.asarray([[0.2, -0.3]])
@@ -214,4 +233,5 @@ if __name__ == "__main__":
 
     # main()
     # main2()
-    fd()
+    main3()
+    # fd()
