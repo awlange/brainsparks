@@ -23,8 +23,8 @@ class ParticleInput(object):
         Just scales the input by the charges
         Turned off for now
         """
-        # return a_in * self.q, self.r
-        return a_in, self.r
+        return a_in * self.q, self.r
+        # return a_in, self.r
 
 
 class Particle(object):
@@ -42,8 +42,12 @@ class Particle(object):
         self.b = np.random.uniform(-s, s, (1, output_size))
 
         # Charges
-        s = 1.0
+        s = 0.1
         self.q = np.random.uniform(-s, s, output_size)
+        # self.q = np.ones(output_size) + np.random.uniform(-s, s, output_size)
+        # for i in range(output_size):
+        #     if np.random.uniform(0, 1) > 0.5:
+        #         self.q[i] *= -1.0
 
         # Positions
         s = 1.0
@@ -57,9 +61,6 @@ class Particle(object):
         z = np.zeros((self.output_size, len(a_in)))
         for j in range(self.output_size):
             zj = z[j]
-            bj = self.b[0][j]
-            for k, a in enumerate(a_in):
-                zj[k] = bj
             q_j = self.q[j]
             r_jx = self.r[j][0]
             r_jy = self.r[j][1]
@@ -69,9 +70,12 @@ class Particle(object):
                 dy = r_in[i][1] - r_jy
                 dz = r_in[i][2] - r_jz
                 d2 = dx*dx + dy*dy + dz*dz
-                # d_ij = math.sqrt(dx*dx + dy*dy + dz*dz)
-                w_ji = q_j * math.exp(-d2)  # gaussian pairwise kernel
+                w_ji = math.exp(-d2)  # gaussian pairwise kernel
                 zj += w_ji * atrans[i]
+            zj *= q_j
+            bj = self.b[0][j]
+            for k, a in enumerate(a_in):
+                zj[k] += bj
         return z.transpose()
 
     def compute_a(self, z):

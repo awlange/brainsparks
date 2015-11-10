@@ -232,15 +232,14 @@ class ParticleNetwork(object):
                 dc_dr[l][j][2] += dc_dr_lj_z
 
         # # Input layer charge gradient
-        # Al_trans = data_X.transpose()
-        # for j in range(len(self.particle_input.r)):
-        #     Al_trans_i = Al_trans[j]
-        #     for di in range(len(data_X)):
-        #         dc_dq[0][j] += Al_trans_i[di] * deltas[0][di][j]
+        this_delta = next_delta
+        Al_trans = data_X.transpose()
+        for j in range(len(self.particle_input.r)):
+            dc_dq[0][j] += np.sum(Al_trans[j] * this_delta[j])
 
         # Perform charge regularization if needed
         if self.regularizer is not None:
-            dc_dq, dc_db = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db)
+            dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
 
         return dc_db, dc_dq, dc_dr
 
