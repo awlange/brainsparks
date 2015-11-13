@@ -28,12 +28,12 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 100
+n_sub = 1000
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
 net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(784))
-net.append(Particle(784, 32, activation="relu"))
+net.append(Particle(784, 32, activation="sigmoid"))
 net.append(Particle(32, 10, activation="softmax"))
 
 print("starting predict")

@@ -163,8 +163,6 @@ class ParticleNetwork(object):
             dc_dr[l][j][1] += dc_dr_lj_y
             dc_dr[l][j][2] += dc_dr_lj_z
 
-        data_ones = np.ones(len(data_X))
-
         l = -1
         while -l < len(self.layers):
             l -= 1
@@ -177,7 +175,7 @@ class ParticleNetwork(object):
 
             this_delta = next_delta
             next_delta = np.zeros((len(prev_layer.r), len(data_X)))
-            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else None
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((len(prev_layer.r), len(data_X)))
 
             # Bias gradient
             trans_delta = this_delta.transpose()
@@ -207,7 +205,7 @@ class ParticleNetwork(object):
 
                     # Next delta
                     w_ij = qj * exp_dij
-                    trans_sigma_Z_i = trans_sigma_Z_l[i] if trans_sigma_Z_l is not None else data_ones
+                    trans_sigma_Z_i = trans_sigma_Z_l[i]
                     next_delta[i] += w_ij * this_delta_j * trans_sigma_Z_i
 
                     # Charge gradient

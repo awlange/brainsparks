@@ -17,6 +17,9 @@ class ParticleInput(object):
         s = 1.0
         # self.q = np.random.uniform(-s, s, size)
         self.q = np.ones(size)
+        # for i in range(size):
+        #     if np.random.uniform(0, 1) > 0.5:
+        #         self.q[i] *= -1.0
 
     def feed_forward(self, a_in):
         """
@@ -38,11 +41,12 @@ class Particle(object):
         self.d_activation = Activation.get_d(activation)
 
         # Weight initialization
-        s = 1.0
-        self.b = np.random.uniform(-s, s, (1, output_size))
+        s = 0.1
+        # self.b = np.random.uniform(-s, s, (1, output_size))
+        self.b = np.zeros((1, output_size))
 
         # Charges
-        s = 0.1
+        s = 1.0 / np.sqrt(self.input_size)
         self.q = np.random.uniform(-s, s, output_size)
         # self.q = np.ones(output_size) + np.random.uniform(-s, s, output_size)
         # for i in range(output_size):

@@ -15,6 +15,8 @@ class Activation(object):
             return Activation.linear
         if nl == "relu":
             return Activation.relu
+        if nl == "leaky_relu":
+            return Activation.leaky_relu
         if nl == "tanh":
             return Activation.tanh
         if nl == "softmax":
@@ -35,6 +37,8 @@ class Activation(object):
             return Activation.d_linear
         if nl == "relu":
             return Activation.d_relu
+        if nl == "leaky_relu":
+            return Activation.d_leaky_relu
         if nl == "tanh":
             return Activation.d_tanh
         if nl == "softmax" or "atomic_softmax":
@@ -73,6 +77,16 @@ class Activation(object):
     @staticmethod
     def d_relu(x):
         return np.piecewise(x, [x < 0.0, x >= 0], [0.0, 1.0])
+
+    # LeakyReLU
+
+    @staticmethod
+    def leaky_relu(x):
+        return np.maximum(0.01*x, x)
+
+    @staticmethod
+    def d_leaky_relu(x):
+        return np.piecewise(x, [x < 0.0, x >= 0], [0.01, 1.0])
 
     # tanh
 
