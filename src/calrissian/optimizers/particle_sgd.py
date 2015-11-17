@@ -109,7 +109,7 @@ class ParticleSGD(Optimizer):
         TODO
         """
         # Initialize velocities to zero for momentum
-        if self.vel_b is None or self.vel_q is None or self.vel_r is None:
+        if self.vel_b is None or self.vel_q is None or self.vel_rx is None or self.vel_ry is None or self.vel_rz is None:
             self.vel_b = []
             self.vel_q = []
             self.vel_rx = [np.zeros(network.particle_input.output_size)]
