@@ -2,42 +2,27 @@ from .layer import Layer
 from ..activation import Activation
 
 import numpy as np
-import math
 
 
 class ParticleInput(object):
-    def __init__(self, size):
-        self.size = size
+    def __init__(self, output_size):
+        self.output_size = output_size
 
         # Positions
         s = 1.0
-        self.r = np.random.uniform(-s, s, (size, 3))
+        self.rx = np.random.uniform(-s, s, output_size)
+        self.ry = np.random.uniform(-s, s, output_size)
+        self.rz = np.random.uniform(-s, s, output_size)
 
-        self.rx = np.zeros(len(self.r))
-        self.ry = np.zeros(len(self.r))
-        self.rz = np.zeros(len(self.r))
-        for i, r in enumerate(self.r):
-            self.rx[i] = r[0]
-            self.ry[i] = r[1]
-            self.rz[i] = r[2]
-
-        self.rr = [self.rx, self.ry, self.rz]
-
-        # Charges
-        s = 1.0
-        # self.q = np.random.uniform(-s, s, size)
-        self.q = np.ones(size)
-        # for i in range(size):
-        #     if np.random.uniform(0, 1) > 0.5:
-        #         self.q[i] *= -1.0
+    def get_rxyz(self):
+        return self.rx, self.ry, self.rz
 
     def feed_forward(self, a_in):
         """
         Just scales the input by the charges
         Turned off for now
         """
-        # return a_in * self.q, self.r
-        return a_in, self.rr
+        return a_in, (self.get_rxyz())
 
 
 class Particle(object):
@@ -60,20 +45,15 @@ class Particle(object):
 
         # Positions
         s = 1.0
-        self.r = np.random.uniform(-s, s, (output_size, 3))
+        self.rx = np.random.uniform(-s, s, output_size)
+        self.ry = np.random.uniform(-s, s, output_size)
+        self.rz = np.random.uniform(-s, s, output_size)
 
-        self.rx = np.zeros(output_size)
-        self.ry = np.zeros(output_size)
-        self.rz = np.zeros(output_size)
-        for i, r in enumerate(self.r):
-            self.rx[i] = r[0]
-            self.ry[i] = r[1]
-            self.rz[i] = r[2]
-
-        self.rr = [self.rx, self.ry, self.rz]
+    def get_rxyz(self):
+        return self.rx, self.ry, self.rz
 
     def feed_forward(self, a_in, r_in):
-        return self.compute_a(self.compute_z(a_in, r_in)), self.rr
+        return self.compute_a(self.compute_z(a_in, r_in)), (self.get_rxyz())
 
     def compute_z(self, a_in, r_in):
         """

@@ -26,12 +26,12 @@ def main():
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
     print(net.cost_gradient(train_X, train_Y))
-    print(net.cost_gradient2(train_X, train_Y))
 
 
 def main2():
 
     sgd = ParticleSGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="momentum", beta=0.5)
+    # sgd = ParticleSGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2)
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
@@ -80,7 +80,7 @@ def fd():
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr = net.cost_gradient2(train_X, train_Y)
+    db, dq, dr = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -108,16 +108,6 @@ def fd():
         print(x)
 
     fd_q = []
-    lq = []
-    for i in range(len(net.particle_input.q)):
-        orig = net.particle_input.q[i]
-        net.particle_input.q[i] += h
-        fp = net.cost(train_X, train_Y)
-        net.particle_input.q[i] -= 2*h
-        fm = net.cost(train_X, train_Y)
-        lq.append((fp - fm) / (2*h))
-        net.particle_input.q[i] = orig
-    fd_q.append(lq)
     for l in range(len(net.layers)):
         lq = []
         for i in range(len(net.layers[l].q)):
@@ -153,7 +143,7 @@ def fd():
     lr_x = []
     lr_y = []
     lr_z = []
-    for i in range(len(layer.r)):
+    for i in range(layer.output_size):
         # x
         orig = layer.rx[i]
         layer.rx[i] += h
@@ -190,7 +180,7 @@ def fd():
         lr_x = []
         lr_y = []
         lr_z = []
-        for i in range(len(layer.r)):
+        for i in range(layer.output_size):
             # x
             orig = layer.rx[i]
             layer.rx[i] += h
@@ -239,6 +229,6 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    # main2()
+    main2()
     # main3()
-    fd()
+    # fd()
