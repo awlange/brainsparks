@@ -234,18 +234,21 @@ class ParticleNetwork(object):
 
         network = {"particle_input": {}, "layers": [], "cost_name": self.cost_name}
 
-        p_inp = {"r": [], "q": []}
-        for i, r in enumerate(self.particle_input.r):
-            p_inp["q"].append(self.particle_input.q[i])
-            p_inp["r"].append([r[0], r[1], r[2]])
+        p_inp = {"rx": [], "ry": [], "rz": []}
+        for i in range(self.particle_input.output_size):
+            p_inp["rx"].append(self.particle_input.rx[i])
+            p_inp["ry"].append(self.particle_input.ry[i])
+            p_inp["rz"].append(self.particle_input.rz[i])
         network["particle_input"] = p_inp
 
         for layer in self.layers:
-            l_data = {"r": [], "q": [], "b": [], "activation_name": layer.activation_name}
-            for i, r in enumerate(layer.r):
+            l_data = {"rx": [], "ry": [], "rz": [], "q": [], "b": [], "activation_name": layer.activation_name}
+            for i in range(layer.output_size):
                 l_data["q"].append(layer.q[i])
                 l_data["b"].append(layer.b[0][i])
-                l_data["r"].append([r[0], r[1], r[2]])
+                l_data["rx"].append(layer.rx[i])
+                l_data["ry"].append(layer.ry[i])
+                l_data["rz"].append(layer.rz[i])
             network["layers"].append(l_data)
 
         json.dump(network, file)
@@ -263,25 +266,29 @@ class ParticleNetwork(object):
         network = ParticleNetwork(cost=data.get("cost_name"))
 
         data_p_inp = data.get("particle_input")
-        particle_input = ParticleInput(len(data_p_inp.get("r")))
-        for i, r in enumerate(data_p_inp.get("r")):
-            particle_input.q[i] = data_p_inp.get("q")[i]
-            particle_input.r[i][0] = r[0]
-            particle_input.r[i][1] = r[1]
-            particle_input.r[i][2] = r[2]
+        particle_input = ParticleInput(len(data_p_inp.get("rx")))
+        for i, r in enumerate(data_p_inp.get("rx")):
+            particle_input.rx[i] = r
+        for i, r in enumerate(data_p_inp.get("ry")):
+            particle_input.ry[i] = r
+        for i, r in enumerate(data_p_inp.get("rz")):
+            particle_input.rz[i] = r
         network.particle_input = particle_input
 
         data_layers = data.get("layers")
-        n_input = len(data_p_inp.get("r"))
+        n_input = len(data_p_inp.get("rx"))
         for d_layer in data_layers:
             particle = Particle(input_size=n_input, output_size=len(d_layer.get("r")),
                                 activation=d_layer.get("activation_name"))
-            for i, r in enumerate(d_layer.get("r")):
+            for i, r in enumerate(d_layer.get("rx")):
                 particle.q[i] = d_layer.get("q")[i]
                 particle.b[0][i] = d_layer.get("b")[i]
-                particle.r[i][0] = r[0]
-                particle.r[i][1] = r[1]
-                particle.r[i][2] = r[2]
+                for i, r in enumerate(data_p_inp.get("rx")):
+                    particle.rx[i] = r
+                for i, r in enumerate(data_p_inp.get("ry")):
+                    particle.ry[i] = r
+                for i, r in enumerate(data_p_inp.get("rz")):
+                    particle.rz[i] = r
             network.layers.append(particle)
 
         return network
