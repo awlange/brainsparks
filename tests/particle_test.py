@@ -26,6 +26,7 @@ def main():
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
     print(net.cost_gradient(train_X, train_Y))
+    print(net.cost_gradient2(train_X, train_Y))
 
 
 def main2():
@@ -79,7 +80,7 @@ def fd():
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr = net.cost_gradient(train_X, train_Y)
+    db, dq, dr = net.cost_gradient2(train_X, train_Y)
 
     h = 0.001
 
@@ -133,9 +134,15 @@ def fd():
     for x in fd_q:
         print(x)
 
-    print("analytic r")
-    for x in dr:
-        print(x)
+    print("analytic x")
+    for layer in dr[0]:
+        print(layer)
+    print("analytic y")
+    for layer in dr[1]:
+        print(layer)
+    print("analytic z")
+    for layer in dr[2]:
+        print(layer)
 
     fd_r_x = []
     fd_r_y = []
@@ -148,31 +155,31 @@ def fd():
     lr_z = []
     for i in range(len(layer.r)):
         # x
-        orig = layer.r[i][0]
-        layer.r[i][0] += h
+        orig = layer.rx[i]
+        layer.rx[i] += h
         fp = net.cost(train_X, train_Y)
-        layer.r[i][0] -= 2*h
+        layer.rx[i] -= 2*h
         fm = net.cost(train_X, train_Y)
         lr_x.append((fp - fm) / (2*h))
-        layer.r[i][0] = orig
+        layer.rx[i] = orig
 
         # y
-        orig = layer.r[i][1]
-        layer.r[i][1] += h
+        orig = layer.ry[i]
+        layer.ry[i] += h
         fp = net.cost(train_X, train_Y)
-        layer.r[i][1] -= 2*h
+        layer.ry[i] -= 2*h
         fm = net.cost(train_X, train_Y)
         lr_y.append((fp - fm) / (2*h))
-        layer.r[i][1] = orig
+        layer.ry[i] = orig
 
         # z
-        orig = layer.r[i][2]
-        layer.r[i][2] += h
+        orig = layer.rz[i]
+        layer.rz[i] += h
         fp = net.cost(train_X, train_Y)
-        layer.r[i][2] -= 2*h
+        layer.rz[i] -= 2*h
         fm = net.cost(train_X, train_Y)
         lr_z.append((fp - fm) / (2*h))
-        layer.r[i][2] = orig
+        layer.rz[i] = orig
 
     fd_r_x.append(lr_x)
     fd_r_y.append(lr_y)
@@ -185,31 +192,31 @@ def fd():
         lr_z = []
         for i in range(len(layer.r)):
             # x
-            orig = layer.r[i][0]
-            layer.r[i][0] += h
+            orig = layer.rx[i]
+            layer.rx[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.r[i][0] -= 2*h
+            layer.rx[i] -= 2*h
             fm = net.cost(train_X, train_Y)
             lr_x.append((fp - fm) / (2*h))
-            layer.r[i][0] = orig
+            layer.rx[i] = orig
 
             # y
-            orig = layer.r[i][1]
-            layer.r[i][1] += h
+            orig = layer.ry[i]
+            layer.ry[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.r[i][1] -= 2*h
+            layer.ry[i] -= 2*h
             fm = net.cost(train_X, train_Y)
             lr_y.append((fp - fm) / (2*h))
-            layer.r[i][1] = orig
+            layer.ry[i] = orig
 
             # z
-            orig = layer.r[i][2]
-            layer.r[i][2] += h
+            orig = layer.rz[i]
+            layer.rz[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.r[i][2] -= 2*h
+            layer.rz[i] -= 2*h
             fm = net.cost(train_X, train_Y)
             lr_z.append((fp - fm) / (2*h))
-            layer.r[i][2] = orig
+            layer.rz[i] = orig
 
         fd_r_x.append(lr_x)
         fd_r_y.append(lr_y)

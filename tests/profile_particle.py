@@ -33,17 +33,18 @@ X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
 net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(784))
-net.append(Particle(784, 32, activation="sigmoid"))
-net.append(Particle(32, 10, activation="softmax"))
+net.append(Particle(784, 64, activation="sigmoid"))
+net.append(Particle(64, 10, activation="softmax"))
 
 print("starting predict")
 times = []
-nt = 1
+nt = 3
 for _ in range(nt):
     ts = time.time()
-    # c = net.cost(X_sub, Y_sub)
+    # c = net.cost(X, Y)
     c = 1.0
-    net.cost_gradient(X_sub, Y_sub)
+    # net.cost_gradient(X_sub, Y_sub)
+    net.cost_gradient2(X_sub, Y_sub)
     t = time.time() - ts
     print("Cost: {} time: {}".format(c, t))
     times.append(t)

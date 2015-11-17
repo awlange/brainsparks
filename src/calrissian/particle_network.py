@@ -90,13 +90,13 @@ class ParticleNetwork(object):
         sigma_Z = []
         A_scaled, _ = self.particle_input.feed_forward(data_X)
         A = [A_scaled]  # Note: A has one more element than sigma_Z
-        R = [self.particle_input.r]
+        prev_layer_rr = self.particle_input.rr
         for l, layer in enumerate(self.layers):
-            z = layer.compute_z(A[l], R[l])
+            z = layer.compute_z(A[l], prev_layer_rr)
             a = layer.compute_a(z)
             A.append(a)
             sigma_Z.append(layer.compute_da(z))
-            R.append(layer.r)
+            prev_layer_rr = layer.rr
 
         delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
 
@@ -229,11 +229,158 @@ class ParticleNetwork(object):
                 dc_dr[l][j][1] += dc_dr_lj_y
                 dc_dr[l][j][2] += dc_dr_lj_z
 
-        # # Input layer charge gradient
+        # Input layer charge gradient
         this_delta = next_delta
         Al_trans = data_X.transpose()
         for j in range(len(self.particle_input.r)):
             dc_dq[0][j] += np.sum(Al_trans[j] * this_delta[j])
+
+        # Perform charge regularization if needed
+        if self.regularizer is not None:
+            dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
+
+        return dc_db, dc_dq, dc_dr
+
+    def cost_gradient2(self, data_X, data_Y):
+        """
+        Computes the gradient of the cost with respect to each weight and bias in the network
+
+        :param data_X:
+        :param data_Y:
+        :return:
+        """
+
+        # Output gradients
+        dc_db = []
+        dc_dq = [np.zeros(self.particle_input.q.shape)]
+        dc_dr_x = [np.zeros(len(self.particle_input.r))]
+        dc_dr_y = [np.zeros(len(self.particle_input.r))]
+        dc_dr_z = [np.zeros(len(self.particle_input.r))]
+
+        # Initialize
+        for l, layer in enumerate(self.layers):
+            dc_db.append(np.zeros(layer.b.shape))
+            dc_dq.append(np.zeros(layer.q.shape))
+            dc_dr_x.append(np.zeros(len(layer.q)))
+            dc_dr_y.append(np.zeros(len(layer.q)))
+            dc_dr_z.append(np.zeros(len(layer.q)))
+
+        sigma_Z = []
+        A_scaled, _ = self.particle_input.feed_forward(data_X)
+        A = [A_scaled]  # Note: A has one more element than sigma_Z
+        prev_layer_rr = self.particle_input.rr
+        for l, layer in enumerate(self.layers):
+            z = layer.compute_z(A[l], prev_layer_rr)
+            a = layer.compute_a(z)
+            A.append(a)
+            sigma_Z.append(layer.compute_da(z))
+            prev_layer_rr = layer.rr
+
+        delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
+
+        # For each piece of data
+        for di, data in enumerate(data_X):
+            dc_db[-1] += delta_L[di]
+
+        l = -1
+        layer = self.layers[l]
+        prev_layer = self.layers[l-1]
+
+        Al = A[l-1]
+        Al_trans = Al.transpose()
+        trans_delta_L = delta_L.transpose()
+        trans_sigma_Z = []
+        for sz in sigma_Z:
+            trans_sigma_Z.append(np.asarray(sz).transpose())
+
+        next_delta = np.zeros((len(prev_layer.r), len(data_X)))
+
+        # Position gradient
+        for j in range(len(layer.r)):
+            qj = layer.q[j]
+            trans_delta_L_j = trans_delta_L[j]
+            trans_sigma_Z_l = trans_sigma_Z[l-1]
+
+            dx = (prev_layer.rx - layer.rx[j]).reshape((len(prev_layer.r), 1))
+            dy = (prev_layer.ry - layer.ry[j]).reshape((len(prev_layer.r), 1))
+            dz = (prev_layer.rz - layer.rz[j]).reshape((len(prev_layer.r), 1))
+            d2 = dx**2 + dy**2 + dz**2
+            exp_dij = np.exp(-d2)
+
+            # Next delta
+            next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
+
+            # Charge gradient
+            dq = exp_dij * Al_trans * trans_delta_L_j
+            dc_dq[l][j] += np.sum(dq)
+
+            # Position gradient
+            tmp = 2.0 * qj * dq
+            tx = dx * tmp
+            ty = dy * tmp
+            tz = dz * tmp
+
+            dc_dr_x[l][j] += np.sum(tx)
+            dc_dr_y[l][j] += np.sum(ty)
+            dc_dr_z[l][j] += np.sum(tz)
+
+            dc_dr_x[l-1] -= np.sum(tx, axis=1)
+            dc_dr_y[l-1] -= np.sum(ty, axis=1)
+            dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+        l = -1
+        while -l < len(self.layers):
+            l -= 1
+            # Gradient computation
+            layer = self.layers[l]
+            prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
+
+            Al = A[l-1]
+            Al_trans = Al.transpose()
+
+            this_delta = next_delta
+            next_delta = np.zeros((len(prev_layer.r), len(data_X)))
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((len(prev_layer.r), len(data_X)))
+
+            # Bias gradient
+            trans_delta = this_delta.transpose()
+            for di, data in enumerate(data_X):
+                dc_db[l] += trans_delta[di]
+
+            # Position gradient
+            for j in range(len(layer.r)):
+                qj = layer.q[j]
+                this_delta_j = this_delta[j]
+
+                dx = (prev_layer.rx - layer.rx[j]).reshape((len(prev_layer.r), 1))
+                dy = (prev_layer.ry - layer.ry[j]).reshape((len(prev_layer.r), 1))
+                dz = (prev_layer.rz - layer.rz[j]).reshape((len(prev_layer.r), 1))
+                d2 = dx**2 + dy**2 + dz**2
+                exp_dij = np.exp(-d2)
+
+                # Next delta
+                next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
+
+                # Charge gradient
+                dq = exp_dij * Al_trans * this_delta_j
+                dc_dq[l][j] += np.sum(dq)
+
+                # Position gradient
+                tmp = 2.0 * qj * dq
+                tx = dx * tmp
+                ty = dy * tmp
+                tz = dz * tmp
+
+                dc_dr_x[l][j] += np.sum(tx)
+                dc_dr_y[l][j] += np.sum(ty)
+                dc_dr_z[l][j] += np.sum(tz)
+
+                dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+        # Position gradient list
+        dc_dr = [dc_dr_x, dc_dr_y, dc_dr_z]
 
         # Perform charge regularization if needed
         if self.regularizer is not None:
