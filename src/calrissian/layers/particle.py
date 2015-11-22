@@ -27,13 +27,15 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid"):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=0.5):
         # super().__init__("Atomic", True)
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
+
+        self.zeta = zeta
 
         # Weight initialization
         s = 0.1
@@ -72,7 +74,7 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
+            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
             z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
         return z.transpose()
 

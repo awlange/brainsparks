@@ -131,7 +131,7 @@ class ParticleNetwork(object):
             dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
             dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
             d2 = dx**2 + dy**2 + dz**2
-            exp_dij = np.exp(-d2)
+            exp_dij = np.exp(-layer.zeta * d2)
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
@@ -141,7 +141,7 @@ class ParticleNetwork(object):
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
-            tmp = 2.0 * qj * dq
+            tmp = 2.0 * layer.zeta * qj * dq
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -182,7 +182,7 @@ class ParticleNetwork(object):
                 dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
                 dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
-                exp_dij = np.exp(-d2)
+                exp_dij = np.exp(-layer.zeta * d2)
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
@@ -192,7 +192,7 @@ class ParticleNetwork(object):
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
-                tmp = 2.0 * qj * dq
+                tmp = 2.0 * layer.zeta * qj * dq
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp

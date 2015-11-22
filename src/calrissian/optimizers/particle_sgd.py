@@ -9,7 +9,8 @@ class ParticleSGD(Optimizer):
     Stochastic gradient descent optimization for Atomic layers
     """
 
-    def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd"):
+    def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
+                 cost_freq=2, position_grad=True):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -20,6 +21,8 @@ class ParticleSGD(Optimizer):
         self.n_epochs = n_epochs
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
+        self.cost_freq = cost_freq
+        self.position_grad = position_grad  # Turn off position gradient?
 
         # Weight update function
         self.weight_update = weight_update
@@ -72,7 +75,7 @@ class ParticleSGD(Optimizer):
                 # Update weights and biases
                 self.weight_update_func(network)
 
-                if self.verbosity > 1:
+                if self.verbosity > 1 and m % self.cost_freq == 0:
                     c = network.cost(data_X, data_Y)
                     print("Cost at epoch {} mini-batch {}: {:g}".format(epoch, m, c))
                     # TODO: could output projected time left based on mini-batch times
@@ -96,12 +99,14 @@ class ParticleSGD(Optimizer):
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
             layer.q -= self.alpha * self.dc_dq[l]
-            layer.rx -= self.alpha * self.dc_dr[0][l+1]
-            layer.ry -= self.alpha * self.dc_dr[1][l+1]
-            layer.rz -= self.alpha * self.dc_dr[2][l+1]
-        network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
-        network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
-        network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
+            if self.position_grad:
+                layer.rx -= self.alpha * self.dc_dr[0][l+1]
+                layer.ry -= self.alpha * self.dc_dr[1][l+1]
+                layer.rz -= self.alpha * self.dc_dr[2][l+1]
+        if self.position_grad:
+            network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
+            network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
+            network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
 
     def weight_update_steepest_descent_with_momentum(self, network):
         """
@@ -130,13 +135,15 @@ class ParticleSGD(Optimizer):
             self.vel_rz[l+1] = -self.alpha * self.dc_dr[2][l+1] + self.beta * self.vel_rz[l+1]
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
-            layer.rx += self.vel_rx[l+1]
-            layer.ry += self.vel_ry[l+1]
-            layer.rz += self.vel_rz[l+1]
+            if self.position_grad:
+                layer.rx += self.vel_rx[l+1]
+                layer.ry += self.vel_ry[l+1]
+                layer.rz += self.vel_rz[l+1]
 
-        self.vel_rx[0] = -self.alpha * self.dc_dr[0][0] + self.beta * self.vel_rx[0]
-        self.vel_ry[0] = -self.alpha * self.dc_dr[1][0] + self.beta * self.vel_ry[0]
-        self.vel_rz[0] = -self.alpha * self.dc_dr[2][0] + self.beta * self.vel_rz[0]
-        network.particle_input.rx += self.vel_rx[0]
-        network.particle_input.ry += self.vel_ry[0]
-        network.particle_input.rz += self.vel_rz[0]
+        if self.position_grad:
+            self.vel_rx[0] = -self.alpha * self.dc_dr[0][0] + self.beta * self.vel_rx[0]
+            self.vel_ry[0] = -self.alpha * self.dc_dr[1][0] + self.beta * self.vel_ry[0]
+            self.vel_rz[0] = -self.alpha * self.dc_dr[2][0] + self.beta * self.vel_rz[0]
+            network.particle_input.rx += self.vel_rx[0]
+            network.particle_input.ry += self.vel_ry[0]
+            network.particle_input.rz += self.vel_rz[0]
