@@ -41,10 +41,9 @@ times = []
 nt = 3
 for _ in range(nt):
     ts = time.time()
-    # c = net.cost(X, Y)
+    c = net.cost(X, Y)
     c = 1.0
     # net.cost_gradient(X_sub, Y_sub)
-    net.cost_gradient2(X_sub, Y_sub)
     t = time.time() - ts
     print("Cost: {} time: {}".format(c, t))
     times.append(t)

@@ -27,8 +27,7 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=0.5):
-        # super().__init__("Atomic", True)
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
