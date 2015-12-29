@@ -8,10 +8,13 @@ class ParticleRPROP(Optimizer):
     """
     RPROP for particle networks
 
+    Technically, iRPROP-
+
     Full-batch, not mini-batch
     """
 
-    def __init__(self, n_epochs=1, verbosity=2, cost_freq=2, init_delta=0.1, eta_plus=1.2, eta_minus=0.5):
+    def __init__(self, n_epochs=1, verbosity=2, cost_freq=2, init_delta=0.1, eta_plus=1.2, eta_minus=0.5,
+                 delta_min=1e-6, delta_max=50.0):
         """
         rprop
         """
@@ -23,6 +26,9 @@ class ParticleRPROP(Optimizer):
         # RPROP params
         self.eta_plus = eta_plus
         self.eta_minus = eta_minus
+        self.init_delta = init_delta
+        self.delta_max = delta_max
+        self.delta_min = delta_min
 
         # Weight gradients, to keep around for a step
         self.prev_dc_db = None
@@ -33,9 +39,6 @@ class ParticleRPROP(Optimizer):
         self.dc_dr = None
 
         # Deltas
-        self.init_delta = init_delta
-        self.delta_max = 4.0
-        self.delta_min = 1e-6
         self.delta_b = None
         self.delta_q = None
         self.delta_rx = None
@@ -74,6 +77,14 @@ class ParticleRPROP(Optimizer):
 
         return network
 
+    def get_delta(self, prod, delta, dc):
+        if prod > 0:
+            delta = min(delta * self.eta_plus, self.delta_max)
+        elif prod < 0:
+            delta = max(delta * self.eta_minus, self.delta_min)
+            dc = 0.0
+        return delta, dc
+
     def weight_update(self, network):
         """
         Update weights and biases according to RPROP
@@ -108,117 +119,60 @@ class ParticleRPROP(Optimizer):
 
             # Biases
             prod = self.prev_dc_db[l] * self.dc_db[l]
-            for i, b in enumerate(layer.b):
-                if prod[0][i] > 0:
-                    self.delta_b[l][0][i] = min(self.delta_b[l][0][i] * self.eta_plus, self.delta_max)
-                    layer.b[i] -= np.sign(self.dc_db[l][i]) * self.delta_b[l][i]
-                    self.prev_dc_db[l][0][i] = self.dc_db[l][0][i]
-                elif prod[0][i] < 0:
-                    self.delta_b[l][0][i] = max(self.delta_b[l][0][i] * self.eta_minus, self.delta_min)
-                    self.prev_dc_db[l][0][i] = 0.0
-                else:
-                    layer.b[i] -= np.sign(self.dc_db[l][0][i]) * self.delta_b[l][0][i]
-                    self.prev_dc_db[l][0][i] = self.dc_db[l][0][i]
+            for i, b in enumerate(layer.b[0]):
+                self.delta_b[l][0][i], self.dc_db[l][0][i] = self.get_delta(prod[0][i], self.delta_b[l][0][i], self.dc_db[l][0][i])
+                layer.b[0][i] -= np.sign(self.dc_db[l][0][i]) * self.delta_b[l][0][i]
+                self.prev_dc_db[l][0][i] = self.dc_db[l][0][i]
 
             # Charges
             prod = self.prev_dc_dq[l] * self.dc_dq[l]
             for i, q in enumerate(layer.q):
-                if prod[i] > 0:
-                    self.delta_q[l][i] = min(self.delta_q[l][i] * self.eta_plus, self.delta_max)
-                    layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
-                    self.prev_dc_dq[l][i] = self.dc_dq[l][i]
-                elif prod[i] < 0:
-                    self.delta_q[l][i] = max(self.delta_q[l][i] * self.eta_minus, self.delta_min)
-                    self.prev_dc_dq[l][i] = 0.0
-                else:
-                    layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
-                    self.prev_dc_dq[l][i] = self.dc_dq[l][i]
+                self.delta_q[l][i], self.dc_dq[l][i] = self.get_delta(prod[i], self.delta_q[l][i], self.dc_dq[l][i])
+                layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
+                self.prev_dc_dq[l][i] = self.dc_dq[l][i]
 
             # Positions
 
             # X
             prod = self.prev_dc_dr[0][l+1] * self.dc_dr[0][l+1]
             for i, rx in enumerate(layer.rx):
-                if prod[i] > 0:
-                    self.delta_rx[l+1][i] = min(self.delta_rx[l+1][i] * self.eta_plus, self.delta_max)
-                    layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
-                    self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
-                elif prod[i] < 0:
-                    self.delta_rx[l+1][i] = max(self.delta_rx[l+1][i] * self.eta_minus, self.delta_min)
-                    self.prev_dc_dr[0][l+1][i] = 0.0
-                else:
-                    layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
-                    self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
+                self.delta_rx[l+1][i], self.dc_dr[0][l+1][i] = self.get_delta(prod[i], self.delta_rx[l+1][i], self.dc_dr[0][l+1][i])
+                layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
+                self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
 
             # Y
             prod = self.prev_dc_dr[1][l+1] * self.dc_dr[1][l+1]
             for i, ry in enumerate(layer.ry):
-                if prod[i] > 0:
-                    self.delta_ry[l+1][i] = min(self.delta_ry[l+1][i] * self.eta_plus, self.delta_max)
-                    layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
-                    self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
-                elif prod[i] < 0:
-                    self.delta_ry[l+1][i] = max(self.delta_ry[l+1][i] * self.eta_minus, self.delta_min)
-                    self.prev_dc_dr[1][l+1][i] = 0.0
-                else:
-                    layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
-                    self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
+                self.delta_ry[l+1][i], self.dc_dr[1][l+1][i] = self.get_delta(prod[i], self.delta_ry[l+1][i], self.dc_dr[1][l+1][i])
+                layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
+                self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
 
             # Z
             prod = self.prev_dc_dr[2][l+1] * self.dc_dr[2][l+1]
             for i, rz in enumerate(layer.rz):
-                if prod[i] > 0:
-                    self.delta_rz[l+1][i] = min(self.delta_rz[l+1][i] * self.eta_plus, self.delta_max)
-                    layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
-                    self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
-                elif prod[i] < 0:
-                    self.delta_rz[l+1][i] = max(self.delta_rz[l+1][i] * self.eta_minus, self.delta_min)
-                    self.prev_dc_dr[2][l+1][i] = 0.0
-                else:
-                    layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
-                    self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
+                self.delta_rz[l+1][i], self.dc_dr[2][l+1][i] = self.get_delta(prod[i], self.delta_rz[l+1][i], self.dc_dr[2][l+1][i])
+                layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
+                self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
 
         # Input layer position
 
         # X
         prod = self.prev_dc_dr[0][0] * self.dc_dr[0][0]
         for i, rx in enumerate(network.particle_input.rx):
-            if prod[i] > 0:
-                self.delta_rx[0][i] = min(self.delta_rx[0][i] * self.eta_plus, self.delta_max)
-                network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
-                self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
-            elif prod[i] < 0:
-                self.delta_rx[0][i] = max(self.delta_rx[0][i] * self.eta_minus, self.delta_min)
-                self.prev_dc_dr[0][0][i] = 0.0
-            else:
-                network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
-                self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
+            self.delta_rx[0][i], self.dc_dr[0][0][i] = self.get_delta(prod[i], self.delta_rx[0][i], self.dc_dr[0][0][i])
+            network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
+            self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
 
         # Y
         prod = self.prev_dc_dr[1][0] * self.dc_dr[1][0]
         for i, ry in enumerate(network.particle_input.ry):
-            if prod[i] > 0:
-                self.delta_ry[0][i] = min(self.delta_ry[0][i] * self.eta_plus, self.delta_max)
-                network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
-                self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
-            elif prod[i] < 0:
-                self.delta_ry[0][i] = max(self.delta_ry[0][i] * self.eta_minus, self.delta_min)
-                self.prev_dc_dr[1][0][i] = 0.0
-            else:
-                network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
-                self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
+            self.delta_ry[0][i], self.dc_dr[1][0][i] = self.get_delta(prod[i], self.delta_ry[0][i], self.dc_dr[1][0][i])
+            network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
+            self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
 
         # Z
         prod = self.prev_dc_dr[2][0] * self.dc_dr[2][0]
         for i, rz in enumerate(network.particle_input.rz):
-            if prod[i] > 0:
-                self.delta_rz[0][i] = min(self.delta_rz[0][i] * self.eta_plus, self.delta_max)
-                network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
-                self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
-            elif prod[i] < 0:
-                self.delta_rz[0][i] = max(self.delta_rz[0][i] * self.eta_minus, self.delta_min)
-                self.prev_dc_dr[2][0][i] = 0.0
-            else:
-                network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
-                self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
-
+            self.delta_rz[0][i], self.dc_dr[2][0][i] = self.get_delta(prod[i], self.delta_rz[0][i], self.dc_dr[2][0][i])
+            network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
+            self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
