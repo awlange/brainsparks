@@ -11,7 +11,7 @@ class ParticleRPROP(Optimizer):
     Full-batch, not mini-batch
     """
 
-    def __init__(self, n_epochs=1, verbosity=2, cost_freq=2):
+    def __init__(self, n_epochs=1, verbosity=2, cost_freq=2, init_delta=0.1, eta_plus=1.2, eta_minus=0.5):
         """
         rprop
         """
@@ -21,8 +21,8 @@ class ParticleRPROP(Optimizer):
         self.cost_freq = cost_freq
 
         # RPROP params
-        self.eta_plus = 1.2
-        self.eta_minus = 0.5
+        self.eta_plus = eta_plus
+        self.eta_minus = eta_minus
 
         # Weight gradients, to keep around for a step
         self.prev_dc_db = None
@@ -33,8 +33,8 @@ class ParticleRPROP(Optimizer):
         self.dc_dr = None
 
         # Deltas
-        self.init_delta = 0.1
-        self.delta_max = 50.0
+        self.init_delta = init_delta
+        self.delta_max = 4.0
         self.delta_min = 1e-6
         self.delta_b = None
         self.delta_q = None
@@ -114,7 +114,7 @@ class ParticleRPROP(Optimizer):
                     layer.b[i] -= np.sign(self.dc_db[l][i]) * self.delta_b[l][i]
                     self.prev_dc_db[l][0][i] = self.dc_db[l][0][i]
                 elif prod[0][i] < 0:
-                    self.delta_b[l][0][i] = min(self.delta_b[l][0][i] * self.eta_minus, self.delta_min)
+                    self.delta_b[l][0][i] = max(self.delta_b[l][0][i] * self.eta_minus, self.delta_min)
                     self.prev_dc_db[l][0][i] = 0.0
                 else:
                     layer.b[i] -= np.sign(self.dc_db[l][0][i]) * self.delta_b[l][0][i]
@@ -128,7 +128,7 @@ class ParticleRPROP(Optimizer):
                     layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
                     self.prev_dc_dq[l][i] = self.dc_dq[l][i]
                 elif prod[i] < 0:
-                    self.delta_q[l][i] = min(self.delta_q[l][i] * self.eta_minus, self.delta_min)
+                    self.delta_q[l][i] = max(self.delta_q[l][i] * self.eta_minus, self.delta_min)
                     self.prev_dc_dq[l][i] = 0.0
                 else:
                     layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
@@ -144,7 +144,7 @@ class ParticleRPROP(Optimizer):
                     layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
                     self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
                 elif prod[i] < 0:
-                    self.delta_rx[l+1][i] = min(self.delta_rx[l+1][i] * self.eta_minus, self.delta_min)
+                    self.delta_rx[l+1][i] = max(self.delta_rx[l+1][i] * self.eta_minus, self.delta_min)
                     self.prev_dc_dr[0][l+1][i] = 0.0
                 else:
                     layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
@@ -158,7 +158,7 @@ class ParticleRPROP(Optimizer):
                     layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
                     self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
                 elif prod[i] < 0:
-                    self.delta_ry[l+1][i] = min(self.delta_ry[l+1][i] * self.eta_minus, self.delta_min)
+                    self.delta_ry[l+1][i] = max(self.delta_ry[l+1][i] * self.eta_minus, self.delta_min)
                     self.prev_dc_dr[1][l+1][i] = 0.0
                 else:
                     layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
@@ -172,7 +172,7 @@ class ParticleRPROP(Optimizer):
                     layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
                     self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
                 elif prod[i] < 0:
-                    self.delta_rz[l+1][i] = min(self.delta_rz[l+1][i] * self.eta_minus, self.delta_min)
+                    self.delta_rz[l+1][i] = max(self.delta_rz[l+1][i] * self.eta_minus, self.delta_min)
                     self.prev_dc_dr[2][l+1][i] = 0.0
                 else:
                     layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
@@ -188,7 +188,7 @@ class ParticleRPROP(Optimizer):
                 network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
                 self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
             elif prod[i] < 0:
-                self.delta_rx[0][i] = min(self.delta_rx[0][i] * self.eta_minus, self.delta_min)
+                self.delta_rx[0][i] = max(self.delta_rx[0][i] * self.eta_minus, self.delta_min)
                 self.prev_dc_dr[0][0][i] = 0.0
             else:
                 network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
@@ -202,7 +202,7 @@ class ParticleRPROP(Optimizer):
                 network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
                 self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
             elif prod[i] < 0:
-                self.delta_ry[0][i] = min(self.delta_ry[0][i] * self.eta_minus, self.delta_min)
+                self.delta_ry[0][i] = max(self.delta_ry[0][i] * self.eta_minus, self.delta_min)
                 self.prev_dc_dr[1][0][i] = 0.0
             else:
                 network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
@@ -216,8 +216,9 @@ class ParticleRPROP(Optimizer):
                 network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
                 self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
             elif prod[i] < 0:
-                self.delta_rz[0][i] = min(self.delta_rz[0][i] * self.eta_minus, self.delta_min)
+                self.delta_rz[0][i] = max(self.delta_rz[0][i] * self.eta_minus, self.delta_min)
                 self.prev_dc_dr[2][0][i] = 0.0
             else:
                 network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
                 self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
+
