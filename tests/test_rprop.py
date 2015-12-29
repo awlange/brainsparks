@@ -5,6 +5,7 @@ import numpy as np
 from src.calrissian.particle_network import ParticleNetwork
 from src.calrissian.layers.particle import Particle
 from src.calrissian.layers.particle import ParticleInput
+from src.calrissian.optimizers.particle_rprop import ParticleRPROP
 
 import time
 
@@ -28,7 +29,7 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 1000
+n_sub = 200
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
@@ -36,15 +37,6 @@ net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleI
 net.append(Particle(784, 128, activation="sigmoid"))
 net.append(Particle(128, 10, activation="softmax"))
 
-print("starting predict")
-times = []
-nt = 3
-for _ in range(nt):
-    ts = time.time()
-    c = net.cost(X, Y)
-    # c = 1.0
-    # net.cost_gradient(X_sub, Y_sub)
-    t = time.time() - ts
-    print("Cost: {} time: {}".format(c, t))
-    times.append(t)
-print("Mean: " + str(sum(times)/nt))
+
+rprop = ParticleRPROP(n_epochs=10, verbosity=2, cost_freq=25)
+rprop.optimize(net, X_sub, Y_sub)

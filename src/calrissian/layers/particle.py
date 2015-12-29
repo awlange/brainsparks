@@ -3,6 +3,9 @@ from ..activation import Activation
 
 import numpy as np
 
+# Testing
+import numexpr as ne
+
 
 class ParticleInput(object):
     def __init__(self, output_size):
