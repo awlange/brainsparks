@@ -14,7 +14,7 @@ class ParticleRPROP(Optimizer):
     """
 
     def __init__(self, n_epochs=1, verbosity=2, cost_freq=2, init_delta=0.1, eta_plus=1.2, eta_minus=0.5,
-                 delta_min=1e-6, delta_max=50.0):
+                 delta_min=1e-6, delta_max=50.0, manhattan=True):
         """
         rprop
         """
@@ -44,6 +44,8 @@ class ParticleRPROP(Optimizer):
         self.delta_rx = None
         self.delta_ry = None
         self.delta_rz = None
+
+        self.manhattan = manhattan
 
     def optimize(self, network, data_X, data_Y):
         """
@@ -133,46 +135,86 @@ class ParticleRPROP(Optimizer):
 
             # Positions
 
-            # X
-            prod = self.prev_dc_dr[0][l+1] * self.dc_dr[0][l+1]
-            for i, rx in enumerate(layer.rx):
-                self.delta_rx[l+1][i], self.dc_dr[0][l+1][i] = self.get_delta(prod[i], self.delta_rx[l+1][i], self.dc_dr[0][l+1][i])
-                layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
-                self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
+            if self.manhattan:
+                # X
+                prod = self.prev_dc_dr[0][l+1] * self.dc_dr[0][l+1]
+                for i, rx in enumerate(layer.rx):
+                    self.delta_rx[l+1][i], self.dc_dr[0][l+1][i] = self.get_delta(prod[i], self.delta_rx[l+1][i], self.dc_dr[0][l+1][i])
+                    layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
+                    self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
 
-            # Y
-            prod = self.prev_dc_dr[1][l+1] * self.dc_dr[1][l+1]
-            for i, ry in enumerate(layer.ry):
-                self.delta_ry[l+1][i], self.dc_dr[1][l+1][i] = self.get_delta(prod[i], self.delta_ry[l+1][i], self.dc_dr[1][l+1][i])
-                layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
-                self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
+                # Y
+                prod = self.prev_dc_dr[1][l+1] * self.dc_dr[1][l+1]
+                for i, ry in enumerate(layer.ry):
+                    self.delta_ry[l+1][i], self.dc_dr[1][l+1][i] = self.get_delta(prod[i], self.delta_ry[l+1][i], self.dc_dr[1][l+1][i])
+                    layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
+                    self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
 
-            # Z
-            prod = self.prev_dc_dr[2][l+1] * self.dc_dr[2][l+1]
-            for i, rz in enumerate(layer.rz):
-                self.delta_rz[l+1][i], self.dc_dr[2][l+1][i] = self.get_delta(prod[i], self.delta_rz[l+1][i], self.dc_dr[2][l+1][i])
-                layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
-                self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
+                # Z
+                prod = self.prev_dc_dr[2][l+1] * self.dc_dr[2][l+1]
+                for i, rz in enumerate(layer.rz):
+                    self.delta_rz[l+1][i], self.dc_dr[2][l+1][i] = self.get_delta(prod[i], self.delta_rz[l+1][i], self.dc_dr[2][l+1][i])
+                    layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
+                    self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
+            else:
+                # R, dot product
+                prod = self.prev_dc_dr[0][l+1] * self.dc_dr[0][l+1] \
+                     + self.prev_dc_dr[1][l+1] * self.dc_dr[1][l+1] \
+                     + self.prev_dc_dr[2][l+1] * self.dc_dr[2][l+1]
+                for i, rx in enumerate(layer.rx):
+                    delta, dc = self.get_delta(prod[i], self.delta_rx[l+1][i], 1.0)
+                    self.dc_dr[0][l+1][i] *= dc
+                    self.dc_dr[1][l+1][i] *= dc
+                    self.dc_dr[2][l+1][i] *= dc
+                    self.delta_rx[l+1][i] = delta
+                    self.delta_ry[l+1][i] = delta
+                    self.delta_rz[l+1][i] = delta
+                    layer.rx[i] -= np.sign(self.dc_dr[0][l+1][i]) * self.delta_rx[l+1][i]
+                    layer.ry[i] -= np.sign(self.dc_dr[1][l+1][i]) * self.delta_ry[l+1][i]
+                    layer.rz[i] -= np.sign(self.dc_dr[2][l+1][i]) * self.delta_rz[l+1][i]
+                    self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
+                    self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
+                    self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
 
         # Input layer position
 
-        # X
-        prod = self.prev_dc_dr[0][0] * self.dc_dr[0][0]
-        for i, rx in enumerate(network.particle_input.rx):
-            self.delta_rx[0][i], self.dc_dr[0][0][i] = self.get_delta(prod[i], self.delta_rx[0][i], self.dc_dr[0][0][i])
-            network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
-            self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
+        if self.manhattan:
+            # X
+            prod = self.prev_dc_dr[0][0] * self.dc_dr[0][0]
+            for i, rx in enumerate(network.particle_input.rx):
+                self.delta_rx[0][i], self.dc_dr[0][0][i] = self.get_delta(prod[i], self.delta_rx[0][i], self.dc_dr[0][0][i])
+                network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
+                self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
 
-        # Y
-        prod = self.prev_dc_dr[1][0] * self.dc_dr[1][0]
-        for i, ry in enumerate(network.particle_input.ry):
-            self.delta_ry[0][i], self.dc_dr[1][0][i] = self.get_delta(prod[i], self.delta_ry[0][i], self.dc_dr[1][0][i])
-            network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
-            self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
+            # Y
+            prod = self.prev_dc_dr[1][0] * self.dc_dr[1][0]
+            for i, ry in enumerate(network.particle_input.ry):
+                self.delta_ry[0][i], self.dc_dr[1][0][i] = self.get_delta(prod[i], self.delta_ry[0][i], self.dc_dr[1][0][i])
+                network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
+                self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
 
-        # Z
-        prod = self.prev_dc_dr[2][0] * self.dc_dr[2][0]
-        for i, rz in enumerate(network.particle_input.rz):
-            self.delta_rz[0][i], self.dc_dr[2][0][i] = self.get_delta(prod[i], self.delta_rz[0][i], self.dc_dr[2][0][i])
-            network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
-            self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
+            # Z
+            prod = self.prev_dc_dr[2][0] * self.dc_dr[2][0]
+            for i, rz in enumerate(network.particle_input.rz):
+                self.delta_rz[0][i], self.dc_dr[2][0][i] = self.get_delta(prod[i], self.delta_rz[0][i], self.dc_dr[2][0][i])
+                network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
+                self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
+        else:
+            # R, dot product
+            prod = self.prev_dc_dr[0][0] * self.dc_dr[0][0] \
+                 + self.prev_dc_dr[1][0] * self.dc_dr[1][0] \
+                 + self.prev_dc_dr[2][0] * self.dc_dr[2][0]
+            for i, rx in enumerate(network.particle_input.rx):
+                delta, dc = self.get_delta(prod[i], self.delta_rx[0][i], 1.0)
+                self.dc_dr[0][0][i] *= dc
+                self.dc_dr[1][0][i] *= dc
+                self.dc_dr[2][0][i] *= dc
+                self.delta_rx[0][i] = delta
+                self.delta_ry[0][i] = delta
+                self.delta_rz[0][i] = delta
+                network.particle_input.rx[i] -= np.sign(self.dc_dr[0][0][i]) * self.delta_rx[0][i]
+                network.particle_input.ry[i] -= np.sign(self.dc_dr[1][0][i]) * self.delta_ry[0][i]
+                network.particle_input.rz[i] -= np.sign(self.dc_dr[2][0][i]) * self.delta_rz[0][i]
+                self.prev_dc_dr[0][0][i] = self.dc_dr[0][0][i]
+                self.prev_dc_dr[1][0][i] = self.dc_dr[1][0][i]
+                self.prev_dc_dr[2][0][i] = self.dc_dr[2][0][i]
