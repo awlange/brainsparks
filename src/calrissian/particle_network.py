@@ -70,6 +70,14 @@ class ParticleNetwork(object):
 
         return c
 
+    def cost_gradient_thread(self, data_XY):
+        """
+        Wrapper for multithreaded call
+        :param data_XY:
+        :return:
+        """
+        return self.cost_gradient(data_XY[0], data_XY[1])
+
     def cost_gradient(self, data_X, data_Y):
         """
         Computes the gradient of the cost with respect to each weight and bias in the network

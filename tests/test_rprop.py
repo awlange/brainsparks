@@ -29,7 +29,7 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 200
+n_sub = 8000
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
@@ -38,5 +38,5 @@ net.append(Particle(784, 128, activation="sigmoid"))
 net.append(Particle(128, 10, activation="softmax"))
 
 
-rprop = ParticleRPROP(n_epochs=10, verbosity=2, cost_freq=25)
+rprop = ParticleRPROP(n_epochs=4, verbosity=2, cost_freq=25, n_threads=4, chunk_size=1000)
 rprop.optimize(net, X_sub, Y_sub)

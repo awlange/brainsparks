@@ -3,6 +3,8 @@ from .optimizer import Optimizer
 import numpy as np
 import time
 
+from multiprocessing import Pool
+
 
 class ParticleRPROP(Optimizer):
     """
@@ -14,7 +16,7 @@ class ParticleRPROP(Optimizer):
     """
 
     def __init__(self, n_epochs=1, verbosity=2, cost_freq=2, init_delta=0.1, eta_plus=1.2, eta_minus=0.5,
-                 delta_min=1e-6, delta_max=50.0, manhattan=True):
+                 delta_min=1e-6, delta_max=50.0, manhattan=True, n_threads=1, chunk_size=100):
         """
         rprop
         """
@@ -45,7 +47,47 @@ class ParticleRPROP(Optimizer):
         self.delta_ry = None
         self.delta_rz = None
 
+        # Run params
         self.manhattan = manhattan
+        self.n_threads = n_threads
+        self.chunk_size = chunk_size
+        self.pool = None
+
+    def get_pool(self):
+        if self.pool is None:
+            self.pool = Pool(self.n_threads)
+        return self.pool
+
+    def cost_gradient_parallel(self, network, data_X, data_Y):
+        offset = 0
+        while offset < len(data_X):
+            data_X_sub = data_X[offset:(offset+self.chunk_size), :]
+            data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
+            data_X_split = np.array_split(data_X_sub, self.n_threads)
+            data_Y_split = np.array_split(data_Y_sub, self.n_threads)
+            data_XY_list = [(data_X_split[i], data_Y_split[i]) for i in range(self.n_threads)]
+
+            result = self.get_pool().map(network.cost_gradient_thread, data_XY_list)
+
+            for t, result_t in enumerate(result):
+                tmp_dc_db = result_t[0]
+                tmp_dc_dq = result_t[1]
+                tmp_dc_dr = result_t[2]
+
+                if t == 0 and offset == 0:
+                    self.dc_db = tmp_dc_db
+                    self.dc_dq = tmp_dc_dq
+                    self.dc_dr = tmp_dc_dr
+                else:
+                    for l, tmp_b in enumerate(tmp_dc_db):
+                        self.dc_db[l] += tmp_b
+                    for l, tmp_q in enumerate(tmp_dc_dq):
+                        self.dc_dq[l] += tmp_q
+                    for i in range(3):
+                        for l, tmp_r in enumerate(tmp_dc_dr[i]):
+                            self.dc_dr[i][l] += tmp_r
+
+            offset += self.chunk_size
 
     def optimize(self, network, data_X, data_Y):
         """
@@ -61,8 +103,11 @@ class ParticleRPROP(Optimizer):
         for epoch in range(self.n_epochs):
             epoch_start_time = time.time()
 
-            # Full batch gradient
-            self.dc_db, self.dc_dq, self.dc_dr = network.cost_gradient(data_X, data_Y)
+            if self.n_threads > 1:
+                self.cost_gradient_parallel(network, data_X, data_Y)
+            else:
+                # Full batch gradient
+                self.dc_db, self.dc_dq, self.dc_dr = network.cost_gradient(data_X, data_Y)
 
             # Update weights and biases
             self.weight_update(network)

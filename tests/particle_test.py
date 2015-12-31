@@ -6,6 +6,7 @@ from src.calrissian.particle_network import ParticleNetwork
 from src.calrissian.layers.particle import Particle
 from src.calrissian.layers.particle import ParticleInput
 from src.calrissian.optimizers.particle_sgd import ParticleSGD
+from src.calrissian.optimizers.particle_rprop import ParticleRPROP
 from src.calrissian.regularization.particle_regularize import ParticleRegularize
 
 import numpy as np
@@ -60,6 +61,21 @@ def main3():
     with open("/Users/alange/network.json", "r") as f:
         new_net = ParticleNetwork.read_from_json(f)
         print(new_net.predict(train_X))
+
+
+def main4():
+
+    rprop = ParticleRPROP(n_epochs=1, verbosity=0, cost_freq=25, init_delta=0.01, eta_minus=0.5, eta_plus=1.2,
+                          delta_max=0.5, delta_min=1e-6, manhattan=False, n_threads=2)
+
+    train_X = np.asarray([[0.2, -0.3], [0.2, -0.4], [0.1, 0.1], [0.9, 1.1], [2.2, 4.4]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+
+    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
+    net.append(Particle(2, 5, activation="sigmoid"))
+    net.append(Particle(5, 3, activation="sigmoid"))
+
+    rprop.optimize(net, train_X, train_Y)
 
 
 def fd():
@@ -231,4 +247,5 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    fd()
+    main4()
+    # fd()
