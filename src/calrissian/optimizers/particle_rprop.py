@@ -39,6 +39,7 @@ class ParticleRPROP(Optimizer):
         self.dc_db = None
         self.dc_dq = None
         self.dc_dr = None
+        self.dc_dt = None
 
         # Deltas
         self.delta_b = None
@@ -46,6 +47,7 @@ class ParticleRPROP(Optimizer):
         self.delta_rx = None
         self.delta_ry = None
         self.delta_rz = None
+        self.delta_t = None
 
         # Run params
         self.manhattan = manhattan
@@ -73,16 +75,20 @@ class ParticleRPROP(Optimizer):
                 tmp_dc_db = result_t[0]
                 tmp_dc_dq = result_t[1]
                 tmp_dc_dr = result_t[2]
+                tmp_dc_dt = result_t[3]
 
                 if t == 0 and offset == 0:
                     self.dc_db = tmp_dc_db
                     self.dc_dq = tmp_dc_dq
                     self.dc_dr = tmp_dc_dr
+                    self.dc_dt = tmp_dc_dt
                 else:
                     for l, tmp_b in enumerate(tmp_dc_db):
                         self.dc_db[l] += tmp_b
                     for l, tmp_q in enumerate(tmp_dc_dq):
                         self.dc_dq[l] += tmp_q
+                    for l, tmp_t in enumerate(tmp_dc_dt):
+                        self.dc_dt[l] += tmp_t
                     for i in range(3):
                         for l, tmp_r in enumerate(tmp_dc_dr[i]):
                             self.dc_dr[i][l] += tmp_r
@@ -107,7 +113,7 @@ class ParticleRPROP(Optimizer):
                 self.cost_gradient_parallel(network, data_X, data_Y)
             else:
                 # Full batch gradient
-                self.dc_db, self.dc_dq, self.dc_dr = network.cost_gradient(data_X, data_Y)
+                self.dc_db, self.dc_dq, self.dc_dr, self.dc_dt = network.cost_gradient(data_X, data_Y)
 
             # Update weights and biases
             self.weight_update(network)
@@ -144,10 +150,12 @@ class ParticleRPROP(Optimizer):
             self.delta_rx = [np.ones(network.particle_input.output_size) * self.init_delta]
             self.delta_ry = [np.ones(network.particle_input.output_size) * self.init_delta]
             self.delta_rz = [np.ones(network.particle_input.output_size) * self.init_delta]
+            self.delta_t = [np.ones(network.particle_input.output_size) * self.init_delta]
 
             self.prev_dc_db = []
             self.prev_dc_dq = []
             self.prev_dc_dr = [[np.zeros(network.particle_input.output_size)] for _ in range(3)]
+            self.prev_dc_dt = [np.zeros(network.particle_input.output_size)]
 
             for l, layer in enumerate(network.layers):
                 self.delta_b.append(np.ones(layer.b.shape) * self.init_delta)
@@ -155,12 +163,14 @@ class ParticleRPROP(Optimizer):
                 self.delta_rx.append(np.ones(layer.output_size) * self.init_delta)
                 self.delta_ry.append(np.ones(layer.output_size) * self.init_delta)
                 self.delta_rz.append(np.ones(layer.output_size) * self.init_delta)
+                self.delta_t.append(np.ones(layer.theta.shape) * self.init_delta)
 
                 self.prev_dc_db.append(np.zeros_like(self.dc_db[l]))
                 self.prev_dc_dq.append(np.zeros_like(self.dc_dq[l]))
                 self.prev_dc_dr[0].append(np.zeros_like(self.dc_dr[0][l+1]))
                 self.prev_dc_dr[1].append(np.zeros_like(self.dc_dr[1][l+1]))
                 self.prev_dc_dr[2].append(np.zeros_like(self.dc_dr[2][l+1]))
+                self.prev_dc_dt.append(np.zeros_like(self.dc_dt[l+1]))
 
         for l, layer in enumerate(network.layers):
 
@@ -177,6 +187,13 @@ class ParticleRPROP(Optimizer):
                 self.delta_q[l][i], self.dc_dq[l][i] = self.get_delta(prod[i], self.delta_q[l][i], self.dc_dq[l][i])
                 layer.q[i] -= np.sign(self.dc_dq[l][i]) * self.delta_q[l][i]
                 self.prev_dc_dq[l][i] = self.dc_dq[l][i]
+
+            # Phases
+            prod = self.prev_dc_dt[l+1] * self.dc_dt[l+1]
+            for i, t in enumerate(layer.theta):
+                self.delta_t[l+1][i], self.dc_dt[l+1][i] = self.get_delta(prod[i], self.delta_t[l+1][i], self.dc_dt[l+1][i])
+                layer.theta[i] -= np.sign(self.dc_dt[l+1][i]) * self.delta_t[l+1][i]
+                self.prev_dc_dt[l+1][i] = self.dc_dt[l+1][i]
 
             # Positions
 
@@ -220,6 +237,13 @@ class ParticleRPROP(Optimizer):
                     self.prev_dc_dr[0][l+1][i] = self.dc_dr[0][l+1][i]
                     self.prev_dc_dr[1][l+1][i] = self.dc_dr[1][l+1][i]
                     self.prev_dc_dr[2][l+1][i] = self.dc_dr[2][l+1][i]
+
+        # Input layer phase
+        prod = self.prev_dc_dt[0] * self.dc_dt[0]
+        for i, t in enumerate(layer.theta):
+            self.delta_t[0][i], self.dc_dt[0][i] = self.get_delta(prod[i], self.delta_t[0][i], self.dc_dt[0][i])
+            layer.theta[i] -= np.sign(self.dc_dt[0][i]) * self.delta_t[0][i]
+            self.prev_dc_dt[0][i] = self.dc_dt[0][i]
 
         # Input layer position
 
