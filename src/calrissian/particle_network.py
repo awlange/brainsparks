@@ -93,6 +93,7 @@ class ParticleNetwork(object):
         dc_dr_x = [np.zeros(self.particle_input.output_size)]
         dc_dr_y = [np.zeros(self.particle_input.output_size)]
         dc_dr_z = [np.zeros(self.particle_input.output_size)]
+        dc_dt = [np.zeros(self.particle_input.output_size)]
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -101,6 +102,7 @@ class ParticleNetwork(object):
             dc_dr_x.append(np.zeros(len(layer.q)))
             dc_dr_y.append(np.zeros(len(layer.q)))
             dc_dr_z.append(np.zeros(len(layer.q)))
+            dc_dt.append(np.zeros(layer.theta.shape))
 
         sigma_Z = []
         A_scaled, _ = self.particle_input.feed_forward(data_X)
@@ -142,7 +144,10 @@ class ParticleNetwork(object):
             dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
             dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
             d2 = dx**2 + dy**2 + dz**2
+            dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
             exp_dij = np.exp(-layer.zeta * d2)
+            exp_dij *= np.cos(dt)
+            # exp_dij = 1.0/np.sqrt(d2)
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
@@ -153,6 +158,7 @@ class ParticleNetwork(object):
 
             # Position gradient
             tmp = 2.0 * layer.zeta * qj * dq
+            # tmp = qj * dq * exp_dij * exp_dij
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -164,6 +170,12 @@ class ParticleNetwork(object):
             dc_dr_x[l-1] -= np.sum(tx, axis=1)
             dc_dr_y[l-1] -= np.sum(ty, axis=1)
             dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+            # Phase gradient
+            dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+            tmp = qj * dq
+            dc_dt[l][j] -= np.sum(tmp)
+            dc_dt[l-1] += np.sum(tmp, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -193,7 +205,10 @@ class ParticleNetwork(object):
                 dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
                 dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
+                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
                 exp_dij = np.exp(-layer.zeta * d2)
+                exp_dij *= np.cos(dt)
+                # exp_dij = 1.0/np.sqrt(d2)
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
@@ -204,6 +219,7 @@ class ParticleNetwork(object):
 
                 # Position gradient
                 tmp = 2.0 * layer.zeta * qj * dq
+                # tmp = qj * dq * exp_dij * exp_dij
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp
@@ -216,6 +232,12 @@ class ParticleNetwork(object):
                 dc_dr_y[l-1] -= np.sum(ty, axis=1)
                 dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
+                # Phase gradient
+                dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+                tmp = qj * dq
+                dc_dt[l][j] -= np.sum(tmp)
+                dc_dt[l-1] += np.sum(tmp, axis=1)
+
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
 
@@ -223,7 +245,7 @@ class ParticleNetwork(object):
         if self.regularizer is not None:
             dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
 
-        return dc_db, dc_dq, dc_dr
+        return dc_db, dc_dq, dc_dr, dc_dt
 
     def fit(self, data_X, data_Y, optimizer):
         """

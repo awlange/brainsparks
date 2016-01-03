@@ -26,7 +26,7 @@ def main():
 
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
-    print(net.cost_gradient(train_X, train_Y))
+    # print(net.cost_gradient(train_X, train_Y))
 
 
 def main2():
@@ -96,7 +96,7 @@ def fd():
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr = net.cost_gradient(train_X, train_Y)
+    db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -138,6 +138,41 @@ def fd():
 
     print("numerical q")
     for x in fd_q:
+        print(x)
+
+    print("analytic theta")
+    for x in dt:
+        print(x)
+
+    # input layer
+    fd_t = []
+    layer = net.particle_input
+    lt = []
+    for i in range(len(layer.theta)):
+        orig = layer.theta[i]
+        layer.theta[i] += h
+        fp = net.cost(train_X, train_Y)
+        layer.theta[i] -= 2*h
+        fm = net.cost(train_X, train_Y)
+        lt.append((fp - fm) / (2*h))
+        layer.theta[i] = orig
+    fd_t.append(lt)
+
+    # layers
+    for l in range(len(net.layers)):
+        lt = []
+        for i in range(len(net.layers[l].theta)):
+            orig = net.layers[l].theta[i]
+            net.layers[l].theta[i] += h
+            fp = net.cost(train_X, train_Y)
+            net.layers[l].theta[i] -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lt.append((fp - fm) / (2*h))
+            net.layers[l].theta[i] = orig
+        fd_t.append(lt)
+
+    print("numerical theta")
+    for x in fd_t:
         print(x)
 
     print("analytic x")
@@ -247,5 +282,5 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    main4()
-    # fd()
+    # main4()
+    fd()
