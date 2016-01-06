@@ -106,7 +106,8 @@ class RPROP(Optimizer):
 
             # Weights
             prod = self.prev_dc_dw[l] * self.dc_dw[l]
-            for i, q in enumerate(layer.w):
-                self.delta_w[l][i], self.dc_dw[l][i] = self.get_delta(prod[i], self.delta_w[l][i], self.dc_dw[l][i])
-                layer.q[i] -= np.sign(self.dc_dw[l][i]) * self.delta_w[l][i]
-                self.prev_dc_dw[l][i] = self.dc_dw[l][i]
+            for i, w in enumerate(layer.w):
+                for j, _ in enumerate(layer.w[i]):
+                    self.delta_w[l][i][j], self.dc_dw[l][i][j] = self.get_delta(prod[i][j], self.delta_w[l][i][j], self.dc_dw[l][i][j])
+                    layer.w[i][j] -= np.sign(self.dc_dw[l][i][j]) * self.delta_w[l][i][j]
+                    self.prev_dc_dw[l][i][j] = self.dc_dw[l][i][j]
