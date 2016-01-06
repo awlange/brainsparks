@@ -141,6 +141,8 @@ class ParticleRPROP(Optimizer):
     def weight_update(self, network):
         """
         Update weights and biases according to RPROP
+
+        TODO: Oof... this code needs to be improved!
         """
         if self.delta_b is None or self.delta_q is None or self.delta_rx is None or self.delta_ry is None or self.delta_rz is None:
             # Initial iteration

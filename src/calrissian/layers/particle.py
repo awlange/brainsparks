@@ -3,9 +3,6 @@ from ..activation import Activation
 
 import numpy as np
 
-# Testing
-import numexpr as ne
-
 
 class ParticleInput(object):
     def __init__(self, output_size, s=1.0):
@@ -45,7 +42,7 @@ class Particle(object):
         self.b = np.zeros((1, output_size))
 
         # Charges
-        c = 1.0 / np.sqrt(self.input_size)
+        c = 1.0
         self.q = np.random.uniform(-c, c, output_size)
 
         # Positions

@@ -4,11 +4,7 @@ from .layers.particle import Particle
 from .layers.particle import ParticleInput
 
 import numpy as np
-import math
 import json
-
-# Testing speedup
-import numexpr as ne
 
 
 class ParticleNetwork(object):
