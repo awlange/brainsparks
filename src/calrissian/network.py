@@ -1,6 +1,9 @@
 from .cost import Cost
 
 import numpy as np
+import json
+
+from .layers.dense import Dense
 
 
 class Network(object):
@@ -9,6 +12,7 @@ class Network(object):
         self.layers = []
         self.cost_function = Cost.get(cost)
         self.cost_d_function = Cost.get_d(cost)
+        self.cost_name = cost
         self.lock_built = False
         self.regularizer = regularizer
 
@@ -194,3 +198,50 @@ class Network(object):
         """
 
         return optimizer.optimize(self, data_X, data_Y)
+
+    def write_to_json(self, file):
+        """
+        Write network data to file in JSON format
+        :param file: a file open for writing
+        :return:
+        """
+
+        network = {"layers": [], "cost_name": self.cost_name}
+
+        for layer in self.layers:
+            l_data = {"w": [], "b": [], "activation_name": layer.activation_name, "input_size": layer.input_size,
+                      "output_size": layer.output_size}
+            for i in range(layer.input_size):
+                w_i = []
+                for j in range(layer.output_size):
+                    w_i.append(layer.w[i][j])
+                l_data["w"].append(w_i)
+            for i in range(layer.output_size):
+                l_data["b"].append(layer.b[0][i])
+            network["layers"].append(l_data)
+        json.dump(network, file)
+
+    @staticmethod
+    def read_from_json(file):
+        """
+        Read network data from file in JSON format, return new ParticleNetwork
+        :param file: a file open for reading
+        :return:
+        """
+
+        data = json.load(file)
+        network = Network(cost=data.get("cost_name"))
+
+        data_layers = data.get("layers")
+
+        for d_layer in data_layers:
+            dense = Dense(input_size=d_layer.get("input_size"), output_size=d_layer.get("output_size"),
+                          activation=d_layer.get("activation_name"))
+            for i in range(dense.input_size):
+                for j in range(dense.output_size):
+                    dense.w[i][j] = d_layer.get("w")[i][j]
+            for i in range(dense.output_size):
+                dense.b[0][i] = d_layer.get("b")[i]
+            network.layers.append(dense)
+
+        return network

@@ -39,11 +39,13 @@ class Particle(object):
         self.zeta = zeta
 
         # Weight initialization
-        self.b = np.zeros((1, output_size))
+        c = np.sqrt(1.0 / (input_size + output_size))
+        self.b = np.random.uniform(-c, c, (1, output_size))
 
         # Charges
         c = 1.0
         self.q = np.random.uniform(-c, c, output_size)
+        # self.q = np.ones(output_size)
 
         # Positions
         self.rx = np.random.uniform(-s, s, output_size)
@@ -52,6 +54,9 @@ class Particle(object):
 
         # Phase
         self.theta = np.random.uniform(0, 2*np.pi, output_size)
+
+        # Matrix
+        self.w = None
 
     def get_rxyz(self):
         return self.rx, self.ry, self.rz, self.theta
@@ -90,3 +95,60 @@ class Particle(object):
     def compute_da(self, z):
         return self.d_activation(z)
 
+    def compute_w(self, r_in):
+
+        w = np.zeros((self.input_size, self.output_size))
+
+        r_in_x = r_in[0]
+        r_in_y = r_in[1]
+        r_in_z = r_in[2]
+        r_in_theta = r_in[3]
+        for j in range(self.output_size):
+            dx = r_in_x - self.rx[j]
+            dy = r_in_y - self.ry[j]
+            dz = r_in_z - self.rz[j]
+            dt = r_in_theta - self.theta[j]
+            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+            w_ji *= self.q[j] * np.cos(dt)
+            for i in range(self.input_size):
+                w[i][j] = w_ji[i]
+
+        self.w = w
+
+        return w
+
+    def compute_w_j(self, r_in, j):
+        """
+        Only update the j-th column values
+        """
+
+        r_in_x = r_in[0]
+        r_in_y = r_in[1]
+        r_in_z = r_in[2]
+        r_in_theta = r_in[3]
+        dx = r_in_x - self.rx[j]
+        dy = r_in_y - self.ry[j]
+        dz = r_in_z - self.rz[j]
+        dt = r_in_theta - self.theta[j]
+        w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+        w_ji *= self.q[j] * np.cos(dt)
+        for i in range(self.input_size):
+            self.w[i][j] = w_ji[i]
+
+    def compute_w_i(self, r_in, i):
+        """
+        Only update the i-th row values
+        """
+
+        r_in_x = r_in[0][i]
+        r_in_y = r_in[1][i]
+        r_in_z = r_in[2][i]
+        r_in_theta = r_in[3][i]
+        for j in range(self.output_size):
+            dx = r_in_x - self.rx[j]
+            dy = r_in_y - self.ry[j]
+            dz = r_in_z - self.rz[j]
+            dt = r_in_theta - self.theta[j]
+            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+            w_ji *= self.q[j] * np.cos(dt)
+            self.w[i][j] = w_ji[i]

@@ -10,7 +10,7 @@ class ParticleSGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, position_grad=True):
+                 cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -23,6 +23,11 @@ class ParticleSGD(Optimizer):
         self.verbosity = verbosity
         self.cost_freq = cost_freq
         self.position_grad = position_grad  # Turn off position gradient?
+
+        self.alpha_b = alpha_b
+        self.alpha_q = alpha_q
+        self.alpha_r = alpha_r
+        self.alpha_t = alpha_t
 
         # Weight update function
         self.weight_update = weight_update
@@ -135,12 +140,12 @@ class ParticleSGD(Optimizer):
                 self.vel_t.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
-            self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
-            self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
-            self.vel_rx[l+1] = -self.alpha * self.dc_dr[0][l+1] + self.beta * self.vel_rx[l+1]
-            self.vel_ry[l+1] = -self.alpha * self.dc_dr[1][l+1] + self.beta * self.vel_ry[l+1]
-            self.vel_rz[l+1] = -self.alpha * self.dc_dr[2][l+1] + self.beta * self.vel_rz[l+1]
-            self.vel_t[l+1] = -self.alpha * self.dc_dt[l+1] + self.beta * self.vel_t[l+1]
+            self.vel_b[l] = -self.alpha_b * self.dc_db[l] + self.beta * self.vel_b[l]
+            self.vel_q[l] = -self.alpha_q * self.dc_dq[l] + self.beta * self.vel_q[l]
+            self.vel_rx[l+1] = -self.alpha_r * self.dc_dr[0][l+1] + self.beta * self.vel_rx[l+1]
+            self.vel_ry[l+1] = -self.alpha_r * self.dc_dr[1][l+1] + self.beta * self.vel_ry[l+1]
+            self.vel_rz[l+1] = -self.alpha_r * self.dc_dr[2][l+1] + self.beta * self.vel_rz[l+1]
+            self.vel_t[l+1] = -self.alpha_t * self.dc_dt[l+1] + self.beta * self.vel_t[l+1]
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
             layer.theta += self.vel_t[l+1]
@@ -149,12 +154,12 @@ class ParticleSGD(Optimizer):
                 layer.ry += self.vel_ry[l+1]
                 layer.rz += self.vel_rz[l+1]
 
-        self.vel_t[0] = -self.alpha * self.dc_dt[0][0] + self.beta * self.vel_t[0]
+        self.vel_t[0] = -self.alpha_t * self.dc_dt[0][0] + self.beta * self.vel_t[0]
         network.particle_input.theta += self.vel_t[0]
         if self.position_grad:
-            self.vel_rx[0] = -self.alpha * self.dc_dr[0][0] + self.beta * self.vel_rx[0]
-            self.vel_ry[0] = -self.alpha * self.dc_dr[1][0] + self.beta * self.vel_ry[0]
-            self.vel_rz[0] = -self.alpha * self.dc_dr[2][0] + self.beta * self.vel_rz[0]
+            self.vel_rx[0] = -self.alpha_r * self.dc_dr[0][0] + self.beta * self.vel_rx[0]
+            self.vel_ry[0] = -self.alpha_r * self.dc_dr[1][0] + self.beta * self.vel_ry[0]
+            self.vel_rz[0] = -self.alpha_r * self.dc_dr[2][0] + self.beta * self.vel_rz[0]
             network.particle_input.rx += self.vel_rx[0]
             network.particle_input.ry += self.vel_ry[0]
             network.particle_input.rz += self.vel_rz[0]

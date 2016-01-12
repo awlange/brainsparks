@@ -49,6 +49,26 @@ def main3():
     net.fit(train_X, train_Y, sgd)
 
 
+def main4():
+
+    net = Network(cost="quadratic")
+    net.append(Dense(2, 5))
+    net.append(Dense(5, 3))
+
+    train_X = np.asarray([[0.2, -0.3]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0]])
+
+    with open("/tmp/tmp.json", "w") as f:
+        net.write_to_json(f)
+
+    net2 = None
+    with open("/tmp/tmp.json", "r") as f:
+        net2 = Network.read_from_json(f)
+
+    print(net.cost(train_X, train_Y))
+    print(net2.cost(train_X, train_Y))
+
+
 def fd():
     net = Network(cost="categorical_cross_entropy")
     net.append(Dense(2, 5, activation="tanh"))
@@ -117,4 +137,5 @@ def fd():
 if __name__ == "__main__":
     # main()
     # main3()
-    fd()
+    main4()
+    # fd()
