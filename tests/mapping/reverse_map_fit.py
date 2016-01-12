@@ -114,6 +114,90 @@ def compute_grad_w(net_mlp, net):
         print(t)
 
 
+    de_drx = []
+    de_dry = []
+    de_drz = []
+
+    # input
+    layer = net.particle_input
+    next_layer = net.layers[0]
+    xx = np.zeros_like(layer.rx)
+    yy = np.zeros_like(layer.ry)
+    zz = np.zeros_like(layer.rz)
+    for j, xj in enumerate(layer.rx):
+        tx = 0.0
+        ty = 0.0
+        tz = 0.0
+        for i in range(next_layer.output_size):
+            dx = layer.rx[j] - next_layer.rx[i]
+            dy = layer.ry[j] - next_layer.ry[i]
+            dz = layer.rz[j] - next_layer.rz[i]
+            tmp = -de_dw[0][j][i]
+            tx += tmp * dx
+            ty += tmp * dy
+            tz += tmp * dz
+        xx[j] = 2 * tx
+        yy[j] = 2 * ty
+        zz[j] = 2 * tz
+    de_drx.append(xx)
+    de_dry.append(yy)
+    de_drz.append(zz)
+
+    # layers
+    for l, layer in enumerate(net.layers):
+        prev_layer = net.particle_input
+        if l > 0:
+            prev_layer = net.layers[l-1]
+
+        # This layer matrix
+        xx = np.zeros_like(layer.rx)
+        yy = np.zeros_like(layer.ry)
+        zz = np.zeros_like(layer.rz)
+        for j, xj in enumerate(layer.rx):
+            tx = 0.0
+            ty = 0.0
+            tz = 0.0
+            for i in range(prev_layer.output_size):
+                dx = layer.rx[j] - prev_layer.rx[i]
+                dy = layer.ry[j] - prev_layer.ry[i]
+                dz = layer.rz[j] - prev_layer.rz[i]
+                tmp = -de_dw[l][i][j]
+                tx += tmp * dx
+                ty += tmp * dy
+                tz += tmp * dz
+            xx[j] = 2 * tx
+            yy[j] = 2 * ty
+            zz[j] = 2 * tz
+
+        # Next layer matrix
+        if l+1 < len(net.layers):
+            next_layer = net.layers[l+1]
+            for j, xj in enumerate(layer.rx):
+                tx = 0.0
+                ty = 0.0
+                tz = 0.0
+                for i in range(next_layer.output_size):
+                    dx = layer.rx[j] - next_layer.rx[i]
+                    dy = layer.ry[j] - next_layer.ry[i]
+                    dz = layer.rz[j] - next_layer.rz[i]
+                    tmp = -de_dw[l+1][j][i]
+                    tx += tmp * dx
+                    ty += tmp * dy
+                    tz += tmp * dz
+                xx[j] += 2 * tx
+                yy[j] += 2 * ty
+                zz[j] += 2 * tz
+
+        de_drx.append(xx)
+        de_dry.append(yy)
+        de_drz.append(zz)
+
+    print("analytical rx")
+    for rx in de_drx:
+        print(rx)
+
+    return de_db, de_dq, de_dt, de_drx, de_dry, de_drz
+
 
 def compute_fd_grad(net_mlp, net):
 
@@ -191,6 +275,48 @@ def compute_fd_grad(net_mlp, net):
     for t in fd_t:
         print(t)
 
+    # Position
+    fd_x = []
+    fd_y = []
+    fd_z = []
+
+    # X
+    # input
+    lx = []
+    layer = net.particle_input
+    for j, x in enumerate(layer.rx):
+        hold = layer.rx[j]
+        layer.rx[j] += h
+        compute_matrices(net)
+        fp = compute_error(net_mlp, net)
+        layer.rx[j] -= 2*h
+        compute_matrices(net)
+        fm = compute_error(net_mlp, net)
+        lx.append((fp - fm) / (2*h))
+        layer.rx[j] = hold
+    fd_x.append(np.asarray(lx))
+
+    # layers
+    for l, layer in enumerate(net.layers):
+        lx = []
+        for j, t in enumerate(layer.rx):
+            hold = layer.rx[j]
+            layer.rx[j] += h
+            compute_matrices(net)
+            fp = compute_error(net_mlp, net)
+            layer.rx[j] -= 2*h
+            compute_matrices(net)
+            fm = compute_error(net_mlp, net)
+            lx.append((fp - fm) / (2*h))
+            layer.rx[j] = hold
+        fd_x.append(np.asarray(lx))
+
+    print("numerical rx")
+    for x in fd_x:
+        print(x)
+
+    return fd_b, fd_q, fd_t, fd_x, fd_y, fd_z
+
 
 def main():
 
@@ -207,9 +333,19 @@ def main():
 
     error = compute_error(net_mlp, net)
 
-    compute_grad_w(net_mlp, net)
-    compute_fd_grad(net_mlp, net)
+    de_db, de_dq, de_dt, de_drx, de_dry, de_drz = compute_grad_w(net_mlp, net)
+    fd_b, fd_q, fd_t, fd_x, fd_y, fd_z = compute_fd_grad(net_mlp, net)
 
+    for l, layer in enumerate(net.layers):
+        diff_b = np.mean(de_db[l] - fd_b[l])
+        diff_q = np.mean(de_dq[l] - fd_q[l])
+        diff_t = np.mean(de_dt[l] - fd_t[l])
+        diff_x = np.mean(de_drx[l] - fd_x[l])
+
+        print("b", diff_b)
+        print("q", diff_q)
+        print("t", diff_t)
+        print("x", diff_x)
 
 if __name__ == "__main__":
     main()
