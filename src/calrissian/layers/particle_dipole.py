@@ -23,7 +23,7 @@ class ParticleDipoleInput(object):
 
         # Negative charge positions
         # Copy of positive charge position with small added noise
-        s = k_eq
+        s = 1.1 * k_eq
         self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
         self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
         self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
@@ -88,7 +88,7 @@ class ParticleDipole(object):
 
         # Negative charge positions
         # Copy of positive charge position with small added noise
-        s = k_eq
+        s = 1.1 * k_eq
         self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
         self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
         self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
@@ -139,22 +139,26 @@ class ParticleDipole(object):
             dx = r_in_x_pos - self.rx_pos[j]
             dy = r_in_y_pos - self.ry_pos[j]
             dz = r_in_z_pos - self.rz_pos[j]
-            potential = 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            # potential = 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            potential = np.exp(-(dx**2 + dy**2 + dz**2))
 
             dx = r_in_x_pos - self.rx_neg[j]
             dy = r_in_y_pos - self.ry_neg[j]
             dz = r_in_z_pos - self.rz_neg[j]
-            potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            # potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
             dx = r_in_x_neg - self.rx_pos[j]
             dy = r_in_y_neg - self.ry_pos[j]
             dz = r_in_z_neg - self.rz_pos[j]
-            potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            # potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
             dx = r_in_x_neg - self.rx_neg[j]
             dy = r_in_y_neg - self.ry_neg[j]
             dz = r_in_z_neg - self.rz_neg[j]
-            potential += 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            # potential += 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
+            potential += np.exp(-(dx**2 + dy**2 + dz**2))
 
             z[j] = self.b[0][j] + self.q[j] * potential.dot(atrans)
         return z.transpose()

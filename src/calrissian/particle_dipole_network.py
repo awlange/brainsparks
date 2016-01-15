@@ -143,41 +143,57 @@ class ParticleDipoleNetwork(object):
             dx_pos_pos = (prev_layer.rx_pos - layer.rx_pos[j]).reshape((prev_layer.output_size, 1))
             dy_pos_pos = (prev_layer.ry_pos - layer.ry_pos[j]).reshape((prev_layer.output_size, 1))
             dz_pos_pos = (prev_layer.rz_pos - layer.rz_pos[j]).reshape((prev_layer.output_size, 1))
-            tmp = 1.0/np.sqrt(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2)
-            tmp3 = tmp*tmp*tmp
-            dx_pos_pos *= tmp3
-            dy_pos_pos *= tmp3
-            dz_pos_pos *= tmp3
+            # tmp = 1.0/np.sqrt(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2)
+            # tmp3 = tmp*tmp*tmp
+            # dx_pos_pos *= tmp3
+            # dy_pos_pos *= tmp3
+            # dz_pos_pos *= tmp3
+            tmp = np.exp(-(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2))
+            dx_pos_pos *= tmp
+            dy_pos_pos *= tmp
+            dz_pos_pos *= tmp
             potential = tmp
 
             dx_pos_neg = (prev_layer.rx_pos - layer.rx_neg[j]).reshape((prev_layer.output_size, 1))
             dy_pos_neg = (prev_layer.ry_pos - layer.ry_neg[j]).reshape((prev_layer.output_size, 1))
             dz_pos_neg = (prev_layer.rz_pos - layer.rz_neg[j]).reshape((prev_layer.output_size, 1))
-            tmp = -1.0/np.sqrt(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2)
-            tmp3 = tmp*tmp*tmp
-            dx_pos_neg *= tmp3
-            dy_pos_neg *= tmp3
-            dz_pos_neg *= tmp3
+            # tmp = -1.0/np.sqrt(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2)
+            # tmp3 = tmp*tmp*tmp
+            # dx_pos_neg *= tmp3
+            # dy_pos_neg *= tmp3
+            # dz_pos_neg *= tmp3
+            tmp = -np.exp(-(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2))
+            dx_pos_neg *= tmp
+            dy_pos_neg *= tmp
+            dz_pos_neg *= tmp
             potential += tmp
 
             dx_neg_pos = (prev_layer.rx_neg - layer.rx_pos[j]).reshape((prev_layer.output_size, 1))
             dy_neg_pos = (prev_layer.ry_neg - layer.ry_pos[j]).reshape((prev_layer.output_size, 1))
             dz_neg_pos = (prev_layer.rz_neg - layer.rz_pos[j]).reshape((prev_layer.output_size, 1))
-            tmp = -1.0/np.sqrt(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2)
-            tmp3 = tmp*tmp*tmp
-            dx_neg_pos *= tmp3
-            dy_neg_pos *= tmp3
-            dz_neg_pos *= tmp3
+            # tmp = -1.0/np.sqrt(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2)
+            # tmp3 = tmp*tmp*tmp
+            # dx_neg_pos *= tmp3
+            # dy_neg_pos *= tmp3
+            # dz_neg_pos *= tmp3
+            tmp = -np.exp(-(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2))
+            dx_neg_pos *= tmp
+            dy_neg_pos *= tmp
+            dz_neg_pos *= tmp
             potential += tmp
 
             dx_neg_neg = (prev_layer.rx_neg - layer.rx_neg[j]).reshape((prev_layer.output_size, 1))
             dy_neg_neg = (prev_layer.ry_neg - layer.ry_neg[j]).reshape((prev_layer.output_size, 1))
             dz_neg_neg = (prev_layer.rz_neg - layer.rz_neg[j]).reshape((prev_layer.output_size, 1))
-            tmp = 1.0/np.sqrt(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2)
-            tmp3 = tmp*tmp*tmp
-            dx_neg_neg *= tmp3
-            dy_neg_neg *= tmp3
-            dz_neg_neg *= tmp3
+            # tmp = 1.0/np.sqrt(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2)
+            # tmp3 = tmp*tmp*tmp
+            # dx_neg_neg *= tmp3
+            # dy_neg_neg *= tmp3
+            # dz_neg_neg *= tmp3
+            tmp = np.exp(-(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2))
+            dx_neg_neg *= tmp
+            dy_neg_neg *= tmp
+            dz_neg_neg *= tmp
             potential += tmp
 
             # Next delta
@@ -188,7 +204,8 @@ class ParticleDipoleNetwork(object):
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
-            tmp = qj * dq / potential
+            # tmp = qj * dq / potential
+            tmp = 2 * qj * dq / potential
 
             dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
             dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
@@ -233,41 +250,57 @@ class ParticleDipoleNetwork(object):
                 dx_pos_pos = (prev_layer.rx_pos - layer.rx_pos[j]).reshape((prev_layer.output_size, 1))
                 dy_pos_pos = (prev_layer.ry_pos - layer.ry_pos[j]).reshape((prev_layer.output_size, 1))
                 dz_pos_pos = (prev_layer.rz_pos - layer.rz_pos[j]).reshape((prev_layer.output_size, 1))
-                tmp = 1.0/np.sqrt(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2)
-                tmp3 = tmp*tmp*tmp
-                dx_pos_pos *= tmp3
-                dy_pos_pos *= tmp3
-                dz_pos_pos *= tmp3
+                # tmp = 1.0/np.sqrt(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2)
+                # tmp3 = tmp*tmp*tmp
+                # dx_pos_pos *= tmp3
+                # dy_pos_pos *= tmp3
+                # dz_pos_pos *= tmp3
+                tmp = np.exp(-(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2))
+                dx_pos_pos *= tmp
+                dy_pos_pos *= tmp
+                dz_pos_pos *= tmp
                 potential = tmp
 
                 dx_pos_neg = (prev_layer.rx_pos - layer.rx_neg[j]).reshape((prev_layer.output_size, 1))
                 dy_pos_neg = (prev_layer.ry_pos - layer.ry_neg[j]).reshape((prev_layer.output_size, 1))
                 dz_pos_neg = (prev_layer.rz_pos - layer.rz_neg[j]).reshape((prev_layer.output_size, 1))
-                tmp = -1.0/np.sqrt(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2)
-                tmp3 = tmp*tmp*tmp
-                dx_pos_neg *= tmp3
-                dy_pos_neg *= tmp3
-                dz_pos_neg *= tmp3
+                # tmp = -1.0/np.sqrt(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2)
+                # tmp3 = tmp*tmp*tmp
+                # dx_pos_neg *= tmp3
+                # dy_pos_neg *= tmp3
+                # dz_pos_neg *= tmp3
+                tmp = -np.exp(-(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2))
+                dx_pos_neg *= tmp
+                dy_pos_neg *= tmp
+                dz_pos_neg *= tmp
                 potential += tmp
 
                 dx_neg_pos = (prev_layer.rx_neg - layer.rx_pos[j]).reshape((prev_layer.output_size, 1))
                 dy_neg_pos = (prev_layer.ry_neg - layer.ry_pos[j]).reshape((prev_layer.output_size, 1))
                 dz_neg_pos = (prev_layer.rz_neg - layer.rz_pos[j]).reshape((prev_layer.output_size, 1))
-                tmp = -1.0/np.sqrt(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2)
-                tmp3 = tmp*tmp*tmp
-                dx_neg_pos *= tmp3
-                dy_neg_pos *= tmp3
-                dz_neg_pos *= tmp3
+                # tmp = -1.0/np.sqrt(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2)
+                # tmp3 = tmp*tmp*tmp
+                # dx_neg_pos *= tmp3
+                # dy_neg_pos *= tmp3
+                # dz_neg_pos *= tmp3
+                tmp = -np.exp(-(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2))
+                dx_neg_pos *= tmp
+                dy_neg_pos *= tmp
+                dz_neg_pos *= tmp
                 potential += tmp
 
                 dx_neg_neg = (prev_layer.rx_neg - layer.rx_neg[j]).reshape((prev_layer.output_size, 1))
                 dy_neg_neg = (prev_layer.ry_neg - layer.ry_neg[j]).reshape((prev_layer.output_size, 1))
                 dz_neg_neg = (prev_layer.rz_neg - layer.rz_neg[j]).reshape((prev_layer.output_size, 1))
-                tmp = 1.0/np.sqrt(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2)
-                tmp3 = tmp*tmp*tmp
-                dx_neg_neg *= tmp3
-                dy_neg_neg *= tmp3
-                dz_neg_neg *= tmp3
+                # tmp = 1.0/np.sqrt(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2)
+                # tmp3 = tmp*tmp*tmp
+                # dx_neg_neg *= tmp3
+                # dy_neg_neg *= tmp3
+                # dz_neg_neg *= tmp3
+                tmp = np.exp(-(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2))
+                dx_neg_neg *= tmp
+                dy_neg_neg *= tmp
+                dz_neg_neg *= tmp
                 potential += tmp
 
                 # Next delta
@@ -278,7 +311,8 @@ class ParticleDipoleNetwork(object):
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
-                tmp = qj * dq / potential
+                # tmp = qj * dq / potential
+                tmp = 2 * qj * dq / potential
 
                 dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
                 dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
@@ -315,17 +349,17 @@ class ParticleDipoleNetwork(object):
 
         return dc_db, dc_dq, dc_drx_pos, dc_dry_pos, dc_drz_pos, dc_drx_neg, dc_dry_neg, dc_drz_neg
 
-    # def fit(self, data_X, data_Y, optimizer):
-    #     """
-    #     Run the optimizer for specified number of epochs
-    #
-    #     :param data_X:
-    #     :param data_Y:
-    #     :return:
-    #     """
-    #
-    #     return optimizer.optimize(self, data_X, data_Y)
-    #
+    def fit(self, data_X, data_Y, optimizer):
+        """
+        Run the optimizer for specified number of epochs
+
+        :param data_X:
+        :param data_Y:
+        :return:
+        """
+
+        return optimizer.optimize(self, data_X, data_Y)
+
     # def write_to_json(self, file):
     #     """
     #     Write network data to file in JSON format
