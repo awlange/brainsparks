@@ -9,12 +9,14 @@ class ParticleDipoleInput(object):
     Dipole approximated as 2 coupled charges of equal magnitude
     """
 
-    def __init__(self, output_size, k_bond=1.0, k_eq=0.1, s=1.0):
+    def __init__(self, output_size, k_bond=1.0, k_eq=0.1, s=1.0, cut=3.0):
         self.output_size = output_size
 
         # Harmonic constraint coefficient and equilibrium
         self.k_bond = k_bond
         self.k_eq = k_eq
+        self.cut = cut
+        self.cut2 = cut*cut
 
         # Positive charge positions
         self.rx_pos = np.random.uniform(-s, s, output_size)
@@ -23,10 +25,18 @@ class ParticleDipoleInput(object):
 
         # Negative charge positions
         # Copy of positive charge position with small added noise
-        s = 1.1 * k_eq
-        self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
-        self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
-        self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
+        # s = 1.1 * k_eq
+        # self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
+        # self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
+        # self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
+        # Random
+        self.rx_neg = np.random.uniform(-s, s, output_size)
+        self.ry_neg = np.random.uniform(-s, s, output_size)
+        self.rz_neg = np.random.uniform(-s, s, output_size)
+
+    def set_cut(self, cut):
+        self.cut = cut
+        self.cut2 = cut*cut
 
     def get_rxyz(self):
         return self.rx_pos, self.ry_pos, self.rz_pos, self.rx_neg, self.ry_neg, self.rz_neg
@@ -62,7 +72,7 @@ class ParticleDipole(object):
     Dipole approximated as 2 coupled charges of equal magnitude
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0, cut=3.0):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -72,6 +82,8 @@ class ParticleDipole(object):
         # Harmonic constraint coefficient and equilibrium
         self.k_bond = k_bond
         self.k_eq = k_eq
+        self.cut = cut
+        self.cut2 = cut*cut
 
         # Weight initialization
         c = np.sqrt(1.0 / (input_size + output_size))
@@ -88,10 +100,18 @@ class ParticleDipole(object):
 
         # Negative charge positions
         # Copy of positive charge position with small added noise
-        s = 1.1 * k_eq
-        self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
-        self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
-        self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
+        # s = 1.1 * k_eq
+        # self.rx_neg = np.copy(self.rx_pos) + np.random.uniform(-s, s, output_size)
+        # self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
+        # self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
+        # Random
+        self.rx_neg = np.random.uniform(-s, s, output_size)
+        self.ry_neg = np.random.uniform(-s, s, output_size)
+        self.rz_neg = np.random.uniform(-s, s, output_size)
+
+    def set_cut(self, cut):
+        self.cut = cut
+        self.cut2 = cut*cut
 
     def compute_bond_cost(self):
         dx = self.rx_pos - self.rx_neg
@@ -141,24 +161,32 @@ class ParticleDipole(object):
             dz = r_in_z_pos - self.rz_pos[j]
             # potential = 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
             potential = np.exp(-(dx**2 + dy**2 + dz**2))
+            # d2 = dx**2 + dy**2 + dz**2
+            # potential = np.piecewise(d2, [d2 <= self.cut2, d2 > self.cut2], [lambda x: np.exp(-x), 0.0])
 
             dx = r_in_x_pos - self.rx_neg[j]
             dy = r_in_y_pos - self.ry_neg[j]
             dz = r_in_z_pos - self.rz_neg[j]
             # potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
             potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+            # d2 = dx**2 + dy**2 + dz**2
+            # potential -= np.piecewise(d2, [d2 <= self.cut2, d2 > self.cut2], [lambda x: np.exp(-x), 0.0])
 
             dx = r_in_x_neg - self.rx_pos[j]
             dy = r_in_y_neg - self.ry_pos[j]
             dz = r_in_z_neg - self.rz_pos[j]
             # potential += -1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
             potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+            # d2 = dx**2 + dy**2 + dz**2
+            # potential -= np.piecewise(d2, [d2 <= self.cut2, d2 > self.cut2], [lambda x: np.exp(-x), 0.0])
 
             dx = r_in_x_neg - self.rx_neg[j]
             dy = r_in_y_neg - self.ry_neg[j]
             dz = r_in_z_neg - self.rz_neg[j]
             # potential += 1.0 / np.sqrt(dx**2 + dy**2 + dz**2)
             potential += np.exp(-(dx**2 + dy**2 + dz**2))
+            # d2 = dx**2 + dy**2 + dz**2
+            # potential += np.piecewise(d2, [d2 <= self.cut2, d2 > self.cut2], [lambda x: np.exp(-x), 0.0])
 
             z[j] = self.b[0][j] + self.q[j] * potential.dot(atrans)
         return z.transpose()
