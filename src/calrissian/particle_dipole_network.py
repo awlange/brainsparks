@@ -61,9 +61,9 @@ class ParticleDipoleNetwork(object):
         """
         c = self.cost_function(data_Y, self.predict(data_X))
         # Add cost of bonds
-        c += self.particle_input.compute_bond_cost()
-        for layer in self.layers:
-            c += layer.compute_bond_cost()
+        # c += self.particle_input.compute_bond_cost()
+        # for layer in self.layers:
+        #     c += layer.compute_bond_cost()
         return c
 
     def cost_gradient_thread(self, data_XY):
@@ -331,21 +331,21 @@ class ParticleDipoleNetwork(object):
                 dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
         # Compute gradient of bonds
-        tx, ty, tz = self.particle_input.compute_bond_cost_gradient()
-        dc_drx_pos[0] += tx
-        dc_dry_pos[0] += ty
-        dc_drz_pos[0] += tz
-        dc_drx_neg[0] -= tx
-        dc_dry_neg[0] -= ty
-        dc_drz_neg[0] -= tz
-        for l, layer in enumerate(self.layers):
-            tx, ty, tz = layer.compute_bond_cost_gradient()
-            dc_drx_pos[l+1] += tx
-            dc_dry_pos[l+1] += ty
-            dc_drz_pos[l+1] += tz
-            dc_drx_neg[l+1] -= tx
-            dc_dry_neg[l+1] -= ty
-            dc_drz_neg[l+1] -= tz
+        # tx, ty, tz = self.particle_input.compute_bond_cost_gradient()
+        # dc_drx_pos[0] += tx
+        # dc_dry_pos[0] += ty
+        # dc_drz_pos[0] += tz
+        # dc_drx_neg[0] -= tx
+        # dc_dry_neg[0] -= ty
+        # dc_drz_neg[0] -= tz
+        # for l, layer in enumerate(self.layers):
+        #     tx, ty, tz = layer.compute_bond_cost_gradient()
+        #     dc_drx_pos[l+1] += tx
+        #     dc_dry_pos[l+1] += ty
+        #     dc_drz_pos[l+1] += tz
+        #     dc_drx_neg[l+1] -= tx
+        #     dc_dry_neg[l+1] -= ty
+        #     dc_drz_neg[l+1] -= tz
 
         return dc_db, dc_dq, dc_drx_pos, dc_dry_pos, dc_drz_pos, dc_drx_neg, dc_dry_neg, dc_drz_neg
 
