@@ -13,7 +13,7 @@ class ParticleDipoleTreeInput(object):
     Paired by (n, n+1)
     """
 
-    def __init__(self, output_size, s=1.0, cut=1000.0):
+    def __init__(self, output_size, s=1.0, cut=1000.0, max_level=3, mac=0.0):
         self.output_size = output_size
 
         self.cut = cut
@@ -26,7 +26,7 @@ class ParticleDipoleTreeInput(object):
 
         # Build Octree for this layer
         # TODO: for now this is keeping a duplicate copies of the data
-        self.octree = Octree(max_levels=3, p=1, n_particle_min=20, cut=self.cut)
+        self.octree = Octree(max_level=max_level, p=1, n_particle_min=20, cut=self.cut, mac=mac)
         self.octree.build_tree(np.zeros(output_size), self.rx, self.ry, self.rz)
 
     def set_cut(self, cut):
@@ -65,7 +65,7 @@ class ParticleDipoleTree(object):
     Paired by (n, n+1)
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", s=1.0, cut=1000.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", s=1.0, cut=1000.0, max_level=3, mac=0.0):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -90,7 +90,7 @@ class ParticleDipoleTree(object):
 
         # Build Octree for this layer
         # TODO: for now this is keeping a duplicate copies of the data
-        self.octree = Octree(max_levels=3, p=1, n_particle_min=20, cut=self.cut)
+        self.octree = Octree(max_level=max_level, p=1, n_particle_min=20, cut=self.cut, mac=mac)
         self.octree.build_tree(self.q, self.rx, self.ry, self.rz)
 
     def copy_pos_neg_positions(self, q, b, rx_pos, ry_pos, rz_pos, rx_neg, ry_neg, rz_neg):
@@ -127,7 +127,11 @@ class ParticleDipoleTree(object):
         Use treecode to compute
         """
         z = np.zeros((self.output_size, len(a_in)))
-        potential = octree_in.compute_potential(self.rx, self.ry, self.rz, a_in)
+
+        # potential = octree_in.compute_potential(self.rx, self.ry, self.rz, a_in)
+        # potential = octree_in.compute_potential2(self.rx, self.ry, self.rz, a_in)
+        potential = octree_in.compute_potential3(self.rx, self.ry, self.rz, a_in)
+
         # Coalesce particle dipole pairs
         for j in range(self.output_size):
             pot = (potential[2*j] - potential[2*j + 1])

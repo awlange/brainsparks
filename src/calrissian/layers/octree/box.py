@@ -35,9 +35,14 @@ class Box(object):
         self.rz = np.asarray([])
         self.indexes = np.asarray([])
 
+        # Dynamic charges
+        self.dynamic_q = np.zeros(1)
+
         # Multipole moments
+        self.moments_computed = False
         # TODO: higher order
         self.moments = np.zeros((p+1, p+1, p+1))  # actually mor space than necessary, but easy for coding
+        self.total_charge = None
 
     def length_x(self):
         return self.x_range[1] - self.x_range[0]
@@ -92,18 +97,18 @@ class Box(object):
     def is_leaf(self):
         return self.leaf
 
-    # def set_box_q(self, q_all):
-    #     """
-    #     To set dynamically changing charges
-    #     :param q_all: (n_input_data, n_input_nodes)
-    #     :return:
-    #     """
-    #     self.q = np.zeros((len(q_all), len(self.rx)))
-    #     for k, qk in enumerate(q_all):
-    #         i = 0
-    #         for ind in self.indexes:
-    #             self.q[k][i] = qk[ind]
-    #             i += 1
+    def set_dynamic_q(self, q_all):
+        """
+        To set dynamically changing charges
+        :param q_all: (n_input_nodes, n_input_data)
+        :return:
+        """
+        qt = q_all.transpose()
+        tmp = []
+        for ind in self.indexes:
+            tmp.append(qt[ind])
+        self.dynamic_q = np.asarray(tmp).transpose()  # (n_input_data, n_particles in this box)
+        self.moments_computed = False  # For lazy loaded moments
 
     def compute_multipoles(self, q_in):
         # Compute multipole moments of this box
@@ -114,6 +119,12 @@ class Box(object):
             for i in self.indexes:
                 q_sum += q_in[i]
             self.moments[0][0][0] = q_sum
+
+    def get_total_charge(self):
+        if not self.moments_computed:
+            self.total_charge = np.sum(self.dynamic_q, axis=1)
+            self.moments_computed = True
+        return self.total_charge
 
     def divide(self):
         """

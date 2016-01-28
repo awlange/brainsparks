@@ -8,8 +8,8 @@ class Octree(object):
     Octree implementation to be used in particle dipole networks
     """
 
-    def __init__(self, max_levels=3, p=0, n_particle_min=20, mac=0.0, cut=1000.0):
-        self.max_level = max_levels
+    def __init__(self, max_level=3, p=0, n_particle_min=20, mac=0.0, cut=1000.0):
+        self.max_level = max_level
         self.p = p
         self.n_particle_min = n_particle_min
         self.mac = mac  # Multipole acceptance criterion
@@ -17,6 +17,7 @@ class Octree(object):
 
         # Root Box
         self.root_box = None
+        self.levels = 0
 
     def build_tree(self, q, rx, ry, rz):
         """
@@ -48,11 +49,14 @@ class Octree(object):
         self.root_box.add(q2, rx, ry, rz, np.arange(len(rx)))
         if self.max_level == 0:
             self.root_box.leaf = True
+        else:
+            self.root_box.divide()
 
         # Subsequent boxes
-        level_boxes = self.root_box.children
-        level = 1
+        level_boxes = [self.root_box]
+        level = 0
         while len(level_boxes) > 0:
+            level += 1
             next_level_boxes = []
             for level_box in level_boxes:
                 # Divide parent box into 8 sub-boxes if it is not a leaf
@@ -67,8 +71,34 @@ class Octree(object):
                             next_level_boxes.append(child_box)
 
             level_boxes = next_level_boxes
+        self.levels = level
 
-    def compute_potential(self, rx, ry, rz, q_in):
+    def set_dynamic_charges(self, q_in):
+        """
+        Set the given charges for each box in the tree
+
+        :param q_in: input charges --> (n_input_data, n_input_nodes)
+        """
+        # Make positive and negative copy of q_in charges
+        q = np.zeros((len(q_in), 2*len(q_in[0])))
+        for i, qq in enumerate(q_in):
+            qi = q[i]
+            for j, qj in enumerate(qq):
+                qi[2*j] = qj
+                qi[2*j+1] = -qj
+
+        self.set_dynamic_charges_recursive(np.asarray(q), self.root_box)
+
+    def set_dynamic_charges_recursive(self, q_in, box):
+        """
+        Recursive loop through the octree to set charges
+        """
+        box.set_dynamic_q(q_in)
+        if not box.leaf:
+            for child_box in box.children:
+                self.set_dynamic_charges_recursive(q_in, child_box)
+
+    def compute_potential(self, rx, ry, rz, q_in, set_dynamic_charges=True):
         """
         Compute the potential at the given input coordinates by recursively traversing the octree
         :param rx: numpy array of x positions
@@ -76,63 +106,158 @@ class Octree(object):
         :param rz: numpy array of z positions
         :param q_in: input charges --> (n_input_data, n_input_nodes)
         """
+
+        if set_dynamic_charges:
+            self.set_dynamic_charges(q_in)
+
         potential = np.zeros((len(rx), len(q_in)))
         for i in range(len(rx)):
-            potential[i] = self.compute_potential_recursive(rx[i], ry[i], rz[i], q_in, self.root_box)
+            self.compute_potential_recursive(potential[i], rx[i], ry[i], rz[i], self.root_box)
         return potential
 
-    def compute_potential_recursive(self, rxi, ryi, rzi, q_in, box):
+    def compute_potential_recursive(self, potential, rxi, ryi, rzi, box):
         """
         Compute potential for single input coordinates (not a numpy array)
         :param rxi: x position
         :param ryi: y position
         :param rzi: z position
-        :param q_in: input charges --> (n_input_data, n_input_nodes)
-        :return: the potential as approximated by the octree
         """
-        potential = np.zeros(len(q_in))
         dx = box.center[0] - rxi
         dy = box.center[1] - ryi
         dz = box.center[2] - rzi
-        R = np.sqrt(dx*dx + dy*dy + dz*dz)
+        R2 = dx*dx + dy*dy + dz*dz
 
         # Beyond cutoff or MAC
-        if R - box.radius > self.cut or box.radius / R <= self.mac:
-            # Use the multipole expansion for potential
-
-            # TODO: higher order multipoles
-            # p = 0
-            # potential = box.multipoles[0][0][0] * np.exp(-R*R)
-            # TODO: do we recompute moments for each input? Or just ignore?
-            # Do nothing, potential already zero above
+        tmp = self.cut + box.radius
+        if R2 > tmp*tmp:
+            # Do nothing!
             pass
+
+        # elif box.radius / R <= self.mac:
+        #     # Use the multipole expansion for potential
+        #
+        #     # TODO: higher order multipoles
+        #     # p = 0
+        #     # potential = box.multipoles[0][0][0] * np.exp(-R*R)
+        #
+        #     # total_charge_vector = np.sum(box.dynamic_q, axis=1)
+        #     total_charge_vector = box.get_total_charge()
+        #     potential += total_charge_vector * np.exp(-R2)
 
         elif box.leaf:
             # Compute direct interaction
+            # Vectorized way with dynamic charges array
             dx = box.rx - rxi
             dy = box.ry - ryi
             dz = box.rz - rzi
-            # box.set_box_q(q_in) # ???
-            # tmp = box.q * np.exp(-(dx*dx + dy*dy + dz*dz))
             d2 = dx*dx + dy*dy + dz*dz
-            exp = np.exp(-d2)
-
-            # TODO: temporary kind of dumb way, but works
-            # For each input data...
-            for ip in range(len(potential)):
-                # Get charges for this box
-                box_q = np.zeros_like(dx)
-                j = 0
-                for ind in box.indexes:
-                    i = ind // 2
-                    box_q[j] = q_in[ip][i] if ind % 2 == 0 else -q_in[ip][i]  # sign of charge
-                    # box_q[j] = 1 if ind % 2 == 0 else -1  # sign of charge
-                    j += 1
-                potential[ip] = np.sum(exp * box_q)  # check
+            potential += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
 
         else:
             # Recurse
             for child_box in box.children:
-                potential += self.compute_potential_recursive(rxi, ryi, rzi, q_in, child_box)
+                self.compute_potential_recursive(potential, rxi, ryi, rzi, child_box)
+
+    def compute_potential2(self, rx, ry, rz, q_in, set_dynamic_charges=True):
+        """
+        Compute the potential at the given input coordinates by recursively traversing the octree
+        :param rx: numpy array of x positions
+        :param ry: numpy array of y positions
+        :param rz: numpy array of z positions
+        :param q_in: input charges --> (n_input_data, n_input_nodes)
+        """
+
+        if set_dynamic_charges:
+            self.set_dynamic_charges(q_in)
+        potential = np.zeros((len(rx), len(q_in)))
+
+        for i in range(len(rx)):
+            potential_i = potential[i]
+            rxi = rx[i]
+            ryi = ry[i]
+            rzi = rz[i]
+
+            # Breadth-first search traversal
+            box_queue = [self.root_box]
+            while len(box_queue) > 0:
+
+                # Get next box from queue
+                box = box_queue.pop(0)
+
+                dx = box.center[0] - rxi
+                dy = box.center[1] - ryi
+                dz = box.center[2] - rzi
+                R2 = dx*dx + dy*dy + dz*dz
+
+                # Beyond cutoff or MAC
+                tmp = self.cut + box.radius
+                if R2 > tmp*tmp:
+                    # Do nothing!
+                    pass
+
+                # TODO: multipoles
+
+                elif box.leaf:
+                    # Compute direct interaction
+                    # Vectorized way with dynamic charges array
+                    dx = box.rx - rxi
+                    dy = box.ry - ryi
+                    dz = box.rz - rzi
+                    d2 = dx*dx + dy*dy + dz*dz
+                    potential_i += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
+
+                else:
+                    # Recurse
+                    for child_box in box.children:
+                        box_queue.append(child_box)
+
+        return potential
+
+    def compute_potential3(self, rx, ry, rz, q_in, set_dynamic_charges=True):
+        """
+        Compute the potential at the given input coordinates by recursively traversing the octree
+        :param rx: numpy array of x positions
+        :param ry: numpy array of y positions
+        :param rz: numpy array of z positions
+        :param q_in: input charges --> (n_input_data, n_input_nodes)
+        """
+
+        if set_dynamic_charges:
+            self.set_dynamic_charges(q_in)
+        potential = np.zeros((len(rx), len(q_in)))
+
+        # Breadth-first search traversal
+        box_queue = [self.root_box]
+        while len(box_queue) > 0:
+
+            # Get next box from queue
+            box = box_queue.pop(0)
+
+            dx = box.center[0] - rx
+            dy = box.center[1] - ry
+            dz = box.center[2] - rz
+            R2 = dx*dx + dy*dy + dz*dz
+
+            # Beyond cutoff or MAC
+            # Try piecewise?
+            tmp = self.cut + box.radius
+            for i in range(len(rx)):
+                if R2[i] > tmp*tmp:
+                    # Do nothing!
+                    pass
+
+                # TODO: multipoles
+
+                elif box.leaf:
+                    # Compute direct interaction
+                    # Vectorized way with dynamic charges array
+                    dx = box.rx - rx[i]
+                    dy = box.ry - ry[i]
+                    dz = box.rz - rz[i]
+                    d2 = dx*dx + dy*dy + dz*dz
+                    potential[i] += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
+
+            for child_box in box.children:
+                box_queue.append(child_box)
 
         return potential
