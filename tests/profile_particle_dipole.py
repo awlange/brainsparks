@@ -31,12 +31,12 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 500
+n_sub = 33
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
 s = 4.0
-cut = 0.0
+cut = 3.5
 max_level = 4
 mac = 0.0
 
@@ -44,18 +44,18 @@ net = ParticleDipoleNetwork(cost="categorical_cross_entropy", particle_input=Par
 net.append(ParticleDipole(784, 128, activation="sigmoid", s=s))
 net.append(ParticleDipole(128, 10, activation="softmax", s=s))
 
-# print("starting predict")
-# times = []
-# nt = 3
-# for _ in range(nt):
-#     ts = time.time()
-#     c = net.cost(X_sub, Y_sub)
-#     # c = 1.0
-#     # net.cost_gradient(X_sub, Y_sub)
-#     t = time.time() - ts
-#     print("Cost: {} time: {}".format(c, t))
-#     times.append(t)
-# print("Mean: " + str(sum(times)/nt))
+print("starting predict")
+times = []
+nt = 3
+for _ in range(nt):
+    ts = time.time()
+    c = net.cost(X_sub, Y_sub)
+    # c = 1.0
+    # net.cost_gradient(X_sub, Y_sub)
+    t = time.time() - ts
+    print("Cost: {} time: {}".format(c, t))
+    times.append(t)
+print("Mean: " + str(sum(times)/nt))
 
 net2 = ParticleDipoleTreeNetwork(cost="categorical_cross_entropy", particle_input=ParticleDipoleTreeInput(784, s=s, cut=cut, max_level=max_level, mac=mac))
 net2.append(ParticleDipoleTree(784, 128, activation="sigmoid", s=s, cut=cut, max_level=max_level, mac=mac))

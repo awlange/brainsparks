@@ -80,13 +80,7 @@ class Octree(object):
         :param q_in: input charges --> (n_input_data, n_input_nodes)
         """
         # Make positive and negative copy of q_in charges
-        q = np.zeros((len(q_in), 2*len(q_in[0])))
-        for i, qq in enumerate(q_in):
-            qi = q[i]
-            for j, qj in enumerate(qq):
-                qi[2*j] = qj
-                qi[2*j+1] = -qj
-
+        q = np.concatenate((q_in, -q_in), axis=1)
         self.set_dynamic_charges_recursive(np.asarray(q), self.root_box)
 
     def set_dynamic_charges_recursive(self, q_in, box):

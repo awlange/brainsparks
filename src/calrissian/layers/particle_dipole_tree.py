@@ -9,8 +9,7 @@ class ParticleDipoleTreeInput(object):
     """
     Particle dipole approach with treecode for fast potential evaluation
 
-    Particle positions are ordered such that even indexes are positive, odd are negative.
-    Paired by (n, n+1)
+    Particle positions are ordered such that first n indexes are positive, next n are negative.
     """
 
     def __init__(self, output_size, s=1.0, cut=1000.0, max_level=3, mac=0.0):
@@ -47,12 +46,13 @@ class ParticleDipoleTreeInput(object):
         For debugging purposes
         """
         for i in range(self.output_size):
-            self.rx[2*i] = rx_pos[i]
-            self.rx[2*i+1] = rx_neg[i]
-            self.ry[2*i] = ry_pos[i]
-            self.ry[2*i+1] = ry_neg[i]
-            self.rz[2*i] = rz_pos[i]
-            self.rz[2*i+1] = rz_neg[i]
+            self.rx[i] = rx_pos[i]
+            self.ry[i] = ry_pos[i]
+            self.rz[i] = rz_pos[i]
+            self.rx[self.output_size + i] = rx_neg[i]
+            self.ry[self.output_size + i] = ry_neg[i]
+            self.rz[self.output_size + i] = rz_neg[i]
+
         # rebuild octree
         self.octree.build_tree(np.zeros(self.output_size), self.rx, self.ry, self.rz)
 
@@ -100,12 +100,12 @@ class ParticleDipoleTree(object):
         for i in range(self.output_size):
             self.q[i] = q[i]
             self.b[0][i] = b[0][i]
-            self.rx[2*i] = rx_pos[i]
-            self.rx[2*i+1] = rx_neg[i]
-            self.ry[2*i] = ry_pos[i]
-            self.ry[2*i+1] = ry_neg[i]
-            self.rz[2*i] = rz_pos[i]
-            self.rz[2*i+1] = rz_neg[i]
+            self.rx[i] = rx_pos[i]
+            self.ry[i] = ry_pos[i]
+            self.rz[i] = rz_pos[i]
+            self.rx[self.output_size + i] = rx_neg[i]
+            self.ry[self.output_size + i] = ry_neg[i]
+            self.rz[self.output_size + i] = rz_neg[i]
         # rebuild octree
         self.octree.build_tree(self.q, self.rx, self.ry, self.rz)
 
@@ -129,13 +129,13 @@ class ParticleDipoleTree(object):
         z = np.zeros((self.output_size, len(a_in)))
 
         # potential = octree_in.compute_potential(self.rx, self.ry, self.rz, a_in)
-        # potential = octree_in.compute_potential2(self.rx, self.ry, self.rz, a_in)
-        potential = octree_in.compute_potential3(self.rx, self.ry, self.rz, a_in)
+        potential = octree_in.compute_potential2(self.rx, self.ry, self.rz, a_in)
+        # potential = octree_in.compute_potential3(self.rx, self.ry, self.rz, a_in)
 
         # Coalesce particle dipole pairs
         for j in range(self.output_size):
-            pot = (potential[2*j] - potential[2*j + 1])
-            z[j] = self.b[0][j] + self.q[j] * (potential[2*j] - potential[2*j + 1])
+            pot = (potential[j] - potential[self.output_size + j])
+            z[j] = self.b[0][j] + self.q[j] * pot
         return z.transpose()
 
     def compute_a(self, z):
