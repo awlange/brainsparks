@@ -31,18 +31,20 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 33
+n_sub = 333
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
 s = 4.0
-cut = 3.5
-max_level = 4
+cut = 3.0
+max_level = 5
 mac = 0.0
+n = 128
+n_min = 10
 
 net = ParticleDipoleNetwork(cost="categorical_cross_entropy", particle_input=ParticleDipoleInput(784, s=s))
-net.append(ParticleDipole(784, 128, activation="sigmoid", s=s))
-net.append(ParticleDipole(128, 10, activation="softmax", s=s))
+net.append(ParticleDipole(784, n, activation="sigmoid", s=s))
+net.append(ParticleDipole(n, 10, activation="softmax", s=s))
 
 print("starting predict")
 times = []
@@ -58,8 +60,8 @@ for _ in range(nt):
 print("Mean: " + str(sum(times)/nt))
 
 net2 = ParticleDipoleTreeNetwork(cost="categorical_cross_entropy", particle_input=ParticleDipoleTreeInput(784, s=s, cut=cut, max_level=max_level, mac=mac))
-net2.append(ParticleDipoleTree(784, 128, activation="sigmoid", s=s, cut=cut, max_level=max_level, mac=mac))
-net2.append(ParticleDipoleTree(128, 10, activation="softmax", s=s, cut=cut, max_level=max_level, mac=mac))
+net2.append(ParticleDipoleTree(784, n, activation="sigmoid", s=s, cut=cut, max_level=max_level, mac=mac, n_particle_min=n_min))
+net2.append(ParticleDipoleTree(n, 10, activation="softmax", s=s, cut=cut, max_level=max_level, mac=mac, n_particle_min=n_min))
 
 # Make sure we have the same coordinates and charges
 net2.particle_input.copy_pos_neg_positions(net.particle_input.rx_pos, net.particle_input.ry_pos, net.particle_input.rz_pos,

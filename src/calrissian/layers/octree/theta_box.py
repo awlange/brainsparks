@@ -3,7 +3,8 @@ import numpy as np
 
 class Box(object):
     """
-    Box container class for Octree
+    Box container class for Octree with phase as theta
+    Used strictly as a means to quickly compute cutoffs
     """
 
     def __init__(self, x_range, y_range, z_range, n_particle_min=20, p=0):
@@ -33,16 +34,13 @@ class Box(object):
         self.rx = np.asarray([])
         self.ry = np.asarray([])
         self.rz = np.asarray([])
+        self.theta = np.asarray([])
         self.indexes = np.asarray([])
 
         # Dynamic charges
         self.dynamic_q = np.zeros(1)
 
-        # Multipole moments
-        self.moments_computed = False
-        # TODO: higher order
-        self.moments = np.zeros((p+1, p+1, p+1))  # actually mor space than necessary, but easy for coding
-        self.total_charge = None
+        # No multipoles
 
     def length_x(self):
         return self.x_range[1] - self.x_range[0]

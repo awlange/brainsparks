@@ -1,6 +1,7 @@
 from .box import Box
 
 import numpy as np
+from numba import jit
 
 
 class Octree(object):
@@ -145,7 +146,7 @@ class Octree(object):
             dy = box.ry - ryi
             dz = box.rz - rzi
             d2 = dx*dx + dy*dy + dz*dz
-            potential += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
+            potential += (np.exp(-d2)).dot(box.dynamic_q)
 
         else:
             # Recurse
@@ -194,11 +195,11 @@ class Octree(object):
                 elif box.leaf:
                     # Compute direct interaction
                     # Vectorized way with dynamic charges array
-                    dx = box.rx - rxi
-                    dy = box.ry - ryi
-                    dz = box.rz - rzi
-                    d2 = dx*dx + dy*dy + dz*dz
-                    potential_i += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
+                    bx = box.rx - rxi
+                    by = box.ry - ryi
+                    bz = box.rz - rzi
+                    d2 = bx*bx + by*by + bz*bz
+                    potential_i += (np.exp(-d2)).dot(box.dynamic_q)
 
                 else:
                     # Recurse
@@ -235,8 +236,10 @@ class Octree(object):
             # Beyond cutoff or MAC
             # Try piecewise?
             tmp = self.cut + box.radius
+            tmp *= tmp
+
             for i in range(len(rx)):
-                if R2[i] > tmp*tmp:
+                if R2[i] > tmp:
                     # Do nothing!
                     pass
 
@@ -245,11 +248,64 @@ class Octree(object):
                 elif box.leaf:
                     # Compute direct interaction
                     # Vectorized way with dynamic charges array
-                    dx = box.rx - rx[i]
-                    dy = box.ry - ry[i]
-                    dz = box.rz - rz[i]
-                    d2 = dx*dx + dy*dy + dz*dz
-                    potential[i] += np.sum(box.dynamic_q * np.exp(-d2), axis=1)
+                    ddx = box.rx - rx[i]
+                    ddy = box.ry - ry[i]
+                    ddz = box.rz - rz[i]
+                    d2 = ddx*ddx + ddy*ddy + ddz*ddz
+                    potential[i] += (np.exp(-d2)).dot(box.dynamic_q)
+                    # TODO: collect all points interacting with this box, then compute dot?
+
+            for child_box in box.children:
+                box_queue.append(child_box)
+
+        return potential
+
+    def compute_potential4(self, rx, ry, rz, q_in, set_dynamic_charges=True):
+        """
+        Compute the potential at the given input coordinates by recursively traversing the octree
+        :param rx: numpy array of x positions
+        :param ry: numpy array of y positions
+        :param rz: numpy array of z positions
+        :param q_in: input charges --> (n_input_data, n_input_nodes)
+        """
+
+        if set_dynamic_charges:
+            self.set_dynamic_charges(q_in)
+        potential = np.zeros((len(rx), len(q_in)))
+
+        # Breadth-first search traversal
+        box_queue = [self.root_box]
+        while len(box_queue) > 0:
+
+            # Get next box from queue
+            box = box_queue.pop(0)
+
+            dx = box.center[0] - rx
+            dy = box.center[1] - ry
+            dz = box.center[2] - rz
+            R2 = dx*dx + dy*dy + dz*dz
+
+            # Beyond cutoff or MAC
+            # Try piecewise?
+            tmp = self.cut + box.radius
+            tmp *= tmp
+
+            for i in range(len(rx)):
+                if R2[i] > tmp:
+                    # Do nothing!
+                    pass
+
+                # TODO: multipoles
+
+                elif box.leaf:
+                    # Compute direct interaction
+                    # Vectorized way with dynamic charges array
+                    ddx = box.rx - rx[i]
+                    ddy = box.ry - ry[i]
+                    ddz = box.rz - rz[i]
+                    d2 = ddx*ddx + ddy*ddy + ddz*ddz
+                    potential[i] += (np.exp(-d2)).dot(box.dynamic_q)
+                    # TODO: collect all points interacting with this box, then compute dot?
 
             for child_box in box.children:
                 box_queue.append(child_box)
