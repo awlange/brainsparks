@@ -140,8 +140,8 @@ class ParticleNetwork(object):
             dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
             dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
             d2 = dx**2 + dy**2 + dz**2
-            dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
             exp_dij = np.exp(-layer.zeta * d2)
+            dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
             exp_dij *= np.cos(dt)
             # exp_dij = 1.0/np.sqrt(d2)
 
@@ -201,8 +201,8 @@ class ParticleNetwork(object):
                 dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
                 dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
-                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
                 exp_dij = np.exp(-layer.zeta * d2)
+                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
                 exp_dij *= np.cos(dt)
                 # exp_dij = 1.0/np.sqrt(d2)
 

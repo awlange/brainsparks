@@ -41,6 +41,7 @@ class Particle(object):
         # Weight initialization
         c = np.sqrt(1.0 / (input_size + output_size))
         self.b = np.random.uniform(-c, c, (1, output_size))
+        # self.b = np.random.uniform(0, c, (1, output_size))
 
         # Charges
         c = 1.0
@@ -82,9 +83,9 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            dt = r_in_theta - self.theta[j]
             w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
             # w_ji = 1.0 / np.sqrt((dx**2 + dy**2 + dz**2))
+            dt = r_in_theta - self.theta[j]
             w_ji *= np.cos(dt)
             z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
         return z.transpose()
