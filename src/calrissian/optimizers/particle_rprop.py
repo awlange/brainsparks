@@ -62,12 +62,13 @@ class ParticleRPROP(Optimizer):
 
     def cost_gradient_parallel(self, network, data_X, data_Y):
         offset = 0
+        chunks = len(data_X) / self.chunk_size
         while offset < len(data_X):
             data_X_sub = data_X[offset:(offset+self.chunk_size), :]
             data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
             data_X_split = np.array_split(data_X_sub, self.n_threads)
             data_Y_split = np.array_split(data_Y_sub, self.n_threads)
-            data_XY_list = [(data_X_split[i], data_Y_split[i]) for i in range(self.n_threads)]
+            data_XY_list = [(data_X_split[i], data_Y_split[i], self.n_threads * chunks) for i in range(self.n_threads)]
 
             result = self.get_pool().map(network.cost_gradient_thread, data_XY_list)
 

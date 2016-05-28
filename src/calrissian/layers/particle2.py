@@ -16,7 +16,7 @@ class Particle2(object):
         self.zeta = zeta
 
         # Weight initialization
-        c = np.sqrt(1.0 / (input_size + output_size))
+        c = np.sqrt(6.0 / (input_size + output_size))
         self.b = np.random.uniform(-c, c, (1, output_size))
 
         # Charges

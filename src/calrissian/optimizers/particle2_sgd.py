@@ -10,7 +10,7 @@ class Particle2SGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01):
+                 cost_freq=2, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01, init_v=0.0):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -43,6 +43,7 @@ class Particle2SGD(Optimizer):
         self.dc_dt_out = None
 
         # Velocities
+        self.init_v = init_v
         self.vel_b = None
         self.vel_q = None
         self.vel_rx_inp = None
@@ -125,7 +126,7 @@ class Particle2SGD(Optimizer):
         Update weights and biases according to steepest descent
         TODO
         """
-        # Initialize velocities to zero for momentum
+        # Initialize velocities to zero/finite for momentum
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
             self.vel_q = []
@@ -138,16 +139,16 @@ class Particle2SGD(Optimizer):
             self.vel_rz_out = []
             self.vel_t_out = []
             for l, layer in enumerate(network.layers):
-                self.vel_b.append(np.zeros(layer.b.shape))
-                self.vel_q.append(np.zeros(layer.q.shape))
-                self.vel_rx_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_inp.append(np.zeros(layer.input_size))
-                self.vel_rx_out.append(np.zeros(layer.output_size))
-                self.vel_ry_out.append(np.zeros(layer.output_size))
-                self.vel_rz_out.append(np.zeros(layer.output_size))
-                self.vel_t_inp.append(np.zeros(layer.input_size))
-                self.vel_t_out.append(np.zeros(layer.output_size))
+                self.vel_b.append(np.random.uniform(-self.init_v, self.init_v, layer.b.shape))
+                self.vel_q.append(np.random.uniform(-self.init_v, self.init_v, layer.q.shape))
+                self.vel_rx_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_ry_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_rz_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_rx_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_ry_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_rz_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_t_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_t_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] = -self.alpha_b * self.dc_db[l] + self.beta * self.vel_b[l]

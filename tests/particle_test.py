@@ -88,7 +88,7 @@ def fd():
 
     # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2))
     net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(0.2))
-    net.append(Particle(2, 5, activation="sigmoid"))
+    net.append(Particle(2, 5, activation="leaky_relu"))
     net.append(Particle(5, 4, activation="sigmoid"))
     net.append(Particle(4, 3, activation="softmax"))
 

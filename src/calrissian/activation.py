@@ -113,4 +113,4 @@ class Activation(object):
         return np.log(1.0 + np.exp(x))
 
     def d_softplus(self, x):
-        return Activation.sigmoid(x)
+        return Activation().sigmoid(x)

@@ -79,6 +79,7 @@ class Cost(object):
         return (a - y) / len(y)
 
     # Binary cross entropy
+    # TODO: this one doesn't take a mean so could be problematic for threaded gradient
 
     def binary_cross_entropy(self, y, a):
         return np.sum(-(y * np.log(a) + (1.0 - y) * np.log(1.0 - a)))

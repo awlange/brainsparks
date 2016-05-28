@@ -66,15 +66,15 @@ class ParticleNetwork(object):
 
         return c
 
-    def cost_gradient_thread(self, data_XY):
+    def cost_gradient_thread(self, data_XYt):
         """
         Wrapper for multithreaded call
         :param data_XY:
         :return:
         """
-        return self.cost_gradient(data_XY[0], data_XY[1])
+        return self.cost_gradient(data_XYt[0], data_XYt[1], thread_scale=data_XYt[2])
 
-    def cost_gradient(self, data_X, data_Y):
+    def cost_gradient(self, data_X, data_Y, thread_scale=1):
         """
         Computes the gradient of the cost with respect to each weight and bias in the network
 
@@ -112,6 +112,12 @@ class ParticleNetwork(object):
             prev_layer_rr = layer.get_rxyz()
 
         delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
+
+        # IMPORTANT:
+        # For threaded calls, we need to divide the cost gradient by the number threads to account for the mean being
+        # taken in the cost function. When data is split, the mean is off by a factor of the number of threads.
+        if thread_scale > 1:
+            delta_L /= thread_scale
 
         # For each piece of data
         for di, data in enumerate(data_X):
