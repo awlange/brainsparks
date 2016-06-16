@@ -88,7 +88,6 @@ class Particle(object):
                 dy = r_in_y - self.ry[j]
                 dz = r_in_z - self.rz[j]
                 w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-                w_ji = 1.0 / np.sqrt((dx**2 + dy**2 + dz**2))
                 dt = r_in_theta - self.theta[j]
                 w_ji *= np.cos(dt)
                 z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)

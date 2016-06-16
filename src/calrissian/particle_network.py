@@ -167,10 +167,10 @@ class ParticleNetwork(object):
             d2 = dx**2 + dy**2 + dz**2
             exp_dij = np.exp(-layer.zeta * d2)
 
+            dt = None
             if layer.phase_enabled and prev_layer.phase_enabled:
                 dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
                 exp_dij *= np.cos(dt)
-                exp_dij = 1.0/np.sqrt(d2)
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
@@ -230,10 +230,11 @@ class ParticleNetwork(object):
                 dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
                 exp_dij = np.exp(-layer.zeta * d2)
+
+                dt = None
                 if layer.phase_enabled and prev_layer.phase_enabled:
                     dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
                     exp_dij *= np.cos(dt)
-                    exp_dij = 1.0/np.sqrt(d2)
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
