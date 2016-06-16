@@ -71,6 +71,8 @@ class Cost(object):
     # Categorical cross entropy
 
     def categorical_cross_entropy(self, y, a):
+        # In case of numerical instability (negative number or zero), set a element to epsilon
+        a = np.maximum(a, np.ones_like(a) * 10e-10)
         return np.mean(-np.sum(y * np.log(a), axis=1), axis=0)
 
     def d_categorical_cross_entropy(self, y, a, z):
@@ -82,6 +84,8 @@ class Cost(object):
     # TODO: this one doesn't take a mean so could be problematic for threaded gradient
 
     def binary_cross_entropy(self, y, a):
+        # In case of numerical instability (negative number or zero), set a element to epsilon
+        a = np.maximum(a, np.ones_like(a) * 10e-10)
         return np.sum(-(y * np.log(a) + (1.0 - y) * np.log(1.0 - a)))
 
     def d_binary_cross_entropy(self, y, a, z):

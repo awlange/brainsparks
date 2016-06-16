@@ -73,7 +73,7 @@ def main4():
 
     net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
     net.append(Particle(2, 5, activation="sigmoid"))
-    net.append(Particle(5, 3, activation="sigmoid"))
+    net.append(Particle(5, 3, activation="softmax"))
 
     rprop.optimize(net, train_X, train_Y)
 
@@ -282,5 +282,5 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    # main4()
-    fd()
+    main4()
+    # fd()

@@ -36,6 +36,7 @@ class ParticleRPROP(Optimizer):
         self.prev_dc_db = None
         self.prev_dc_dq = None
         self.prev_dc_dr = None
+        self.prev_dc_dt = None
         self.dc_db = None
         self.dc_dq = None
         self.dc_dr = None

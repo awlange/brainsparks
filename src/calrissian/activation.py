@@ -1,5 +1,7 @@
 import numpy as np
 
+MAX_FLOAT = np.finfo(0.0).max
+
 
 class Activation(object):
 
@@ -92,11 +94,16 @@ class Activation(object):
     # SoftMax
 
     def softmax(self, x):
-        ex = np.exp(x)
-        denoms = np.sum(ex, axis=1)
-        for i in range(len(ex)):
-            ex[i] /= denoms[i]
-        return ex
+        # ex = np.exp(x)
+        # denoms = np.sum(ex, axis=1)
+        # for i in range(len(ex)):
+        #     ex[i] /= denoms[i]
+        # return ex
+        # Code borrowed from Theano for numerical stability:
+        # http://deeplearning.net/software/theano/library/tensor/nnet/nnet.html#tensor.nnet.softmax
+        e_x = np.exp(x - x.max(axis=1, keepdims=True))
+        out = e_x / e_x.sum(axis=1, keepdims=True)
+        return out
 
     def d_softmax(self, x):
         # Note: not actually used. So, just echo input to maintain interface.
