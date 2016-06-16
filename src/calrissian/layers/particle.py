@@ -5,8 +5,9 @@ import numpy as np
 
 
 class ParticleInput(object):
-    def __init__(self, output_size, s=1.0):
+    def __init__(self, output_size, s=1.0, phase_enabled=False):
         self.output_size = output_size
+        self.phase_enabled = phase_enabled
 
         # Positions
         self.rx = np.random.uniform(-s, s, output_size)
@@ -29,24 +30,25 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, q=1.0, b=None, boff=0.0,
+                 phase_enabled=False):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
+        self.phase_enabled = phase_enabled
 
         self.zeta = zeta
 
         # Weight initialization
-        c = np.sqrt(1.0 / (input_size + output_size))
-        self.b = np.random.uniform(-c, c, (1, output_size))
+        if b is None:
+            b = np.sqrt(1.0 / (input_size + output_size))
+        self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
         # self.b = np.random.uniform(0, c, (1, output_size))
 
         # Charges
-        c = 1.0
-        self.q = np.random.uniform(-c, c, output_size)
-        # self.q = np.ones(output_size)
+        self.q = np.random.uniform(-q, q, output_size)
 
         # Positions
         self.rx = np.random.uniform(-s, s, output_size)
@@ -79,15 +81,25 @@ class Particle(object):
         r_in_y = r_in[1]
         r_in_z = r_in[2]
         r_in_theta = r_in[3]
-        for j in range(self.output_size):
-            dx = r_in_x - self.rx[j]
-            dy = r_in_y - self.ry[j]
-            dz = r_in_z - self.rz[j]
-            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-            # w_ji = 1.0 / np.sqrt((dx**2 + dy**2 + dz**2))
-            dt = r_in_theta - self.theta[j]
-            w_ji *= np.cos(dt)
-            z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
+
+        if self.phase_enabled:
+            for j in range(self.output_size):
+                dx = r_in_x - self.rx[j]
+                dy = r_in_y - self.ry[j]
+                dz = r_in_z - self.rz[j]
+                w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+                w_ji = 1.0 / np.sqrt((dx**2 + dy**2 + dz**2))
+                dt = r_in_theta - self.theta[j]
+                w_ji *= np.cos(dt)
+                z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
+        else:
+            for j in range(self.output_size):
+                dx = r_in_x - self.rx[j]
+                dy = r_in_y - self.ry[j]
+                dz = r_in_z - self.rz[j]
+                w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+                z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
+
         return z.transpose()
 
     def compute_a(self, z):
@@ -108,9 +120,10 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            dt = r_in_theta - self.theta[j]
             w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-            w_ji *= self.q[j] * np.cos(dt)
+            if self.phase_enabled:
+                dt = r_in_theta - self.theta[j]
+                w_ji *= self.q[j] * np.cos(dt)
             for i in range(self.input_size):
                 w[i][j] = w_ji[i]
 
@@ -130,9 +143,10 @@ class Particle(object):
         dx = r_in_x - self.rx[j]
         dy = r_in_y - self.ry[j]
         dz = r_in_z - self.rz[j]
-        dt = r_in_theta - self.theta[j]
         w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-        w_ji *= self.q[j] * np.cos(dt)
+        if self.phase_enabled:
+            dt = r_in_theta - self.theta[j]
+            w_ji *= self.q[j] * np.cos(dt)
         for i in range(self.input_size):
             self.w[i][j] = w_ji[i]
 
@@ -149,7 +163,8 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            dt = r_in_theta - self.theta[j]
             w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-            w_ji *= self.q[j] * np.cos(dt)
+            if self.phase_enabled:
+                dt = r_in_theta - self.theta[j]
+                w_ji *= self.q[j] * np.cos(dt)
             self.w[i][j] = w_ji[i]

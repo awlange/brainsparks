@@ -51,6 +51,25 @@ class ParticleNetwork(object):
             a, r = layer.feed_forward(a, r)
         return a
 
+    def feed_to_layer(self, data_X, end_layer=0):
+        """
+        Feed data forward until given end layer. Return the resulting activation
+
+        :param data_X: input data
+        :param end_layer: the index of the ending layer
+        :return: resulting activation at end layer
+        """
+        if len(self.layers) <= end_layer < 0:
+            return None
+
+        a, r = self.particle_input.feed_forward(data_X)
+        for l, layer in enumerate(self.layers):
+            a, r = layer.feed_forward(a, r)
+            if l == end_layer:
+                return a
+
+        return None
+
     def cost(self, data_X, data_Y):
         """
         Compute the cost for all input data corresponding to expected output
@@ -147,9 +166,11 @@ class ParticleNetwork(object):
             dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
             d2 = dx**2 + dy**2 + dz**2
             exp_dij = np.exp(-layer.zeta * d2)
-            dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
-            exp_dij *= np.cos(dt)
-            # exp_dij = 1.0/np.sqrt(d2)
+
+            if layer.phase_enabled and prev_layer.phase_enabled:
+                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
+                exp_dij *= np.cos(dt)
+                exp_dij = 1.0/np.sqrt(d2)
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
@@ -160,7 +181,6 @@ class ParticleNetwork(object):
 
             # Position gradient
             tmp = 2.0 * layer.zeta * qj * dq
-            # tmp = qj * dq * exp_dij * exp_dij
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -173,11 +193,13 @@ class ParticleNetwork(object):
             dc_dr_y[l-1] -= np.sum(ty, axis=1)
             dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-            # Phase gradient
-            dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-            tmp = qj * dq
-            dc_dt[l][j] -= np.sum(tmp)
-            dc_dt[l-1] += np.sum(tmp, axis=1)
+            if layer.phase_enabled and prev_layer.phase_enabled:
+                # Phase gradient
+                # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+                dq *= -np.tan(dt)
+                tmp = qj * dq
+                dc_dt[l][j] -= np.sum(tmp)
+                dc_dt[l-1] += np.sum(tmp, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -208,9 +230,10 @@ class ParticleNetwork(object):
                 dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
                 exp_dij = np.exp(-layer.zeta * d2)
-                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
-                exp_dij *= np.cos(dt)
-                # exp_dij = 1.0/np.sqrt(d2)
+                if layer.phase_enabled and prev_layer.phase_enabled:
+                    dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
+                    exp_dij *= np.cos(dt)
+                    exp_dij = 1.0/np.sqrt(d2)
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
@@ -221,7 +244,6 @@ class ParticleNetwork(object):
 
                 # Position gradient
                 tmp = 2.0 * layer.zeta * qj * dq
-                # tmp = qj * dq * exp_dij * exp_dij
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp
@@ -234,11 +256,13 @@ class ParticleNetwork(object):
                 dc_dr_y[l-1] -= np.sum(ty, axis=1)
                 dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-                # Phase gradient
-                dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                tmp = qj * dq
-                dc_dt[l][j] -= np.sum(tmp)
-                dc_dt[l-1] += np.sum(tmp, axis=1)
+                # # Phase gradient
+                if layer.phase_enabled and prev_layer.phase_enabled:
+                    # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+                    dq *= -np.tan(dt)  # could use tan but being explicit here
+                    tmp = qj * dq
+                    dc_dt[l][j] -= np.sum(tmp)
+                    dc_dt[l-1] += np.sum(tmp, axis=1)
 
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
@@ -269,21 +293,24 @@ class ParticleNetwork(object):
 
         network = {"particle_input": {}, "layers": [], "cost_name": self.cost_name}
 
-        p_inp = {"rx": [], "ry": [], "rz": []}
+        p_inp = {"rx": [], "ry": [], "rz": [], "theta": []}
         for i in range(self.particle_input.output_size):
             p_inp["rx"].append(self.particle_input.rx[i])
             p_inp["ry"].append(self.particle_input.ry[i])
             p_inp["rz"].append(self.particle_input.rz[i])
+            p_inp["theta"].append(self.particle_input.theta[i])
         network["particle_input"] = p_inp
 
         for layer in self.layers:
-            l_data = {"rx": [], "ry": [], "rz": [], "q": [], "b": [], "activation_name": layer.activation_name}
+            l_data = {"rx": [], "ry": [], "rz": [], "q": [], "b": [], "theta": [],
+                      "activation_name": layer.activation_name}
             for i in range(layer.output_size):
                 l_data["q"].append(layer.q[i])
                 l_data["b"].append(layer.b[0][i])
                 l_data["rx"].append(layer.rx[i])
                 l_data["ry"].append(layer.ry[i])
                 l_data["rz"].append(layer.rz[i])
+                l_data["theta"].append(layer.theta[i])
             network["layers"].append(l_data)
 
         json.dump(network, file)
@@ -308,22 +335,26 @@ class ParticleNetwork(object):
             particle_input.ry[i] = r
         for i, r in enumerate(data_p_inp.get("rz")):
             particle_input.rz[i] = r
+        for i, t in enumerate(data_p_inp.get("theta")):
+            particle_input.theta[i] = t
         network.particle_input = particle_input
 
         data_layers = data.get("layers")
         n_input = len(data_p_inp.get("rx"))
         for d_layer in data_layers:
-            particle = Particle(input_size=n_input, output_size=len(d_layer.get("r")),
+            particle = Particle(input_size=n_input, output_size=len(d_layer.get("rx")),
                                 activation=d_layer.get("activation_name"))
-            for i, r in enumerate(d_layer.get("rx")):
-                particle.q[i] = d_layer.get("q")[i]
-                particle.b[0][i] = d_layer.get("b")[i]
-                for i, r in enumerate(data_p_inp.get("rx")):
+            for j, _ in enumerate(d_layer.get("rx")):
+                particle.q[j] = d_layer.get("q")[j]
+                particle.b[0][j] = d_layer.get("b")[j]
+                for i, r in enumerate(d_layer.get("rx")):
                     particle.rx[i] = r
-                for i, r in enumerate(data_p_inp.get("ry")):
+                for i, r in enumerate(d_layer.get("ry")):
                     particle.ry[i] = r
-                for i, r in enumerate(data_p_inp.get("rz")):
+                for i, r in enumerate(d_layer.get("rz")):
                     particle.rz[i] = r
+                for i, t in enumerate(d_layer.get("theta")):
+                    particle.theta[i] = t
             network.layers.append(particle)
 
         return network
