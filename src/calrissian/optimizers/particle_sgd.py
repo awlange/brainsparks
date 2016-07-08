@@ -11,9 +11,9 @@ class ParticleSGD(Optimizer):
     Stochastic gradient descent optimization for Atomic layers
     """
 
-    def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
+    def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
                  cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01, init_v=0.0,
-                 n_threads=1, chunk_size=10):
+                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -21,6 +21,9 @@ class ParticleSGD(Optimizer):
         super().__init__()
         self.alpha = alpha
         self.beta = beta
+        self.gamma = gamma
+        self.gamma2 = gamma2
+        self.epsilon = epsilon
         self.n_epochs = n_epochs
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
@@ -40,10 +43,14 @@ class ParticleSGD(Optimizer):
         self.weight_update_func = self.weight_update_steepest_descent
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
+        elif weight_update == "rmsprop_momentum":
+            self.weight_update_func = self.weight_update_rmsprop_momentum
         elif weight_update == "rmsprop":
             self.weight_update_func = self.weight_update_rmsprop
         elif weight_update == "adadelta":
             self.weight_update_func = self.weight_update_adadelta
+        elif weight_update == "adam":
+            self.weight_update_func = self.weight_update_adam
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -81,6 +88,10 @@ class ParticleSGD(Optimizer):
         self.del_ry = None
         self.del_rz = None
         self.del_t = None
+
+        self.t = 1
+        self.gamma_t = 0.0
+        self.gamma2_t = 0.0
 
         self.n_threads = n_threads
         self.chunk_size = chunk_size
@@ -168,6 +179,9 @@ class ParticleSGD(Optimizer):
                     print("Cost at epoch {} mini-batch {}: {:g}".format(epoch, m, c))
                     # TODO: could output projected time left based on mini-batch times
 
+                    # Temporary
+                    # print(np.sqrt(self.ms_dq[0]))
+
             if self.verbosity > 0:
                 c = network.cost(data_X, data_Y)
                 print("Cost after epoch {}: {:g}".format(epoch, c))
@@ -248,10 +262,12 @@ class ParticleSGD(Optimizer):
         """
         Update weights and biases according to RMSProp
         """
-        gamma = 0.9
-        one_m_gamma = 0.1
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        # one_m_gamma = self.gamma2
         alpha = self.alpha
-        epsilon = 10e-8  # small number to avoid division by zero
+        # epsilon = 10e-8  # small number to avoid division by zero
+        epsilon = self.epsilon  # small number to avoid division by zero
 
         # Initialize RMS to zero
         if self.ms_db is None or self.ms_dq is None:
@@ -294,15 +310,184 @@ class ParticleSGD(Optimizer):
         network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
         network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
 
+    def weight_update_rmsprop_momentum(self, network):
+        """
+        Update weights and biases according to RMSProp, plus momentum
+        """
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        alpha = self.alpha
+        epsilon = 10e-8  # small number to avoid division by zero
+
+        # Initialize RMS to zero
+        if self.ms_db is None or self.ms_dq is None:
+            self.ms_db = []
+            self.ms_dq = []
+            self.ms_drx = [np.zeros(network.particle_input.output_size)]
+            self.ms_dry = [np.zeros(network.particle_input.output_size)]
+            self.ms_drz = [np.zeros(network.particle_input.output_size)]
+            self.ms_dt = [np.zeros(network.particle_input.output_size)]
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dq.append(np.zeros(layer.q.shape))
+                self.ms_drx.append(np.zeros(layer.output_size))
+                self.ms_dry.append(np.zeros(layer.output_size))
+                self.ms_drz.append(np.zeros(layer.output_size))
+                self.ms_dt.append(np.zeros(layer.output_size))
+
+        # Initialize velocities to zero for momentum
+        if self.vel_b is None or self.vel_q is None or self.vel_rx is None or self.vel_ry is None or self.vel_rz is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_rx = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_ry = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_rz = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_t = [np.zeros(network.particle_input.output_size)]
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.zeros(layer.b.shape))
+                self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_rx.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_ry.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_rz.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_t.append(np.zeros(layer.output_size))
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
+            self.ms_dq[l] = gamma * self.ms_dq[l] + one_m_gamma * (self.dc_dq[l] * self.dc_dq[l])
+            self.ms_dt[l + 1] = gamma * self.ms_dt[l + 1] + one_m_gamma * (self.dc_dt[l + 1] * self.dc_dt[l + 1])
+            self.ms_drx[l + 1] = gamma * self.ms_drx[l + 1] + one_m_gamma * (self.dc_dr[0][l + 1] * self.dc_dr[0][l + 1])
+            self.ms_dry[l + 1] = gamma * self.ms_dry[l + 1] + one_m_gamma * (self.dc_dr[1][l + 1] * self.dc_dr[1][l + 1])
+            self.ms_drz[l + 1] = gamma * self.ms_drz[l + 1] + one_m_gamma * (self.dc_dr[2][l + 1] * self.dc_dr[2][l + 1])
+
+            self.vel_b[l] = -self.alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon) + self.beta * self.vel_b[l]
+            self.vel_q[l] = -self.alpha * self.dc_dq[l] / np.sqrt(self.ms_dq[l] + epsilon) + self.beta * self.vel_q[l]
+            self.vel_rx[l+1] = -self.alpha * self.dc_dr[0][l+1] / np.sqrt(self.ms_drx[l + 1] + epsilon) + self.beta * self.vel_rx[l+1]
+            self.vel_ry[l+1] = -self.alpha * self.dc_dr[1][l+1] / np.sqrt(self.ms_dry[l + 1] + epsilon) + self.beta * self.vel_ry[l+1]
+            self.vel_rz[l+1] = -self.alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon) + self.beta * self.vel_rz[l+1]
+            self.vel_t[l+1] = -self.alpha * self.dc_dt[l+1] / np.sqrt(self.ms_dt[l + 1] + epsilon) + self.beta * self.vel_t[l+1]
+            layer.b += self.vel_b[l]
+            layer.q += self.vel_q[l]
+            layer.theta += self.vel_t[l+1]
+            if self.position_grad:
+                layer.rx += self.vel_rx[l+1]
+                layer.ry += self.vel_ry[l+1]
+                layer.rz += self.vel_rz[l+1]
+
+        # Input layer
+        self.ms_dt[0] = gamma * self.ms_dt[0] + one_m_gamma * (self.dc_dt[0] * self.dc_dt[0])
+        self.ms_drx[0] = gamma * self.ms_drx[0] + one_m_gamma * (self.dc_dr[0][0] * self.dc_dr[0][0])
+        self.ms_dry[0] = gamma * self.ms_dry[0] + one_m_gamma * (self.dc_dr[1][0] * self.dc_dr[1][0])
+        self.ms_drz[0] = gamma * self.ms_drz[0] + one_m_gamma * (self.dc_dr[2][0] * self.dc_dr[2][0])
+
+        self.vel_t[0] = -self.alpha * self.dc_dt[0][0] / np.sqrt(self.ms_dt[0] + epsilon) + self.beta * self.vel_t[0]
+        self.vel_rx[0] = -self.alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon) + self.beta * self.vel_rx[0]
+        self.vel_ry[0] = -self.alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon) + self.beta * self.vel_ry[0]
+        self.vel_rz[0] = -self.alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon) + self.beta * self.vel_rz[0]
+        network.particle_input.theta += self.vel_t[0]
+        network.particle_input.rx += self.vel_rx[0]
+        network.particle_input.ry += self.vel_ry[0]
+        network.particle_input.rz += self.vel_rz[0]
+
+    def weight_update_adam(self, network):
+        """
+        Update weights and biases according to ADAM
+        """
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        gamma2 = self.gamma2
+        one_m_gamma2 = 1.0 - gamma2
+        alpha = self.alpha
+        epsilon = 10e-8  # small number to avoid division by zero
+
+        gamma_t = gamma
+        gamma2_t = gamma2
+
+        # Initialize RMS to zero
+        if self.ms_db is None or self.ms_dq is None:
+            self.ms_db = []
+            self.ms_dq = []
+            self.ms_drx = [np.zeros(network.particle_input.output_size)]
+            self.ms_dry = [np.zeros(network.particle_input.output_size)]
+            self.ms_drz = [np.zeros(network.particle_input.output_size)]
+            self.ms_dt = [np.zeros(network.particle_input.output_size)]
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dq.append(np.zeros(layer.q.shape))
+                self.ms_drx.append(np.zeros(layer.output_size))
+                self.ms_dry.append(np.zeros(layer.output_size))
+                self.ms_drz.append(np.zeros(layer.output_size))
+                self.ms_dt.append(np.zeros(layer.output_size))
+
+        # Initialize velocities to zero for momentum
+        if self.vel_b is None or self.vel_q is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_rx = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_ry = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_rz = [np.random.uniform(-self.init_v, self.init_v, network.particle_input.output_size)]
+            self.vel_t = [np.zeros(network.particle_input.output_size)]
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.zeros(layer.b.shape))
+                self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_rx.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_ry.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_rz.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_t.append(np.zeros(layer.output_size))
+
+        gv = 1.0 - self.gamma_t
+        gm = 1.0 - self.gamma2_t
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] = gamma2 * self.ms_db[l] + one_m_gamma2 * (self.dc_db[l] * self.dc_db[l])
+            self.ms_dq[l] = gamma2 * self.ms_dq[l] + one_m_gamma2 * (self.dc_dq[l] * self.dc_dq[l])
+            self.ms_dt[l + 1] = gamma2 * self.ms_dt[l + 1] + one_m_gamma2 * (self.dc_dt[l + 1] * self.dc_dt[l + 1])
+            self.ms_drx[l + 1] = gamma2 * self.ms_drx[l + 1] + one_m_gamma2 * (self.dc_dr[0][l + 1] * self.dc_dr[0][l + 1])
+            self.ms_dry[l + 1] = gamma2 * self.ms_dry[l + 1] + one_m_gamma2 * (self.dc_dr[1][l + 1] * self.dc_dr[1][l + 1])
+            self.ms_drz[l + 1] = gamma2 * self.ms_drz[l + 1] + one_m_gamma2 * (self.dc_dr[2][l + 1] * self.dc_dr[2][l + 1])
+
+            self.vel_b[l] = gamma2 * self.vel_b[l] + one_m_gamma * self.dc_db[l]
+            self.vel_q[l] = gamma2 * self.vel_q[l] + one_m_gamma * self.dc_dq[l]
+            self.vel_t[l + 1] = gamma2 * self.vel_t[l + 1] + one_m_gamma * self.dc_dt[l + 1]
+            self.vel_rx[l + 1] = gamma2 * self.vel_rx[l + 1] + one_m_gamma * self.dc_dr[0][l + 1]
+            self.vel_ry[l + 1] = gamma2 * self.vel_ry[l + 1] + one_m_gamma * self.dc_dr[1][l + 1]
+            self.vel_rz[l + 1] = gamma2 * self.vel_rz[l + 1] + one_m_gamma * self.dc_dr[2][l + 1]
+
+            layer.b -= (alpha * self.vel_b[l]/gv) / np.sqrt(self.ms_db[l]/gm + epsilon)
+            layer.q -= (alpha * self.vel_q[l]/gv) / np.sqrt(self.ms_dq[l]/gm + epsilon)
+            layer.theta -= (alpha * self.vel_t[l+1]/gv) / (np.sqrt(self.ms_dt[l + 1]/gm) + epsilon)
+            layer.rx -= (alpha * self.vel_rx[l+1]/gv) / (np.sqrt(self.ms_drx[l + 1]/gm) + epsilon)
+            layer.ry -= (alpha * self.vel_ry[l+1]/gv) / (np.sqrt(self.ms_dry[l + 1]/gm) + epsilon)
+            layer.rz -= (alpha * self.vel_rz[l+1]/gv) / (np.sqrt(self.ms_drz[l + 1]/gm) + epsilon)
+
+        # Input layer
+        self.ms_dt[0] = gamma2 * self.ms_dt[0] + one_m_gamma2 * (self.dc_dt[0] * self.dc_dt[0])
+        self.ms_drx[0] = gamma2 * self.ms_drx[0] + one_m_gamma2 * (self.dc_dr[0][0] * self.dc_dr[0][0])
+        self.ms_dry[0] = gamma2 * self.ms_dry[0] + one_m_gamma2 * (self.dc_dr[1][0] * self.dc_dr[1][0])
+        self.ms_drz[0] = gamma2 * self.ms_drz[0] + one_m_gamma2 * (self.dc_dr[2][0] * self.dc_dr[2][0])
+
+        self.vel_t[0] = gamma * self.vel_t[0] + one_m_gamma * self.dc_dt[0]
+        self.vel_rx[0] = gamma * self.vel_rx[0] + one_m_gamma * self.dc_dr[0][0]
+        self.vel_ry[0] = gamma * self.vel_ry[0] + one_m_gamma * self.dc_dr[1][0]
+        self.vel_rz[0] = gamma * self.vel_rz[0] + one_m_gamma * self.dc_dr[2][0]
+
+        network.particle_input.theta  -= (alpha * self.vel_t[0]/gv) / (np.sqrt(self.ms_dt[0]/gm) + epsilon)
+        network.particle_input.rx -= (alpha * self.vel_rx[0]/gv) / (np.sqrt(self.ms_drx[0]/gm) + epsilon)
+        network.particle_input.ry -= (alpha * self.vel_ry[0]/gv) / (np.sqrt(self.ms_dry[0]/gm) + epsilon)
+        network.particle_input.rz -= (alpha * self.vel_rz[0]/gv) / (np.sqrt(self.ms_drz[0]/gm) + epsilon)
+
+        # Gamma powers
+        self.t += 1
+        self.gamma_t *= self.gamma_t
+        self.gamma2_t *= self.gamma2_t
 
     def weight_update_adadelta(self, network):
         """
         Update weights and biases according to AdaDelta
         """
         alpha = self.alpha
-        gamma = 0.95
-        one_m_gamma = 0.05
-        epsilon = 10e-6  # small number to avoid division by zero, as from paper
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        epsilon = 10e-8  # small number to avoid division by zero, as from paper
 
         # Initialize RMS to zero
         if self.ms_db is None or self.ms_dq is None:
