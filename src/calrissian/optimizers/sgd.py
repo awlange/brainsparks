@@ -9,7 +9,8 @@ class SGD(Optimizer):
     Stochastic gradient descent optimization
     """
 
-    def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=10, verbosity=2, weight_update="sd"):
+    def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=10, verbosity=2, weight_update="sd",
+                 cost_freq=1, gamma=0.9):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -20,12 +21,16 @@ class SGD(Optimizer):
         self.n_epochs = n_epochs
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
+        self.cost_freq = cost_freq
+        self.gamma = gamma
 
         # Weight update function
         self.weight_update = weight_update
         self.weight_update_func = self.weight_update_steepest_descent
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
+        elif weight_update == "rmsprop":
+            self.weight_update_func = self.weight_update_rmsprop
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -34,6 +39,10 @@ class SGD(Optimizer):
         # Velocities
         self.vel_b = None
         self.vel_w = None
+
+        # RMS
+        self.ms_db = None
+        self.ms_dw = None
 
     def optimize(self, network, data_X, data_Y):
         """
@@ -66,7 +75,7 @@ class SGD(Optimizer):
                 # Update weights and biases
                 self.weight_update_func(network, self.dc_db, self.dc_dw)
 
-                if self.verbosity > 1:
+                if self.verbosity > 1 and m % self.cost_freq == 0:
                     c = network.cost(data_X, data_Y)
                     print("Cost at epoch {} mini-batch {}: {:g}".format(epoch, m, c))
                     # TODO: could output projected time left based on mini-batch times
@@ -108,3 +117,26 @@ class SGD(Optimizer):
             self.vel_w[l] = -self.alpha * dc_dw[l] + self.beta * self.vel_w[l]
             layer.b += self.vel_b[l]
             layer.w += self.vel_w[l]
+
+    def weight_update_rmsprop(self, network, dc_db, dc_dw):
+        """
+        Update weights and biases according to RMSProp
+        """
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        alpha = self.alpha
+        epsilon = 10e-8  # small number to avoid division by zero
+
+        # Initialize RMS to zero
+        if self.ms_db is None or self.ms_dw is None:
+            self.ms_db = []
+            self.ms_dw = []
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dw.append(np.zeros(layer.w.shape))
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (dc_db[l] * dc_db[l])
+            self.ms_dw[l] = gamma * self.ms_dw[l] + one_m_gamma * (dc_dw[l] * dc_dw[l])
+            layer.b -= alpha * dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
+            layer.w -= alpha * dc_dw[l] / np.sqrt(self.ms_dw[l] + epsilon)

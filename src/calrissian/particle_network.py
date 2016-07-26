@@ -257,13 +257,17 @@ class ParticleNetwork(object):
                 dc_dr_y[l-1] -= np.sum(ty, axis=1)
                 dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-                # # Phase gradient
+                # Phase gradient
                 if layer.phase_enabled and prev_layer.phase_enabled:
                     # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
                     dq *= -np.tan(dt)  # could use tan but being explicit here
                     tmp = qj * dq
                     dc_dt[l][j] -= np.sum(tmp)
                     dc_dt[l-1] += np.sum(tmp, axis=1)
+
+        # Zero out z for 2D
+        # for i, d in enumerate(dc_dr_z):
+        #     dc_dr_z[i] = np.zeros_like(d)
 
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
