@@ -31,6 +31,8 @@ class SGD(Optimizer):
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
         elif weight_update == "rmsprop":
             self.weight_update_func = self.weight_update_rmsprop
+        elif weight_update == "adagrad":
+            self.weight_update_func = self.weight_update_adagrad
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -138,5 +140,26 @@ class SGD(Optimizer):
         for l, layer in enumerate(network.layers):
             self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (dc_db[l] * dc_db[l])
             self.ms_dw[l] = gamma * self.ms_dw[l] + one_m_gamma * (dc_dw[l] * dc_dw[l])
+            layer.b -= alpha * dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
+            layer.w -= alpha * dc_dw[l] / np.sqrt(self.ms_dw[l] + epsilon)
+
+    def weight_update_adagrad(self, network, dc_db, dc_dw):
+        """
+        Update weights and biases according to AdaGrad
+        """
+        alpha = self.alpha
+        epsilon = 10e-8  # small number to avoid division by zero
+
+        # Initialize RMS to zero
+        if self.ms_db is None or self.ms_dw is None:
+            self.ms_db = []
+            self.ms_dw = []
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dw.append(np.zeros(layer.w.shape))
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] += (dc_db[l] * dc_db[l])
+            self.ms_dw[l] += (dc_dw[l] * dc_dw[l])
             layer.b -= alpha * dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             layer.w -= alpha * dc_dw[l] / np.sqrt(self.ms_dw[l] + epsilon)
