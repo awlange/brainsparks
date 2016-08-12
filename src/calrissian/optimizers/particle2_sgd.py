@@ -10,7 +10,7 @@ class Particle2SGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01, init_v=0.0):
+                 cost_freq=2, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01, alpha_t=0.01, init_v=0.0, gamma=0.9):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -18,21 +18,24 @@ class Particle2SGD(Optimizer):
         super().__init__()
         self.alpha = alpha
         self.beta = beta
+        self.gamma = gamma
         self.n_epochs = n_epochs
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
         self.cost_freq = cost_freq
 
-        self.alpha_b = alpha_b
-        self.alpha_q = alpha_q
-        self.alpha_r = alpha_r
-        self.alpha_t = alpha_t
+        self.alpha_b = alpha
+        self.alpha_q = alpha
+        self.alpha_r = alpha
+        self.alpha_t = alpha
 
         # Weight update function
         self.weight_update = weight_update
         self.weight_update_func = self.weight_update_steepest_descent
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
+        elif weight_update == "adagrad":
+            self.weight_update_func = self.weight_update_adagrad
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -171,5 +174,55 @@ class Particle2SGD(Optimizer):
             layer.rx_out += self.vel_rx_out[l]
             layer.ry_out += self.vel_ry_out[l]
             layer.rz_out += self.vel_rz_out[l]
+
+    def weight_update_adagrad(self, network):
+        """
+        Update weights and biases according to AdaGrad
+        """
+        
+        epsilon = 10e-8
+
+        if self.vel_b is None or self.vel_q is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_rx_inp = []
+            self.vel_ry_inp = []
+            self.vel_rz_inp = []
+            self.vel_t_inp = []
+            self.vel_rx_out = []
+            self.vel_ry_out = []
+            self.vel_rz_out = []
+            self.vel_t_out = []
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.random.uniform(-self.init_v, self.init_v, layer.b.shape))
+                self.vel_q.append(np.random.uniform(-self.init_v, self.init_v, layer.q.shape))
+                self.vel_rx_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_ry_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_rz_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_rx_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_ry_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_rz_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+                self.vel_t_inp.append(np.random.uniform(-self.init_v, self.init_v, layer.input_size))
+                self.vel_t_out.append(np.random.uniform(-self.init_v, self.init_v, layer.output_size))
+
+        for l, layer in enumerate(network.layers):
+            self.vel_b[l] += self.dc_db[l]**2
+            self.vel_q[l] += self.dc_dq[l]**2
+            self.vel_rx_inp[l] += self.dc_dr_inp[0][l]**2
+            self.vel_ry_inp[l] += self.dc_dr_inp[1][l]**2
+            self.vel_rz_inp[l] += self.dc_dr_inp[2][l]**2
+            self.vel_t_inp[l] += self.dc_dt_inp[l]**2
+            self.vel_rx_out[l] += self.dc_dr_out[0][l]**2
+            self.vel_ry_out[l] += self.dc_dr_out[1][l]**2
+            self.vel_rz_out[l] += self.dc_dr_out[2][l]**2
+            self.vel_t_out[l] += self.dc_dt_out[l]**2
+            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
+            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
+            layer.rx_inp += -self.alpha * self.dc_dr_inp[0][l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
+            layer.ry_inp += -self.alpha * self.dc_dr_inp[1][l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
+            layer.rz_inp += -self.alpha * self.dc_dr_inp[2][l] / np.sqrt(self.vel_rz_inp[l] + epsilon)
+            layer.rx_out += -self.alpha * self.dc_dr_out[0][l] / np.sqrt(self.vel_rx_out[l] + epsilon)
+            layer.ry_out += -self.alpha * self.dc_dr_out[1][l] / np.sqrt(self.vel_ry_out[l] + epsilon)
+            layer.rz_out += -self.alpha * self.dc_dr_out[2][l] / np.sqrt(self.vel_rz_out[l] + epsilon)
 
 

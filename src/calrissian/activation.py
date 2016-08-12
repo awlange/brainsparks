@@ -17,6 +17,8 @@ class Activation(object):
             return Activation().linear
         if nl == "relu":
             return Activation().relu
+        if nl == "relu2":
+            return Activation().relu2
         if nl == "leaky_relu":
             return Activation().leaky_relu
         if nl == "tanh":
@@ -39,6 +41,8 @@ class Activation(object):
             return Activation().d_linear
         if nl == "relu":
             return Activation().d_relu
+        if nl == "relu2":
+            return Activation().d_relu2
         if nl == "leaky_relu":
             return Activation().d_leaky_relu
         if nl == "tanh":
@@ -81,6 +85,14 @@ class Activation(object):
 
     def d_leaky_relu(self, x):
         return np.piecewise(x, [x < 0.0, x >= 0], [0.01, 1.0])
+
+    # ReLU2: ReLU minus one to allow for negative output
+
+    def relu2(self, x):
+        return np.maximum(0, x) - 1
+
+    def d_relu2(self, x):
+        return np.piecewise(x, [x < 0.0, x >= 0], [0.0, 1.0])
 
     # tanh
 

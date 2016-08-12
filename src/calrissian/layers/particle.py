@@ -31,8 +31,8 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, q=1.0, b=None, boff=0.0,
-                 phase_enabled=False):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, q=None, b=None, boff=0.0,
+                 phase_enabled=False, qw=0.1):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -43,13 +43,18 @@ class Particle(object):
         self.zeta = zeta
 
         # Weight initialization
-        g = np.sqrt(6.0 / (input_size + output_size))
+        g = np.sqrt(2.0 / (input_size + output_size))
         if b is None:
             b = g
         self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
 
         # Charges
-        self.q = 2 * np.random.uniform(-g, g, output_size)
+        if q is None:
+            q = g
+        # self.q = np.ones(output_size)
+        # self.q = np.random.uniform(-q, q, output_size)
+        # self.q = np.random.normal(loc=0.0, scale=qw, size=output_size) + np.random.choice([q, -q], size=output_size)
+        self.q = np.random.choice([q, -q], size=output_size)
 
         # Positions
         self.rx = np.random.uniform(-s, s, output_size)

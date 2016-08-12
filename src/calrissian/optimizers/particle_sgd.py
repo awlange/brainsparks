@@ -196,6 +196,9 @@ class ParticleSGD(Optimizer):
                 else:
                     self.dc_db, self.dc_dq, self.dc_dr, self.dc_dt = network.cost_gradient(mini_X, mini_Y)
 
+                # Remove translational degrees of freedom gradients (later: include rotational)
+                self.remove_translational_gradients()
+
                 # Update weights and biases
                 self.weight_update_func(network)
 
@@ -218,6 +221,46 @@ class ParticleSGD(Optimizer):
             print("Optimize run time: {:g} s".format(time.time() - optimize_start_time))
 
         return network
+
+    def remove_translational_gradients(self):
+        """
+        Subtract zeroth moment from position and phase gradients
+        """
+        # # Phase
+        # n_dt = 0
+        # mean_dt = 0.0
+        # for dt in self.dc_dt:
+        #     n_dt += len(dt)
+        #     mean_dt += np.sum(dt)
+        # mean_dt /= n_dt
+        #
+        # if self.verbosity > 2:
+        #     print("Mean theta gradient: {}".format(mean_dt))
+        #
+        # for l, dt in enumerate(self.dc_dt):
+        #     self.dc_dt[l] -= mean_dt
+
+        # Position
+        n_dr = 0
+        mean_dx = 0.0
+        mean_dy = 0.0
+        mean_dz = 0.0
+        for l in range(len(self.dc_dr)):
+            n_dr += len(self.dc_dr[0][l])
+            mean_dx += np.sum(self.dc_dr[0][l])
+            mean_dy += np.sum(self.dc_dr[1][l])
+            mean_dz += np.sum(self.dc_dr[2][l])
+        mean_dx /= n_dr
+        mean_dy /= n_dr
+        mean_dz /= n_dr
+
+        if self.verbosity > 2:
+            print("Mean position gradient: {} {} {}".format(mean_dx, mean_dy, mean_dz))
+
+        for l in range(len(self.dc_dr)):
+            self.dc_dr[0][l] -= mean_dx
+            self.dc_dr[1][l] -= mean_dy
+            self.dc_dr[2][l] -= mean_dz
 
     def weight_update_steepest_descent(self, network):
         """

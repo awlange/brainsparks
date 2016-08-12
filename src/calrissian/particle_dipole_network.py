@@ -64,6 +64,10 @@ class ParticleDipoleNetwork(object):
         # c += self.particle_input.compute_bond_cost()
         # for layer in self.layers:
         #     c += layer.compute_bond_cost()
+
+        if self.regularizer is not None:
+            c += self.regularizer.cost(self.particle_input, self.layers)
+
         return c
 
     def cost_gradient_thread(self, data_XY):
@@ -205,7 +209,34 @@ class ParticleDipoleNetwork(object):
 
             # Position gradient
             # tmp = qj * dq / potential
-            tmp = 2 * qj * dq / potential
+            tmp = 2 * qj * (Al_trans * trans_delta_L_j)
+
+            dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
+            dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
+            dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
+
+            dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
+            dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
+            dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+
+            dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
+            dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
+            dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
+
+            dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
+            dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
+            dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
+
+            # ----- L2 regularized w_ij by position
+            coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
+            w_ij = qj * potential
+
+            # Charge gradient
+            dq = 2 * coeff_lambda * w_ij * potential
+            dc_dq[l][j] += np.sum(dq)
+
+            # Position gradient
+            tmp = 2 * qj * (2 * coeff_lambda * w_ij)
 
             dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
             dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
@@ -312,7 +343,34 @@ class ParticleDipoleNetwork(object):
 
                 # Position gradient
                 # tmp = qj * dq / potential
-                tmp = 2 * qj * dq / potential
+                tmp = 2 * qj * (Al_trans * this_delta_j)
+
+                dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
+                dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
+                dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
+
+                dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
+                dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
+                dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+
+                dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
+                dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
+                dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
+
+                dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
+                dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
+                dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
+
+                # ----- L2 regularized w_ij by position
+                coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
+                w_ij = qj * potential
+
+                # Charge gradient
+                dq = 2 * coeff_lambda * w_ij * potential
+                dc_dq[l][j] += np.sum(dq)
+
+                # Position gradient
+                tmp = 2 * qj * (2 * coeff_lambda * w_ij)
 
                 dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
                 dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
@@ -346,6 +404,10 @@ class ParticleDipoleNetwork(object):
         #     dc_drx_neg[l+1] -= tx
         #     dc_dry_neg[l+1] -= ty
         #     dc_drz_neg[l+1] -= tz
+
+        # Perform charge regularization if needed
+        # if self.regularizer is not None:
+        #     dc_dq = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq)
 
         return dc_db, dc_dq, dc_drx_pos, dc_dry_pos, dc_drz_pos, dc_drx_neg, dc_dry_neg, dc_drz_neg
 
