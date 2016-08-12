@@ -72,12 +72,16 @@ class ParticleDipole(object):
     Dipole approximated as 2 coupled charges of equal magnitude
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0, cut=3.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0, cut=3.0,
+                 q=None, b=None):
+
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
+
+        self.w = None
 
         # Harmonic constraint coefficient and equilibrium
         self.k_bond = k_bond
@@ -86,12 +90,16 @@ class ParticleDipole(object):
         self.cut2 = cut*cut
 
         # Weight initialization
-        c = np.sqrt(1.0 / (input_size + output_size))
-        self.b = np.random.uniform(-c, c, (1, output_size))
+        g = np.sqrt(2.0 / (input_size + output_size))
+        if b is None:
+            b = g
+        self.b = np.random.uniform(-b, b, (1, output_size))
 
         # Charges
-        c = 1.0
-        self.q = np.random.uniform(-c, c, output_size)
+        if q is None:
+            q = g
+        # self.q = np.random.uniform(-q, q, output_size)
+        self.q = np.random.choice([q, -q], size=output_size)
 
         # Positive charge positions
         self.rx_pos = np.random.uniform(-s, s, output_size)
@@ -196,3 +204,40 @@ class ParticleDipole(object):
 
     def compute_da(self, z):
         return self.d_activation(z)
+
+    def compute_w(self, r_in):
+        w = np.zeros((self.input_size, self.output_size))
+        r_in_x_pos = r_in[0]
+        r_in_y_pos = r_in[1]
+        r_in_z_pos = r_in[2]
+        r_in_x_neg = r_in[3]
+        r_in_y_neg = r_in[4]
+        r_in_z_neg = r_in[5]
+
+        for j in range(self.output_size):
+            dx = r_in_x_pos - self.rx_pos[j]
+            dy = r_in_y_pos - self.ry_pos[j]
+            dz = r_in_z_pos - self.rz_pos[j]
+            potential = np.exp(-(dx**2 + dy**2 + dz**2))
+
+            dx = r_in_x_pos - self.rx_neg[j]
+            dy = r_in_y_pos - self.ry_neg[j]
+            dz = r_in_z_pos - self.rz_neg[j]
+            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+
+            dx = r_in_x_neg - self.rx_pos[j]
+            dy = r_in_y_neg - self.ry_pos[j]
+            dz = r_in_z_neg - self.rz_pos[j]
+            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+
+            dx = r_in_x_neg - self.rx_neg[j]
+            dy = r_in_y_neg - self.ry_neg[j]
+            dz = r_in_z_neg - self.rz_neg[j]
+            potential += np.exp(-(dx**2 + dy**2 + dz**2))
+
+            potential = self.q[j] * potential
+            for i in range(self.input_size):
+                w[i][j] = potential[i]
+
+        self.w = w
+        return w

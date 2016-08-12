@@ -173,41 +173,49 @@ class ParticleCG(Optimizer):
         # Need to do the dot products for all parameters
         beta = 0.0
         if not first_iter:
-            numerator = self.full_dot(network, self.dc_db, self.dc_dq, self.dc_dr, self.dc_dt)
+            numerator = -self.full_dot(network, self.dc_db, self.dc_dq, self.dc_dr, self.dc_dt)
             denominator = self.full_dot(network, self.prev_dc_db, self.prev_dc_dq, self.prev_dc_dr, self.prev_dc_dt)
             beta = numerator / denominator
+        print("beta {}".format(beta))
         if np.isnan(beta):
             beta = 0.0
 
         # Update the conjugate directions
         for l, layer in enumerate(network.layers):
-            self.s_b[l] = self.dc_db[l] + beta * self.s_b[l]
-            self.s_q[l] = self.dc_dq[l] + beta * self.s_q[l]
-            self.s_rx[l+1] = self.dc_dr[0][l+1] + beta * self.s_rx[l+1]
-            self.s_ry[l+1] = self.dc_dr[1][l+1] + beta * self.s_ry[l+1]
-            self.s_rz[l+1] = self.dc_dr[2][l+1] + beta * self.s_rz[l+1]
-            self.s_t[l+1] = self.dc_dt[l+1] + beta * self.s_t[l+1]
-        self.s_rx[0] = self.dc_dr[0][0] + beta * self.s_rx[0]
-        self.s_ry[0] = self.dc_dr[1][0] + beta * self.s_ry[0]
-        self.s_rz[0] = self.dc_dr[2][0] + beta * self.s_rz[0]
-        self.s_t[0] = self.dc_dt[0] + beta * self.s_t[0]
+            self.s_b[l] = -self.dc_db[l] + beta * self.s_b[l]
+            self.s_q[l] = -self.dc_dq[l] + beta * self.s_q[l]
+            self.s_rx[l+1] = -self.dc_dr[0][l+1] + beta * self.s_rx[l+1]
+            self.s_ry[l+1] = -self.dc_dr[1][l+1] + beta * self.s_ry[l+1]
+            self.s_rz[l+1] = -self.dc_dr[2][l+1] + beta * self.s_rz[l+1]
+            self.s_t[l+1] = -self.dc_dt[l+1] + beta * self.s_t[l+1]
+        self.s_rx[0] = -self.dc_dr[0][0] + beta * self.s_rx[0]
+        self.s_ry[0] = -self.dc_dr[1][0] + beta * self.s_ry[0]
+        self.s_rz[0] = -self.dc_dr[2][0] + beta * self.s_rz[0]
+        self.s_t[0] = -self.dc_dt[0] + beta * self.s_t[0]
 
         # Take step
         for l, layer in enumerate(network.layers):
-            layer.b -= self.alpha * self.s_b[l]
-            layer.q -= self.alpha * self.s_q[l]
-            layer.theta -= self.alpha * self.s_t[l+1]
-            layer.rx -= self.alpha * self.s_rx[l+1]
-            layer.ry -= self.alpha * self.s_ry[1][l+1]
-            layer.rz -= self.alpha * self.s_rz[2][l+1]
+            layer.b += self.alpha * self.s_b[l]
+            layer.q += self.alpha * self.s_q[l]
+            layer.theta += self.alpha * self.s_t[l+1]
+            layer.rx += self.alpha * self.s_rx[l+1]
+            layer.ry += self.alpha * self.s_ry[1][l+1]
+            layer.rz += self.alpha * self.s_rz[2][l+1]
 
-        network.particle_input.theta -= self.alpha * self.s_t[0]
-        network.particle_input.rx -= self.alpha * self.s_rx[0][0]
-        network.particle_input.ry -= self.alpha * self.s_ry[1][0]
-        network.particle_input.rz -= self.alpha * self.s_rz[2][0]
+        network.particle_input.theta += self.alpha * self.s_t[0]
+        network.particle_input.rx += self.alpha * self.s_rx[0][0]
+        network.particle_input.ry += self.alpha * self.s_ry[1][0]
+        network.particle_input.rz += self.alpha * self.s_rz[2][0]
 
         # Copy params for next iter
-        self.prev_dc_db = self.dc_db
-        self.prev_dc_dq = self.dc_dq
-        self.prev_dc_dr = self.dc_dr
-        self.prev_dc_dt = self.dc_dt
+        for l, layer in enumerate(network.layers):
+            self.prev_dc_db[l] = -self.dc_db[l]
+            self.prev_dc_dq[l] = -self.dc_dq[l]
+            self.prev_dc_dr[0][l+1] = -self.dc_dr[0][l+1]
+            self.prev_dc_dr[1][l+1] = -self.dc_dr[1][l+1]
+            self.prev_dc_dr[2][l+1] = -self.dc_dr[2][l+1]
+            self.prev_dc_dt[l+1] = -self.dc_dt[l+1]
+        self.prev_dc_dr[0][0] = -self.dc_dr[0][0]
+        self.prev_dc_dr[1][0] = -self.dc_dr[1][0]
+        self.prev_dc_dr[2][0] = -self.dc_dr[2][0]
+        self.prev_dc_dt[0] = -self.dc_dt[0]

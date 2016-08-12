@@ -6,7 +6,7 @@ import numpy as np
 
 class Particle2(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, b=None, q=None):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -16,12 +16,16 @@ class Particle2(object):
         self.zeta = zeta
 
         # Weight initialization
-        c = np.sqrt(6.0 / (input_size + output_size))
-        self.b = np.random.uniform(-c, c, (1, output_size))
+        g = np.sqrt(2.0 / (input_size + output_size))
+        if b is None:
+            b = g
+        self.b = np.random.uniform(-b, b, (1, output_size))
 
         # Charges
-        c = 1.0
-        self.q = np.random.uniform(-c, c, output_size)
+        if q is None:
+            q = g
+        # self.q = np.random.uniform(-q, q, output_size)
+        self.q = np.random.choice([q, -q], size=output_size)
 
         # Positions
         self.rx_inp = np.random.uniform(-s, s, input_size)
@@ -59,3 +63,17 @@ class Particle2(object):
 
     def compute_da(self, z):
         return self.d_activation(z)
+
+    def compute_w(self):
+        w = np.zeros((self.input_size, self.output_size))
+        for j in range(self.output_size):
+            dx = self.rx_inp - self.rx_out[j]
+            dy = self.ry_inp - self.ry_out[j]
+            dz = self.rz_inp - self.rz_out[j]
+            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+            dt = self.theta_inp - self.theta_out[j]
+            w_ji *= np.cos(dt)
+            for i in range(self.input_size):
+                w[i][j] = w_ji[i]
+        self.w = w
+        return w

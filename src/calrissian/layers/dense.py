@@ -17,7 +17,7 @@ class Dense(Layer):
         # Weight initialization
         if weight_init == "glorot":
             # Sample from uniform distribution [-s, s]
-            s = np.sqrt(6.0 / (input_size + output_size))
+            s = np.sqrt(2.0 / (input_size + output_size))
             self.b = np.random.uniform(-s, s, (1, output_size))
             self.w = np.random.uniform(-s, s, (input_size, output_size))
         else:
