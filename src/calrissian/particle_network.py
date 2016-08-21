@@ -202,34 +202,35 @@ class ParticleNetwork(object):
                 dc_dt[l-1] += np.sum(tmp, axis=1)
 
             # ----- L2 regularized w_ij by position
-            coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-            w_ij = qj * exp_dij * np.cos(dt)
+            if self.regularizer is not None:
+                coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
+                w_ij = qj * exp_dij * np.cos(dt)
 
-            # Charge gradient
-            dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
-            # dq = coeff_lambda * np.sign(w_ij) np.abs(w_ij / qj)
-            dc_dq[l][j] += np.sum(dq)
+                # Charge gradient
+                dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
+                # dq = coeff_lambda * np.sign(w_ij) np.abs(w_ij / qj)
+                dc_dq[l][j] += np.sum(dq)
 
-            # Position gradient
-            tmp = 2.0 * qj * dq
-            tx = dx * tmp
-            ty = dy * tmp
-            tz = dz * tmp
+                # Position gradient
+                tmp = 2.0 * qj * dq
+                tx = dx * tmp
+                ty = dy * tmp
+                tz = dz * tmp
 
-            dc_dr_x[l][j] += np.sum(tx)
-            dc_dr_y[l][j] += np.sum(ty)
-            dc_dr_z[l][j] += np.sum(tz)
+                dc_dr_x[l][j] += np.sum(tx)
+                dc_dr_y[l][j] += np.sum(ty)
+                dc_dr_z[l][j] += np.sum(tz)
 
-            dc_dr_x[l-1] -= np.sum(tx, axis=1)
-            dc_dr_y[l-1] -= np.sum(ty, axis=1)
-            dc_dr_z[l-1] -= np.sum(tz, axis=1)
+                dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-            # Phase
-            if layer.phase_enabled and prev_layer.phase_enabled:
-                dq *= -np.tan(dt)
-                tmp = qj * dq
-                dc_dt[l][j] -= np.sum(tmp)
-                dc_dt[l-1] += np.sum(tmp, axis=1)
+                # Phase
+                if layer.phase_enabled and prev_layer.phase_enabled:
+                    dq *= -np.tan(dt)
+                    tmp = qj * dq
+                    dc_dt[l][j] -= np.sum(tmp)
+                    dc_dt[l-1] += np.sum(tmp, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -296,34 +297,35 @@ class ParticleNetwork(object):
                     dc_dt[l-1] += np.sum(tmp, axis=1)
 
                 # ----- L2 regularized w_ij by position
-                coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-                w_ij = qj * exp_dij * np.cos(dt)
+                if self.regularizer is not None:
+                    coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
+                    w_ij = qj * exp_dij * np.cos(dt)
 
-                # Charge gradient
-                dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
-                # dq = coeff_lambda * np.sign(w_ij) / qj
-                dc_dq[l][j] += np.sum(dq)
+                    # Charge gradient
+                    dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
+                    # dq = coeff_lambda * np.sign(w_ij) / qj
+                    dc_dq[l][j] += np.sum(dq)
 
-                # Position gradient
-                tmp = 2.0 * qj * dq
-                tx = dx * tmp
-                ty = dy * tmp
-                tz = dz * tmp
+                    # Position gradient
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
 
-                dc_dr_x[l][j] += np.sum(tx)
-                dc_dr_y[l][j] += np.sum(ty)
-                dc_dr_z[l][j] += np.sum(tz)
+                    dc_dr_x[l][j] += np.sum(tx)
+                    dc_dr_y[l][j] += np.sum(ty)
+                    dc_dr_z[l][j] += np.sum(tz)
 
-                dc_dr_x[l-1] -= np.sum(tx, axis=1)
-                dc_dr_y[l-1] -= np.sum(ty, axis=1)
-                dc_dr_z[l-1] -= np.sum(tz, axis=1)
+                    dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                    dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                    dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-                # Phase
-                if layer.phase_enabled and prev_layer.phase_enabled:
-                    dq *= -np.tan(dt)
-                    tmp = qj * dq
-                    dc_dt[l][j] -= np.sum(tmp)
-                    dc_dt[l-1] += np.sum(tmp, axis=1)
+                    # Phase
+                    if layer.phase_enabled and prev_layer.phase_enabled:
+                        dq *= -np.tan(dt)
+                        tmp = qj * dq
+                        dc_dt[l][j] -= np.sum(tmp)
+                        dc_dt[l-1] += np.sum(tmp, axis=1)
 
         # Zero out z for 2D
         # for i, d in enumerate(dc_dr_z):

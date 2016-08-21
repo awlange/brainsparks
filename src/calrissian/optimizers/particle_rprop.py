@@ -149,12 +149,14 @@ class ParticleRPROP(Optimizer):
         if self.delta_b is None or self.delta_q is None or self.delta_rx is None or self.delta_ry is None or self.delta_rz is None:
             # Initial iteration
 
+            id = self.init_delta
+
             self.delta_b = []
             self.delta_q = []
-            self.delta_rx = [np.ones(network.particle_input.output_size) * self.init_delta]
-            self.delta_ry = [np.ones(network.particle_input.output_size) * self.init_delta]
-            self.delta_rz = [np.ones(network.particle_input.output_size) * self.init_delta]
-            self.delta_t = [np.ones(network.particle_input.output_size) * self.init_delta]
+            self.delta_rx = [np.random.uniform(0, id, network.particle_input.output_size)]
+            self.delta_ry = [np.random.uniform(0, id, network.particle_input.output_size)]
+            self.delta_rz = [np.random.uniform(0, id, network.particle_input.output_size)]
+            self.delta_t = [np.random.uniform(0, id, network.particle_input.output_size)]
 
             self.prev_dc_db = []
             self.prev_dc_dq = []
@@ -162,12 +164,12 @@ class ParticleRPROP(Optimizer):
             self.prev_dc_dt = [np.zeros(network.particle_input.output_size)]
 
             for l, layer in enumerate(network.layers):
-                self.delta_b.append(np.ones(layer.b.shape) * self.init_delta)
-                self.delta_q.append(np.ones(layer.q.shape) * self.init_delta)
-                self.delta_rx.append(np.ones(layer.output_size) * self.init_delta)
-                self.delta_ry.append(np.ones(layer.output_size) * self.init_delta)
-                self.delta_rz.append(np.ones(layer.output_size) * self.init_delta)
-                self.delta_t.append(np.ones(layer.theta.shape) * self.init_delta)
+                self.delta_b.append(np.random.uniform(0, id, layer.b.shape))
+                self.delta_q.append(np.random.uniform(0, id, layer.q.shape))
+                self.delta_rx.append(np.random.uniform(0, id, layer.output_size))
+                self.delta_ry.append(np.random.uniform(0, id, layer.output_size))
+                self.delta_rz.append(np.random.uniform(0, id, layer.output_size))
+                self.delta_t.append(np.random.uniform(0, id, layer.theta.shape))
 
                 self.prev_dc_db.append(np.zeros_like(self.dc_db[l]))
                 self.prev_dc_dq.append(np.zeros_like(self.dc_dq[l]))
