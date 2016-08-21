@@ -8,6 +8,7 @@ from src.calrissian.layers.particle import ParticleInput
 from src.calrissian.optimizers.particle_sgd import ParticleSGD
 from src.calrissian.optimizers.particle_rprop import ParticleRPROP
 from src.calrissian.regularization.particle_regularize import ParticleRegularize
+from src.calrissian.regularization.particle_regularize_l2plus import ParticleRegularizeL2Plus
 
 import numpy as np
 
@@ -88,9 +89,10 @@ def fd():
 
     phase = True
 
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
-    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(0.2))
-    net.append(Particle(2, 5, activation="leaky_relu", phase_enabled=phase))
+    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
+    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(1.0))
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeL2Plus(0.3))
+    net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
     net.append(Particle(5, 4, activation="sigmoid", phase_enabled=phase))
     net.append(Particle(4, 3, activation="softmax", phase_enabled=phase))
 
@@ -100,7 +102,7 @@ def fd():
 
     db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
 
-    h = 0.001
+    h = 0.0001
 
     print("analytic b")
     print(db)
@@ -176,16 +178,6 @@ def fd():
     print("numerical theta")
     for x in fd_t:
         print(x)
-
-    print("analytic x")
-    for layer in dr[0]:
-        print(layer)
-    print("analytic y")
-    for layer in dr[1]:
-        print(layer)
-    print("analytic z")
-    for layer in dr[2]:
-        print(layer)
 
     fd_r_x = []
     fd_r_y = []
@@ -265,12 +257,23 @@ def fd():
         fd_r_y.append(lr_y)
         fd_r_z.append(lr_z)
 
+    print("analytic x")
+    for layer in dr[0]:
+        print(layer)
     print("numerical r x")
     for f in fd_r_x:
         print(f)
+
+    print("analytic y")
+    for layer in dr[1]:
+        print(layer)
     print("numerical r y")
     for f in fd_r_y:
         print(f)
+
+    print("analytic z")
+    for layer in dr[2]:
+        print(layer)
     print("numerical r z")
     for f in fd_r_z:
         print(f)

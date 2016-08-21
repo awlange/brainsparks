@@ -5,7 +5,7 @@ import numpy as np
 
 
 class ParticleInput(object):
-    def __init__(self, output_size, s=1.0, t=1.0, phase_enabled=False):
+    def __init__(self, output_size, s=1.0, t=1.0, phase_enabled=True):
         self.output_size = output_size
         self.phase_enabled = phase_enabled
 
@@ -33,7 +33,7 @@ class ParticleInput(object):
 class Particle(object):
 
     def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, t=1.0, q=None, b=None, boff=0.0,
-                 phase_enabled=False, qw=0.1):
+                 phase_enabled=True, qw=0.1):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()

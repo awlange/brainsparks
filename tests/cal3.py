@@ -14,6 +14,11 @@ from src.calrissian.regularization.bias_couple_l2 import BiasCoupleL2
 
 import numpy as np
 
+# Seed random for reproducibility
+n_seed = 777
+np.random.seed(n_seed)
+state = np.random.get_state()
+
 
 def main():
 
@@ -40,7 +45,7 @@ def fd():
         ((0, 0), (1, 2))
     ]
 
-    net = Network(cost="categorical_cross_entropy", regularizer=RegularizeL2Plus(coeff_lambda=1.0))
+    net = Network(cost="categorical_cross_entropy", regularizer=RegularizeL2Plus(coeff_lambda=0.3))
     # net = Network(cost="categorical_cross_entropy")
     net.append(Dense(2, 5, activation="sigmoid"))
     net.append(Dense(5, 5, activation="sigmoid"))
