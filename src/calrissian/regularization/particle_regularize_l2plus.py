@@ -22,8 +22,8 @@ class ParticleRegularizeL2Plus(object):
             wt = w.transpose()
             for j in range(layer.output_size):
                 for k in range(layer.output_size):
-                    # c += np.abs(wt[j].dot(wt[k]))
-                    c += wt[j].dot(wt[k])
+                    c += np.abs(wt[j].dot(wt[k]))
+                    # c += wt[j].dot(wt[k])
             r = layer.get_rxyz()
 
         return self.coeff_lambda * c

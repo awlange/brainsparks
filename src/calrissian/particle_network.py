@@ -224,7 +224,8 @@ class ParticleNetwork(object):
                 w_ij = wt[j]
 
                 for kk in range(layer.output_size):
-                    dq = 2 * coeff_lambda * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
+                    s = np.sign(wt[j].dot(wt[kk]))
+                    dq = 2 * coeff_lambda * s * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
 
                     # Charge
                     dc_dq[l][j] += np.sum(dq)
@@ -249,7 +250,6 @@ class ParticleNetwork(object):
                         tmp = qj * dq
                         dc_dt[l][j] -= np.sum(tmp)
                         dc_dt[l - 1] += np.sum(tmp, axis=1)
-
 
             elif self.regularizer is not None:
                 coeff_lambda = self.regularizer.coeff_lambda
@@ -349,7 +349,8 @@ class ParticleNetwork(object):
                     coeff_lambda = self.regularizer.coeff_lambda
                     wt = layer.w.transpose()
                     for kk in range(layer.output_size):
-                        dq = 2 * coeff_lambda * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
+                        s = np.sign(wt[j].dot(wt[kk]))
+                        dq = 2 * coeff_lambda * s * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
 
                         # Charge
                         dc_dq[l][j] += np.sum(dq)
