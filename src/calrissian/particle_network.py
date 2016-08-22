@@ -223,37 +223,33 @@ class ParticleNetwork(object):
                 # dc_dw[l] += self.coeff_lambda * tmp.transpose()
                 w_ij = wt[j]
 
-                # Charge gradient
-                # dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
-                # dc_dq[l][j] += np.sum(dq)
+                for kk in range(layer.output_size):
+                    dq = 2 * coeff_lambda * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
 
-                for jj in range(layer.output_size):
-                    for kk in range(jj, layer.output_size):
-                        s = coeff_lambda * np.sign(wt[jj].dot(wt[kk]))
-                        dc_dq[l][jj] += np.sum(wt[jj] * wt[kk] / qj * s)
-                        dc_dq[l][kk] += np.sum(wt[jj] * wt[kk] / qj * s)
+                    # Charge
+                    dc_dq[l][j] += np.sum(dq)
 
+                    # Position
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
 
-                # # Position gradient
-                # tmp = 2.0 * qj * dq
-                # tx = dx * tmp
-                # ty = dy * tmp
-                # tz = dz * tmp
-                #
-                # dc_dr_x[l][j] += np.sum(tx)
-                # dc_dr_y[l][j] += np.sum(ty)
-                # dc_dr_z[l][j] += np.sum(tz)
-                #
-                # dc_dr_x[l-1] -= np.sum(tx, axis=1)
-                # dc_dr_y[l-1] -= np.sum(ty, axis=1)
-                # dc_dr_z[l-1] -= np.sum(tz, axis=1)
-                #
-                # # Phase
-                # if layer.phase_enabled and prev_layer.phase_enabled:
-                #     dq *= -np.tan(dt)
-                #     tmp = qj * dq
-                #     dc_dt[l][j] -= np.sum(tmp)
-                #     dc_dt[l-1] += np.sum(tmp, axis=1)
+                    dc_dr_x[l][j] += np.sum(tx)
+                    dc_dr_y[l][j] += np.sum(ty)
+                    dc_dr_z[l][j] += np.sum(tz)
+
+                    dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                    dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                    dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+                    # Phase
+                    if layer.phase_enabled and prev_layer.phase_enabled:
+                        dq *= -np.tan(dt)
+                        tmp = qj * dq
+                        dc_dt[l][j] -= np.sum(tmp)
+                        dc_dt[l - 1] += np.sum(tmp, axis=1)
+
 
             elif self.regularizer is not None:
                 coeff_lambda = self.regularizer.coeff_lambda
@@ -352,11 +348,32 @@ class ParticleNetwork(object):
                 if l2plus:
                     coeff_lambda = self.regularizer.coeff_lambda
                     wt = layer.w.transpose()
-                    for jj in range(layer.output_size):
-                        for kk in range(jj, layer.output_size):
-                            s = coeff_lambda * np.sign(wt[jj].dot(wt[kk])) * exp_dij
-                            dc_dq[l][jj] += np.sum(wt[kk] * s)
-                            dc_dq[l][kk] += np.sum(wt[jj] * s)
+                    for kk in range(layer.output_size):
+                        dq = 2 * coeff_lambda * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
+
+                        # Charge
+                        dc_dq[l][j] += np.sum(dq)
+
+                        # Position
+                        tmp = 2.0 * qj * dq
+                        tx = dx * tmp
+                        ty = dy * tmp
+                        tz = dz * tmp
+
+                        dc_dr_x[l][j] += np.sum(tx)
+                        dc_dr_y[l][j] += np.sum(ty)
+                        dc_dr_z[l][j] += np.sum(tz)
+
+                        dc_dr_x[l - 1] -= np.sum(tx, axis=1)
+                        dc_dr_y[l - 1] -= np.sum(ty, axis=1)
+                        dc_dr_z[l - 1] -= np.sum(tz, axis=1)
+
+                        # Phase
+                        if layer.phase_enabled and prev_layer.phase_enabled:
+                            dq *= -np.tan(dt)
+                            tmp = qj * dq
+                            dc_dt[l][j] -= np.sum(tmp)
+                            dc_dt[l - 1] += np.sum(tmp, axis=1)
 
                 elif self.regularizer is not None:
                     coeff_lambda = self.regularizer.coeff_lambda

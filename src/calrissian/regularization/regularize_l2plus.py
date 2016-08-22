@@ -39,7 +39,7 @@ class RegularizeL2Plus(object):
 
             wt = layer.w.transpose()
             for j in range(layer.output_size):
-                for k in range(j, layer.output_size):
+                for k in range(layer.output_size):
                     c += np.abs(wt[j].dot(wt[k]))
                     # c += (wt[j].dot(wt[k]))**2
         return self.coeff_lambda * c
@@ -90,11 +90,10 @@ class RegularizeL2Plus(object):
             wt = layer.w.transpose()
             tmp = np.zeros_like(wt)
             for j in range(layer.output_size):
-                for k in range(j, layer.output_size):
-                    s = np.sign(wt[j].dot(wt[k]))
+                for k in range(layer.output_size):
+                    s = 2 * np.sign(wt[j].dot(wt[k]))
                     # s = 2 * wt[j].dot(wt[k])
                     tmp[j] += wt[k] * s
-                    tmp[k] += wt[j] * s
             dc_dw[l] += self.coeff_lambda * tmp.transpose()
 
         return dc_db, dc_dw
