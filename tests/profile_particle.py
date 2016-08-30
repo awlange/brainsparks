@@ -14,7 +14,7 @@ np.random.seed(n_seed)
 state = np.random.get_state()
 
 # MNIST data
-raw_data_train = pd.read_csv("/Users/alange/programming/MNIST/data/mnist_train.csv", header=None)
+raw_data_train = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_train.csv", header=None)
 print("data loaded")
 
 # Prepare data
@@ -28,7 +28,7 @@ for val in raw_data_train.ix[:, 0]:
 Y = np.asarray(Y)
 
 # Data subset
-n_sub = 1000
+n_sub = 10000
 X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
@@ -41,9 +41,9 @@ times = []
 nt = 3
 for _ in range(nt):
     ts = time.time()
-    c = net.cost(X, Y)
-    # c = 1.0
-    # net.cost_gradient(X_sub, Y_sub)
+    # c = net.cost(X, Y)
+    c = 1.0
+    net.cost_gradient(X_sub, Y_sub)
     t = time.time() - ts
     print("Cost: {} time: {}".format(c, t))
     times.append(t)

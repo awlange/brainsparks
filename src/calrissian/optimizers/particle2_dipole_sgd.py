@@ -229,7 +229,7 @@ class Particle2DipoleSGD(Optimizer):
             layer.ry_neg_out += self.vel_ry_neg_out[l]
             layer.rz_neg_out += self.vel_rz_neg_out[l]
 
-    def weight_update_adagrad(self, network):
+    def weight_update_rmsprop(self, network):
         """
         Update weights and biases according to AdaGrad
         """
@@ -304,9 +304,9 @@ class Particle2DipoleSGD(Optimizer):
             layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.vel_ry_neg_out[l] + epsilon)
             layer.rz_neg_out += -self.alpha * self.dc_drz_neg_out[l] / np.sqrt(self.vel_rz_neg_out[l] + epsilon)
 
-    def weight_update_rmsprop(self, network):
+    def weight_update_adagrad(self, network):
         """
-        Update weights and biases according to rmsprop
+        Update weights and biases according to adagrad
         """
         epsilon = 10e-8
 
