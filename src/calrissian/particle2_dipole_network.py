@@ -164,7 +164,7 @@ class Particle2DipoleNetwork(object):
         for j in range(layer.output_size):
             qj = layer.q[j]
             trans_delta_L_j = trans_delta_L[j]
-            trans_sigma_Z_l = trans_sigma_Z[l-1]
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((layer.input_size, len(data_X)))
 
             dx_pos_pos = (layer.rx_pos_inp - layer.rx_pos_out[j]).reshape((layer.input_size, 1))
             dy_pos_pos = (layer.ry_pos_inp - layer.ry_pos_out[j]).reshape((layer.input_size, 1))

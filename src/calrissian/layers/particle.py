@@ -5,7 +5,7 @@ import numpy as np
 
 
 class ParticleInput(object):
-    def __init__(self, output_size, s=1.0, t=1.0, phase_enabled=True):
+    def __init__(self, output_size, s=1.0, t=None, phase_enabled=True):
         self.output_size = output_size
         self.phase_enabled = phase_enabled
 
@@ -16,11 +16,16 @@ class ParticleInput(object):
         # self.rz = np.zeros(output_size)
 
         # Phase
-        self.theta = np.random.uniform(0, 2*np.pi, output_size)
-        # self.theta = np.random.uniform(-t, t, output_size)
+        if t is not None:
+            self.theta = np.random.uniform(-t, t, output_size)
+        else:
+            self.theta = np.random.uniform(0, 2*np.pi, output_size)
+
+        # Gaussian width
+        self.zeta = np.random.uniform(0.9, 1.1, output_size)
 
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.theta
+        return self.rx, self.ry, self.rz, self.theta, self.zeta
 
     def feed_forward(self, a_in):
         """
@@ -32,7 +37,7 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", zeta=1.0, s=1.0, t=1.0, q=None, b=None, boff=0.0,
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", s=1.0, t=None, q=None, b=None, boff=0.0,
                  phase_enabled=True, qw=0.1):
         self.input_size = input_size
         self.output_size = output_size
@@ -40,8 +45,6 @@ class Particle(object):
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
         self.phase_enabled = phase_enabled
-
-        self.zeta = zeta
 
         # Weight initialization
         g = np.sqrt(2.0 / (input_size + output_size))
@@ -64,14 +67,19 @@ class Particle(object):
         # self.rz = np.zeros(output_size)
 
         # Phase
-        self.theta = np.random.uniform(0, 2*np.pi, output_size)
-        # self.theta = np.random.uniform(-t, t, output_size)
+        if t is not None:
+            self.theta = np.random.uniform(-t, t, output_size)
+        else:
+            self.theta = np.random.uniform(0, 2*np.pi, output_size)
+
+        # Gaussian width
+        self.zeta = np.random.uniform(0.9, 1.1, output_size)
 
         # Matrix
         self.w = None
 
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.theta
+        return self.rx, self.ry, self.rz, self.theta, self.zeta
 
     def feed_forward(self, a_in, r_in):
         return self.compute_a(self.compute_z(a_in, r_in)), (self.get_rxyz())
@@ -90,13 +98,15 @@ class Particle(object):
         r_in_y = r_in[1]
         r_in_z = r_in[2]
         r_in_theta = r_in[3]
+        r_in_zeta = r_in[4]
 
         if self.phase_enabled:
             for j in range(self.output_size):
                 dx = r_in_x - self.rx[j]
                 dy = r_in_y - self.ry[j]
                 dz = r_in_z - self.rz[j]
-                w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+                zeta_ij = r_in_zeta * self.zeta[j]
+                w_ji = np.exp(-zeta_ij * (dx**2 + dy**2 + dz**2))
                 dt = r_in_theta - self.theta[j]
                 w_ji *= np.cos(dt)
                 z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
@@ -105,7 +115,8 @@ class Particle(object):
                 dx = r_in_x - self.rx[j]
                 dy = r_in_y - self.ry[j]
                 dz = r_in_z - self.rz[j]
-                w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+                zeta_ij = r_in_zeta * self.zeta[j]
+                w_ji = np.exp(-zeta_ij * (dx**2 + dy**2 + dz**2))
                 z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
 
         return z.transpose()
@@ -128,7 +139,7 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            w_ji = self.q[j] * np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+            w_ji = self.q[j] * np.exp(-(dx**2 + dy**2 + dz**2))
             if self.phase_enabled:
                 dt = r_in_theta - self.theta[j]
                 w_ji *= np.cos(dt)
@@ -151,7 +162,7 @@ class Particle(object):
         dx = r_in_x - self.rx[j]
         dy = r_in_y - self.ry[j]
         dz = r_in_z - self.rz[j]
-        w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+        w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
         if self.phase_enabled:
             dt = r_in_theta - self.theta[j]
             w_ji *= self.q[j] * np.cos(dt)
@@ -171,7 +182,7 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
+            w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
             if self.phase_enabled:
                 dt = r_in_theta - self.theta[j]
                 w_ji *= self.q[j] * np.cos(dt)

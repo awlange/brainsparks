@@ -86,13 +86,21 @@ class Activation(object):
     def d_leaky_relu(self, x):
         return np.piecewise(x, [x < 0.0, x >= 0], [0.01, 1.0])
 
-    # ReLU2: ReLU minus one to allow for negative output
+    # ReLU2: ReLU half pos, half neg
 
     def relu2(self, x):
-        return np.maximum(0, x) - 1
+        xt = x.transpose()
+        xs = np.split(xt, 2, axis=1)
+        spos = np.maximum(0, xs[0])
+        sneg = np.minimum(0, xs[1])
+        return np.concatenate((spos, sneg), axis=1).transpose()
 
     def d_relu2(self, x):
-        return np.piecewise(x, [x < 0.0, x >= 0], [0.0, 1.0])
+        xt = x.transpose()
+        xs = np.split(xt, 2, axis=1)
+        spos = np.piecewise(xs[0], [xs[0] < 0.0, xs[0] >= 0], [0.0, 1.0])
+        sneg = np.piecewise(xs[1], [xs[1] < 0.0, xs[1] >= 0], [1.0, 0.0])
+        return np.concatenate((spos, sneg), axis=1).transpose()
 
     # tanh
 

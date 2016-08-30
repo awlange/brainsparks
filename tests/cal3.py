@@ -9,6 +9,7 @@ from src.calrissian.optimizers.sgd import SGD
 from src.calrissian.regularization.regularize_l1 import RegularizeL1
 from src.calrissian.regularization.regularize_l2 import RegularizeL2
 from src.calrissian.regularization.regularize_l2plus import RegularizeL2Plus
+from src.calrissian.regularization.regularize_orthogonal import RegularizeOrthogonal
 from src.calrissian.regularization.bias_couple_l1 import BiasCoupleL1
 from src.calrissian.regularization.bias_couple_l2 import BiasCoupleL2
 
@@ -45,7 +46,7 @@ def fd():
         ((0, 0), (1, 2))
     ]
 
-    net = Network(cost="categorical_cross_entropy", regularizer=RegularizeL2Plus(coeff_lambda=0.3))
+    net = Network(cost="categorical_cross_entropy", regularizer=RegularizeOrthogonal(coeff_lambda=0.7))
     # net = Network(cost="categorical_cross_entropy")
     net.append(Dense(2, 5, activation="sigmoid"))
     net.append(Dense(5, 5, activation="sigmoid"))

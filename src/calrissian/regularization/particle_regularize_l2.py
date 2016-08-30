@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ParticleRegularize(object):
+class ParticleRegularizeL2(object):
     """
     L2 regularizer for charges
     """

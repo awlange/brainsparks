@@ -1,15 +1,13 @@
 import numpy as np
 
 
-class ParticleRegularizeL2Plus(object):
+class ParticleRegularizeOrthogonal(object):
     """
-    L2 plus regularizer
+    Orthogonal regularizer
     """
 
-    def __init__(self, coeff_lambda=0.0, zeta=8.0):
+    def __init__(self, coeff_lambda=0.0):
         self.coeff_lambda = coeff_lambda
-        self.zeta = zeta
-        self.n = 1
 
     def cost(self, particle_input, layers):
         c = 0.0
@@ -18,15 +16,14 @@ class ParticleRegularizeL2Plus(object):
         r = particle_input.get_rxyz()
         for l, layer in enumerate(layers):
             w = layer.compute_w(r)
-
             wt = w.transpose()
             for j in range(layer.output_size):
+                wtj = wt[j] / np.sqrt(wt[j].dot(wt[j]))
                 for k in range(layer.output_size):
                     if j == k:
                         continue
-                    # c += wt[j].dot(wt[k])**2
-                    c += np.abs(wt[j].dot(wt[k]))
-                    # c += wt[j].dot(wt[k])
+                    wtk = wt[k] / np.sqrt(wt[k].dot(wt[k]))
+                    c += np.abs(wtj.dot(wtk))
             r = layer.get_rxyz()
 
         return self.coeff_lambda * c

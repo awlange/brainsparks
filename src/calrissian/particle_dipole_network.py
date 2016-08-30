@@ -127,7 +127,7 @@ class ParticleDipoleNetwork(object):
 
         l = -1
         layer = self.layers[l]
-        prev_layer = self.layers[l-1]
+        prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
 
         Al = A[l-1]
         Al_trans = Al.transpose()
@@ -142,7 +142,7 @@ class ParticleDipoleNetwork(object):
         for j in range(layer.output_size):
             qj = layer.q[j]
             trans_delta_L_j = trans_delta_L[j]
-            trans_sigma_Z_l = trans_sigma_Z[l-1]
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
 
             dx_pos_pos = (prev_layer.rx_pos - layer.rx_pos[j]).reshape((prev_layer.output_size, 1))
             dy_pos_pos = (prev_layer.ry_pos - layer.ry_pos[j]).reshape((prev_layer.output_size, 1))

@@ -7,8 +7,10 @@ from src.calrissian.layers.particle import Particle
 from src.calrissian.layers.particle import ParticleInput
 from src.calrissian.optimizers.particle_sgd import ParticleSGD
 from src.calrissian.optimizers.particle_rprop import ParticleRPROP
-from src.calrissian.regularization.particle_regularize import ParticleRegularize
+from src.calrissian.regularization.particle_regularize_l2 import ParticleRegularizeL2
+from src.calrissian.regularization.particle_regularize_distance import ParticleRegularizeDistance
 from src.calrissian.regularization.particle_regularize_l2plus import ParticleRegularizeL2Plus
+from src.calrissian.regularization.particle_regularize_orthogonal import ParticleRegularizeOrthogonal
 
 import numpy as np
 
@@ -87,20 +89,20 @@ def fd():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    phase = True
+    phase = False
 
-    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
     # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(1.0))
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeL2Plus(0.3))
-    net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
-    net.append(Particle(5, 4, activation="sigmoid", phase_enabled=phase))
+    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeDistance(0.3))
+    net.append(Particle(2, 5, activation="relu2", phase_enabled=phase))
+    net.append(Particle(5, 4, activation="relu2", phase_enabled=phase))
     net.append(Particle(4, 3, activation="softmax", phase_enabled=phase))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
+    db, dq, dr, dt, dzeta = net.cost_gradient(train_X, train_Y)
 
     h = 0.0001
 
@@ -177,6 +179,41 @@ def fd():
 
     print("numerical theta")
     for x in fd_t:
+        print(x)
+
+    print("analytic zeta")
+    for x in dzeta:
+        print(x)
+
+    # input layer
+    fd_zeta = []
+    layer = net.particle_input
+    lt = []
+    for i in range(len(layer.zeta)):
+        orig = layer.zeta[i]
+        layer.zeta[i] += h
+        fp = net.cost(train_X, train_Y)
+        layer.zeta[i] -= 2*h
+        fm = net.cost(train_X, train_Y)
+        lt.append((fp - fm) / (2*h))
+        layer.zeta[i] = orig
+    fd_zeta.append(lt)
+
+    # layers
+    for l in range(len(net.layers)):
+        lt = []
+        for i in range(len(net.layers[l].zeta)):
+            orig = net.layers[l].zeta[i]
+            net.layers[l].zeta[i] += h
+            fp = net.cost(train_X, train_Y)
+            net.layers[l].zeta[i] -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lt.append((fp - fm) / (2*h))
+            net.layers[l].zeta[i] = orig
+        fd_zeta.append(lt)
+
+    print("numerical zeta")
+    for x in fd_zeta:
         print(x)
 
     fd_r_x = []
