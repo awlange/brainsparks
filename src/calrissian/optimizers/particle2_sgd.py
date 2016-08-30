@@ -36,6 +36,8 @@ class Particle2SGD(Optimizer):
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
         elif weight_update == "adagrad":
             self.weight_update_func = self.weight_update_adagrad
+        elif weight_update == "rmsprop":
+            self.weight_update_func = self.weight_update_rmsprop
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -159,10 +161,10 @@ class Particle2SGD(Optimizer):
             self.vel_rx_inp[l] = -self.alpha_r * self.dc_dr_inp[0][l] + self.beta * self.vel_rx_inp[l]
             self.vel_ry_inp[l] = -self.alpha_r * self.dc_dr_inp[1][l] + self.beta * self.vel_ry_inp[l]
             self.vel_rz_inp[l] = -self.alpha_r * self.dc_dr_inp[2][l] + self.beta * self.vel_rz_inp[l]
-            self.vel_t_inp[l] = -self.alpha_t * self.dc_dt_inp[l] + self.beta * self.vel_t_inp[l]
             self.vel_rx_out[l] = -self.alpha_r * self.dc_dr_out[0][l] + self.beta * self.vel_rx_out[l]
             self.vel_ry_out[l] = -self.alpha_r * self.dc_dr_out[1][l] + self.beta * self.vel_ry_out[l]
             self.vel_rz_out[l] = -self.alpha_r * self.dc_dr_out[2][l] + self.beta * self.vel_rz_out[l]
+            self.vel_t_inp[l] = -self.alpha_t * self.dc_dt_inp[l] + self.beta * self.vel_t_inp[l]
             self.vel_t_out[l] = -self.alpha_t * self.dc_dt_out[l] + self.beta * self.vel_t_out[l]
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
@@ -268,10 +270,9 @@ class Particle2SGD(Optimizer):
             self.vel_rx_inp[l] = gamma * self.vel_rx_inp[l] + one_m_gamma * self.dc_dr_inp[0][l]**2
             self.vel_ry_inp[l] = gamma * self.vel_ry_inp[l] + one_m_gamma * self.dc_dr_inp[1][l]**2
             self.vel_rz_inp[l] = gamma * self.vel_rz_inp[l] + one_m_gamma * self.dc_dr_inp[2][l]**2
-
-            self.vel_rx_out[l] = gamma * self.vel_rx_inp[l] + one_m_gamma * self.dc_dr_out[0][l]**2
-            self.vel_ry_out[l] = gamma * self.vel_ry_inp[l] + one_m_gamma * self.dc_dr_out[1][l]**2
-            self.vel_rz_out[l] = gamma * self.vel_rz_inp[l] + one_m_gamma * self.dc_dr_out[2][l]**2
+            self.vel_rx_out[l] = gamma * self.vel_rx_out[l] + one_m_gamma * self.dc_dr_out[0][l]**2
+            self.vel_ry_out[l] = gamma * self.vel_ry_out[l] + one_m_gamma * self.dc_dr_out[1][l]**2
+            self.vel_rz_out[l] = gamma * self.vel_rz_out[l] + one_m_gamma * self.dc_dr_out[2][l]**2
 
             self.vel_t_inp[l] = gamma * self.vel_t_inp[l] + one_m_gamma * self.dc_dt_inp[l]**2
             self.vel_t_out[l] = gamma * self.vel_t_out[l] + one_m_gamma * self.dc_dt_out[l]**2
@@ -282,7 +283,6 @@ class Particle2SGD(Optimizer):
             layer.rx_inp += -self.alpha * self.dc_dr_inp[0][l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
             layer.ry_inp += -self.alpha * self.dc_dr_inp[1][l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
             layer.rz_inp += -self.alpha * self.dc_dr_inp[2][l] / np.sqrt(self.vel_rz_inp[l] + epsilon)
-
             layer.rx_out += -self.alpha * self.dc_dr_out[0][l] / np.sqrt(self.vel_rx_out[l] + epsilon)
             layer.ry_out += -self.alpha * self.dc_dr_out[1][l] / np.sqrt(self.vel_ry_out[l] + epsilon)
             layer.rz_out += -self.alpha * self.dc_dr_out[2][l] / np.sqrt(self.vel_rz_out[l] + epsilon)
