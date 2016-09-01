@@ -19,7 +19,6 @@ class ParticleDipoleRegularize(object):
         # return self.coeff_lambda * c
 
         # Compute the matrices
-        self.n = 0
         c = 0.0
         r = particle_input.get_rxyz()
         for i, layer in enumerate(layers):
@@ -27,9 +26,8 @@ class ParticleDipoleRegularize(object):
             c += np.sum(w * w)
             # c += np.sum(np.abs(w))
             r = layer.get_rxyz()
-            self.n += w.size
 
-        return self.coeff_lambda * c / self.n
+        return self.coeff_lambda * c
 
     def cost_gradient(self, particle_input, layers, dc_dq):
         # two_lambda = 2.0 * self.coeff_lambda

@@ -141,8 +141,8 @@ class Particle2Network(object):
             dz = (layer.rz_inp - layer.rz_out[j]).reshape((layer.input_size, 1))
             d2 = dx**2 + dy**2 + dz**2
             exp_dij = np.exp(-layer.zeta * d2)
-            dt = (layer.theta_inp - layer.theta_out[j]).reshape((layer.input_size, 1))
-            exp_dij *= np.cos(dt)
+            # dt = (layer.theta_inp - layer.theta_out[j]).reshape((layer.input_size, 1))
+            # exp_dij *= np.cos(dt)
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
@@ -165,12 +165,12 @@ class Particle2Network(object):
             dc_dr_y_inp[l] -= np.sum(ty, axis=1)
             dc_dr_z_inp[l] -= np.sum(tz, axis=1)
 
-            # Phase gradient
-            # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-            dq *= -np.tan(dt)  # could use tan but being explicit here
-            tmp = qj * dq
-            dc_dt_out[l][j] -= np.sum(tmp)
-            dc_dt_inp[l] += np.sum(tmp, axis=1)
+            # # Phase gradient
+            # # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+            # dq *= -np.tan(dt)  # could use tan but being explicit here
+            # tmp = qj * dq
+            # dc_dt_out[l][j] -= np.sum(tmp)
+            # dc_dt_inp[l] += np.sum(tmp, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -200,8 +200,8 @@ class Particle2Network(object):
                 dz = (layer.rz_inp - layer.rz_out[j]).reshape((layer.input_size, 1))
                 d2 = dx**2 + dy**2 + dz**2
                 exp_dij = np.exp(-layer.zeta * d2)
-                dt = (layer.theta_inp - layer.theta_out[j]).reshape((layer.input_size, 1))
-                exp_dij *= np.cos(dt)
+                # dt = (layer.theta_inp - layer.theta_out[j]).reshape((layer.input_size, 1))
+                # exp_dij *= np.cos(dt)
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
@@ -224,12 +224,12 @@ class Particle2Network(object):
                 dc_dr_y_inp[l] -= np.sum(ty, axis=1)
                 dc_dr_z_inp[l] -= np.sum(tz, axis=1)
 
-                # Phase gradient
-                # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                dq *= -np.tan(dt)  # could use tan but being explicit here
-                tmp = qj * dq
-                dc_dt_out[l][j] -= np.sum(tmp)
-                dc_dt_inp[l] += np.sum(tmp, axis=1)
+                # # Phase gradient
+                # # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+                # dq *= -np.tan(dt)  # could use tan but being explicit here
+                # tmp = qj * dq
+                # dc_dt_out[l][j] -= np.sum(tmp)
+                # dc_dt_inp[l] += np.sum(tmp, axis=1)
 
         # Position gradient list
         dc_dr_inp = (dc_dr_x_inp, dc_dr_y_inp, dc_dr_z_inp)

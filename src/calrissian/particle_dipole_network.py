@@ -227,32 +227,33 @@ class ParticleDipoleNetwork(object):
             dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
             dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
-            # ----- L2 regularized w_ij by position
-            coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-            w_ij = qj * potential
+            if self.regularizer is not None:
+                # ----- L2 regularized w_ij by position
+                coeff_lambda = self.regularizer.coeff_lambda
+                w_ij = qj * potential
 
-            # Charge gradient
-            dq = 2 * coeff_lambda * w_ij * potential
-            dc_dq[l][j] += np.sum(dq)
+                # Charge gradient
+                dq = 2 * coeff_lambda * w_ij * potential
+                dc_dq[l][j] += np.sum(dq)
 
-            # Position gradient
-            tmp = 2 * qj * (2 * coeff_lambda * w_ij)
+                # Position gradient
+                tmp = 2 * qj * (2 * coeff_lambda * w_ij)
 
-            dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
-            dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
-            dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
+                dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
+                dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
+                dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
 
-            dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
-            dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-            dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+                dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
+                dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
+                dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
 
-            dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
-            dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
-            dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
+                dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
+                dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
+                dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
 
-            dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
-            dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
-            dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
+                dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
+                dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
+                dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -361,32 +362,33 @@ class ParticleDipoleNetwork(object):
                 dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
                 dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
-                # ----- L2 regularized w_ij by position
-                coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-                w_ij = qj * potential
+                if self.regularizer is not None:
+                    # ----- L2 regularized w_ij by position
+                    coeff_lambda = self.regularizer.coeff_lambda
+                    w_ij = qj * potential
 
-                # Charge gradient
-                dq = 2 * coeff_lambda * w_ij * potential
-                dc_dq[l][j] += np.sum(dq)
+                    # Charge gradient
+                    dq = 2 * coeff_lambda * w_ij * potential
+                    dc_dq[l][j] += np.sum(dq)
 
-                # Position gradient
-                tmp = 2 * qj * (2 * coeff_lambda * w_ij)
+                    # Position gradient
+                    tmp = 2 * qj * (2 * coeff_lambda * w_ij)
 
-                dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
-                dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
-                dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
+                    dc_drx_pos[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
+                    dc_dry_pos[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
+                    dc_drz_pos[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
 
-                dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
-                dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-                dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+                    dc_drx_pos[l-1] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
+                    dc_dry_pos[l-1] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
+                    dc_drz_pos[l-1] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
 
-                dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
-                dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
-                dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
+                    dc_drx_neg[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
+                    dc_dry_neg[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
+                    dc_drz_neg[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
 
-                dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
-                dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
-                dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
+                    dc_drx_neg[l-1] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
+                    dc_dry_neg[l-1] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
+                    dc_drz_neg[l-1] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
         # Compute gradient of bonds
         # tx, ty, tz = self.particle_input.compute_bond_cost_gradient()

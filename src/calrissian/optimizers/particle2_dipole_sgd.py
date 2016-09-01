@@ -280,12 +280,12 @@ class Particle2DipoleSGD(Optimizer):
             self.vel_ry_neg_inp[l] = gamma * self.vel_ry_neg_inp[l] + one_m_gamma * self.dc_dry_neg_inp[l]**2
             self.vel_rz_neg_inp[l] = gamma * self.vel_rz_neg_inp[l] + one_m_gamma * self.dc_drz_neg_inp[l]**2
 
-            self.vel_rx_pos_out[l] = gamma * self.vel_rx_pos_inp[l] + one_m_gamma * self.dc_drx_pos_out[l]**2
-            self.vel_ry_pos_out[l] = gamma * self.vel_ry_pos_inp[l] + one_m_gamma * self.dc_dry_pos_out[l]**2
-            self.vel_rz_pos_out[l] = gamma * self.vel_rz_pos_inp[l] + one_m_gamma * self.dc_drz_pos_out[l]**2
-            self.vel_rx_neg_out[l] = gamma * self.vel_rx_neg_inp[l] + one_m_gamma * self.dc_drx_neg_out[l]**2
-            self.vel_ry_neg_out[l] = gamma * self.vel_ry_neg_inp[l] + one_m_gamma * self.dc_dry_neg_out[l]**2
-            self.vel_rz_neg_out[l] = gamma * self.vel_rz_neg_inp[l] + one_m_gamma * self.dc_drz_neg_out[l]**2
+            self.vel_rx_pos_out[l] = gamma * self.vel_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l]**2
+            self.vel_ry_pos_out[l] = gamma * self.vel_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l]**2
+            self.vel_rz_pos_out[l] = gamma * self.vel_rz_pos_out[l] + one_m_gamma * self.dc_drz_pos_out[l]**2
+            self.vel_rx_neg_out[l] = gamma * self.vel_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l]**2
+            self.vel_ry_neg_out[l] = gamma * self.vel_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l]**2
+            self.vel_rz_neg_out[l] = gamma * self.vel_rz_neg_out[l] + one_m_gamma * self.dc_drz_neg_out[l]**2
 
             layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
             layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)

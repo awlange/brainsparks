@@ -24,8 +24,8 @@ class Particle2(object):
         # Charges
         if q is None:
             q = g
-        # self.q = np.random.uniform(-q, q, output_size)
-        self.q = np.random.choice([q, -q], size=output_size)
+        self.q = np.random.uniform(-q, q, output_size)
+        # self.q = np.random.choice([q, -q], size=output_size)
 
         # Positions
         self.rx_inp = np.random.uniform(-s, s, input_size)
@@ -53,8 +53,8 @@ class Particle2(object):
             dy = self.ry_inp - self.ry_out[j]
             dz = self.rz_inp - self.rz_out[j]
             w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-            dt = self.theta_inp - self.theta_out[j]
-            w_ji *= np.cos(dt)
+            # dt = self.theta_inp - self.theta_out[j]
+            # w_ji *= np.cos(dt)
             z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
         return z.transpose()
 
@@ -71,8 +71,8 @@ class Particle2(object):
             dy = self.ry_inp - self.ry_out[j]
             dz = self.rz_inp - self.rz_out[j]
             w_ji = np.exp(-self.zeta * (dx**2 + dy**2 + dz**2))
-            dt = self.theta_inp - self.theta_out[j]
-            w_ji *= np.cos(dt)
+            # dt = self.theta_inp - self.theta_out[j]
+            # w_ji *= np.cos(dt)
             for i in range(self.input_size):
                 w[i][j] = w_ji[i]
         self.w = w

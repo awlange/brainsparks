@@ -86,16 +86,16 @@ def fd():
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
 
     phase = False
 
     net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
     # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(1.0))
     # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeDistance(0.3))
-    net.append(Particle(2, 5, activation="relu2", phase_enabled=phase))
-    net.append(Particle(5, 4, activation="relu2", phase_enabled=phase))
+    net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
+    net.append(Particle(5, 4, activation="sigmoid", phase_enabled=phase))
     net.append(Particle(4, 3, activation="softmax", phase_enabled=phase))
 
     # Finite difference checking
