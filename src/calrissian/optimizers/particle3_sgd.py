@@ -6,9 +6,9 @@ import time
 from multiprocessing import Pool
 
 
-class Particle2DipoleSGD(Optimizer):
+class Particle3SGD(Optimizer):
     """
-    Stochastic gradient descent optimization for Particle2 Dipole layers
+    Stochastic gradient descent optimization for Particle3 layers
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
@@ -41,34 +41,22 @@ class Particle2DipoleSGD(Optimizer):
         # Weight gradients, to keep around for a step
         self.dc_db = None
         self.dc_dq = None
-        self.dc_drx_pos_inp = None
-        self.dc_dry_pos_inp = None
-        self.dc_drz_pos_inp = None
-        self.dc_drx_neg_inp = None
-        self.dc_dry_neg_inp = None
-        self.dc_drz_neg_inp = None
+        self.dc_drx_inp = None
+        self.dc_dry_inp = None
         self.dc_drx_pos_out = None
         self.dc_dry_pos_out = None
-        self.dc_drz_pos_out = None
         self.dc_drx_neg_out = None
         self.dc_dry_neg_out = None
-        self.dc_drz_neg_out = None
 
         # Velocities
         self.vel_b = None
         self.vel_q = None
-        self.vel_rx_pos_inp = None
-        self.vel_ry_pos_inp = None
-        self.vel_rz_pos_inp = None
-        self.vel_rx_neg_inp = None
-        self.vel_ry_neg_inp = None
-        self.vel_rz_neg_inp = None
+        self.vel_rx_inp = None
+        self.vel_ry_inp = None
         self.vel_rx_pos_out = None
         self.vel_ry_pos_out = None
-        self.vel_rz_pos_out = None
         self.vel_rx_neg_out = None
         self.vel_ry_neg_out = None
-        self.vel_rz_neg_out = None
 
         self.n_threads = n_threads
         self.chunk_size = chunk_size
@@ -95,48 +83,30 @@ class Particle2DipoleSGD(Optimizer):
                 if t == 0 and offset == 0:
                     self.dc_db = gradients[0]
                     self.dc_dq = gradients[1]
-                    self.dc_drx_pos_inp = gradients[2]
-                    self.dc_dry_pos_inp = gradients[3]
-                    self.dc_drz_pos_inp = gradients[4]
-                    self.dc_drx_neg_inp = gradients[5]
-                    self.dc_dry_neg_inp = gradients[6]
-                    self.dc_drz_neg_inp = gradients[7]
-                    self.dc_drx_pos_out = gradients[8]
-                    self.dc_dry_pos_out = gradients[9]
-                    self.dc_drz_pos_out = gradients[10]
-                    self.dc_drx_neg_out = gradients[11]
-                    self.dc_dry_neg_out = gradients[12]
-                    self.dc_drz_neg_out = gradients[13]
+                    self.dc_drx_inp = gradients[2]
+                    self.dc_dry_inp = gradients[3]
+                    self.dc_drx_pos_out = gradients[4]
+                    self.dc_dry_pos_out = gradients[5]
+                    self.dc_drx_neg_out = gradients[6]
+                    self.dc_dry_neg_out = gradients[7]
                 else:
                     tmp_dc_db = gradients[0]
                     tmp_dc_dq = gradients[1]
-                    tmp_dc_drx_pos_inp = gradients[2]
-                    tmp_dc_dry_pos_inp = gradients[3]
-                    tmp_dc_drz_pos_inp = gradients[4]
-                    tmp_dc_drx_neg_inp = gradients[5]
-                    tmp_dc_dry_neg_inp = gradients[6]
-                    tmp_dc_drz_neg_inp = gradients[7]
-                    tmp_dc_drx_pos_out = gradients[8]
-                    tmp_dc_dry_pos_out = gradients[9]
-                    tmp_dc_drz_pos_out = gradients[10]
-                    tmp_dc_drx_neg_out = gradients[11]
-                    tmp_dc_dry_neg_out = gradients[12]
-                    tmp_dc_drz_neg_out = gradients[13]
+                    tmp_dc_drx_inp = gradients[2]
+                    tmp_dc_dry_inp = gradients[3]
+                    tmp_dc_drx_pos_out = gradients[4]
+                    tmp_dc_dry_pos_out = gradients[5]
+                    tmp_dc_drx_neg_out = gradients[6]
+                    tmp_dc_dry_neg_out = gradients[7]
 
-                    for l, tmp_b in enumerate(tmp_dc_db): self.dc_db[l] += tmp_b
-                    for l, tmp_q in enumerate(tmp_dc_dq): self.dc_dq[l] += tmp_q
-                    for l, tmp in enumerate(tmp_dc_drx_pos_inp): self.dc_drx_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_pos_inp): self.dc_dry_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_pos_inp): self.dc_drz_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drx_neg_inp): self.dc_drx_neg_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_neg_inp): self.dc_dry_neg_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_neg_inp): self.dc_drz_neg_inp[l] += tmp
+                    for l, tmp in enumerate(tmp_dc_db): self.dc_db[l] += tmp
+                    for l, tmp in enumerate(tmp_dc_dq): self.dc_dq[l] += tmp
+                    for l, tmp in enumerate(tmp_dc_drx_inp): self.dc_drx_inp[l] += tmp
+                    for l, tmp in enumerate(tmp_dc_dry_inp): self.dc_dry_inp[l] += tmp
                     for l, tmp in enumerate(tmp_dc_drx_pos_out): self.dc_drx_pos_out[l] += tmp
                     for l, tmp in enumerate(tmp_dc_dry_pos_out): self.dc_dry_pos_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_pos_out): self.dc_drz_pos_out[l] += tmp
                     for l, tmp in enumerate(tmp_dc_drx_neg_out): self.dc_drx_neg_out[l] += tmp
                     for l, tmp in enumerate(tmp_dc_dry_neg_out): self.dc_dry_neg_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_neg_out): self.dc_drz_neg_out[l] += tmp
 
             offset += self.chunk_size
 
@@ -175,18 +145,12 @@ class Particle2DipoleSGD(Optimizer):
 
                     self.dc_db = gradients[0]
                     self.dc_dq = gradients[1]
-                    self.dc_drx_pos_inp = gradients[2]
-                    self.dc_dry_pos_inp = gradients[3]
-                    self.dc_drz_pos_inp = gradients[4]
-                    self.dc_drx_neg_inp = gradients[5]
-                    self.dc_dry_neg_inp = gradients[6]
-                    self.dc_drz_neg_inp = gradients[7]
-                    self.dc_drx_pos_out = gradients[8]
-                    self.dc_dry_pos_out = gradients[9]
-                    self.dc_drz_pos_out = gradients[10]
-                    self.dc_drx_neg_out = gradients[11]
-                    self.dc_dry_neg_out = gradients[12]
-                    self.dc_drz_neg_out = gradients[13]
+                    self.dc_drx_inp = gradients[2]
+                    self.dc_dry_inp = gradients[3]
+                    self.dc_drx_pos_out = gradients[4]
+                    self.dc_dry_pos_out = gradients[5]
+                    self.dc_drx_neg_out = gradients[6]
+                    self.dc_dry_neg_out = gradients[7]
 
                 # Update weights and biases
                 self.weight_update_func(network)
@@ -218,18 +182,12 @@ class Particle2DipoleSGD(Optimizer):
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
             layer.q -= self.alpha * self.dc_dq[l]
-            layer.rx_pos_inp -= self.alpha * self.dc_drx_pos_inp[l]
-            layer.ry_pos_inp -= self.alpha * self.dc_dry_pos_inp[l]
-            layer.rz_pos_inp -= self.alpha * self.dc_drz_pos_inp[l]
-            layer.rx_neg_inp -= self.alpha * self.dc_drx_neg_inp[l]
-            layer.ry_neg_inp -= self.alpha * self.dc_dry_neg_inp[l]
-            layer.rz_neg_inp -= self.alpha * self.dc_drz_neg_inp[l]
+            layer.rx_inp -= self.alpha * self.dc_drx_inp[l]
+            layer.ry_inp -= self.alpha * self.dc_dry_inp[l]
             layer.rx_pos_out -= self.alpha * self.dc_drx_pos_out[l]
             layer.ry_pos_out -= self.alpha * self.dc_dry_pos_out[l]
-            layer.rz_pos_out -= self.alpha * self.dc_drz_pos_out[l]
             layer.rx_neg_out -= self.alpha * self.dc_drx_neg_out[l]
             layer.ry_neg_out -= self.alpha * self.dc_dry_neg_out[l]
-            layer.rz_neg_out -= self.alpha * self.dc_drz_neg_out[l]
 
     def weight_update_steepest_descent_with_momentum(self, network):
         """
@@ -239,67 +197,43 @@ class Particle2DipoleSGD(Optimizer):
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
             self.vel_q = []
-            self.vel_rx_pos_inp = []
-            self.vel_ry_pos_inp = []
-            self.vel_rz_pos_inp = []
-            self.vel_rx_neg_inp = []
-            self.vel_ry_neg_inp = []
-            self.vel_rz_neg_inp = []
+            self.vel_rx_inp = []
+            self.vel_ry_inp = []
             self.vel_rx_pos_out = []
             self.vel_ry_pos_out = []
-            self.vel_rz_pos_out = []
             self.vel_rx_neg_out = []
             self.vel_ry_neg_out = []
-            self.vel_rz_neg_out = []
             for l, layer in enumerate(network.layers):
                 self.vel_b.append(np.zeros(layer.b.shape))
                 self.vel_q.append(np.zeros(layer.q.shape))
-                self.vel_rx_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rx_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_neg_inp.append(np.zeros(layer.input_size))
+                self.vel_rx_inp.append(np.zeros(layer.input_size))
+                self.vel_ry_inp.append(np.zeros(layer.input_size))
                 self.vel_rx_pos_out.append(np.zeros(layer.output_size))
                 self.vel_ry_pos_out.append(np.zeros(layer.output_size))
-                self.vel_rz_pos_out.append(np.zeros(layer.output_size))
                 self.vel_rx_neg_out.append(np.zeros(layer.output_size))
                 self.vel_ry_neg_out.append(np.zeros(layer.output_size))
-                self.vel_rz_neg_out.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
             self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
-            self.vel_rx_pos_inp[l] = -self.alpha * self.dc_drx_pos_inp[l] + self.beta * self.vel_rx_pos_inp[l]
-            self.vel_ry_pos_inp[l] = -self.alpha * self.dc_dry_pos_inp[l] + self.beta * self.vel_ry_pos_inp[l]
-            self.vel_rz_pos_inp[l] = -self.alpha * self.dc_drz_pos_inp[l] + self.beta * self.vel_rz_pos_inp[l]
-            self.vel_rx_neg_inp[l] = -self.alpha * self.dc_drx_neg_inp[l] + self.beta * self.vel_rx_neg_inp[l]
-            self.vel_ry_neg_inp[l] = -self.alpha * self.dc_dry_neg_inp[l] + self.beta * self.vel_ry_neg_inp[l]
-            self.vel_rz_neg_inp[l] = -self.alpha * self.dc_drz_neg_inp[l] + self.beta * self.vel_rz_neg_inp[l]
+            self.vel_rx_inp[l] = -self.alpha * self.dc_drx_inp[l] + self.beta * self.vel_rx_inp[l]
+            self.vel_ry_inp[l] = -self.alpha * self.dc_dry_inp[l] + self.beta * self.vel_ry_inp[l]
 
             self.vel_rx_pos_out[l] = -self.alpha * self.dc_drx_pos_out[l] + self.beta * self.vel_rx_pos_out[l]
             self.vel_ry_pos_out[l] = -self.alpha * self.dc_dry_pos_out[l] + self.beta * self.vel_ry_pos_out[l]
-            self.vel_rz_pos_out[l] = -self.alpha * self.dc_drz_pos_out[l] + self.beta * self.vel_rz_pos_out[l]
             self.vel_rx_neg_out[l] = -self.alpha * self.dc_drx_neg_out[l] + self.beta * self.vel_rx_neg_out[l]
             self.vel_ry_neg_out[l] = -self.alpha * self.dc_dry_neg_out[l] + self.beta * self.vel_ry_neg_out[l]
-            self.vel_rz_neg_out[l] = -self.alpha * self.dc_drz_neg_out[l] + self.beta * self.vel_rz_neg_out[l]
 
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
 
-            layer.rx_pos_inp += self.vel_rx_pos_inp[l]
-            layer.ry_pos_inp += self.vel_ry_pos_inp[l]
-            layer.rz_pos_inp += self.vel_rz_pos_inp[l]
-            layer.rx_neg_inp += self.vel_rx_neg_inp[l]
-            layer.ry_neg_inp += self.vel_ry_neg_inp[l]
-            layer.rz_neg_inp += self.vel_rz_neg_inp[l]
+            layer.rx_inp += self.vel_rx_inp[l]
+            layer.ry_inp += self.vel_ry_inp[l]
 
             layer.rx_pos_out += self.vel_rx_pos_out[l]
             layer.ry_pos_out += self.vel_ry_pos_out[l]
-            layer.rz_pos_out += self.vel_rz_pos_out[l]
             layer.rx_neg_out += self.vel_rx_neg_out[l]
             layer.ry_neg_out += self.vel_ry_neg_out[l]
-            layer.rz_neg_out += self.vel_rz_neg_out[l]
 
     def weight_update_rmsprop(self, network):
         """
@@ -309,72 +243,48 @@ class Particle2DipoleSGD(Optimizer):
         gamma = self.gamma
         one_m_gamma = 1.0 - gamma
 
-        # Initialize velocities/MSE to zero for momentum
+        # Initialize velocities to zero for momentum
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
             self.vel_q = []
-            self.vel_rx_pos_inp = []
-            self.vel_ry_pos_inp = []
-            self.vel_rz_pos_inp = []
-            self.vel_rx_neg_inp = []
-            self.vel_ry_neg_inp = []
-            self.vel_rz_neg_inp = []
+            self.vel_rx_inp = []
+            self.vel_ry_inp = []
             self.vel_rx_pos_out = []
             self.vel_ry_pos_out = []
-            self.vel_rz_pos_out = []
             self.vel_rx_neg_out = []
             self.vel_ry_neg_out = []
-            self.vel_rz_neg_out = []
             for l, layer in enumerate(network.layers):
                 self.vel_b.append(np.zeros(layer.b.shape))
                 self.vel_q.append(np.zeros(layer.q.shape))
-                self.vel_rx_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rx_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_neg_inp.append(np.zeros(layer.input_size))
+                self.vel_rx_inp.append(np.zeros(layer.input_size))
+                self.vel_ry_inp.append(np.zeros(layer.input_size))
                 self.vel_rx_pos_out.append(np.zeros(layer.output_size))
                 self.vel_ry_pos_out.append(np.zeros(layer.output_size))
-                self.vel_rz_pos_out.append(np.zeros(layer.output_size))
                 self.vel_rx_neg_out.append(np.zeros(layer.output_size))
                 self.vel_ry_neg_out.append(np.zeros(layer.output_size))
-                self.vel_rz_neg_out.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] = gamma * self.vel_b[l] + one_m_gamma * self.dc_db[l]**2
             self.vel_q[l] = gamma * self.vel_q[l] + one_m_gamma * self.dc_dq[l]**2
 
-            self.vel_rx_pos_inp[l] = gamma * self.vel_rx_pos_inp[l] + one_m_gamma * self.dc_drx_pos_inp[l]**2
-            self.vel_ry_pos_inp[l] = gamma * self.vel_ry_pos_inp[l] + one_m_gamma * self.dc_dry_pos_inp[l]**2
-            self.vel_rz_pos_inp[l] = gamma * self.vel_rz_pos_inp[l] + one_m_gamma * self.dc_drz_pos_inp[l]**2
-            self.vel_rx_neg_inp[l] = gamma * self.vel_rx_neg_inp[l] + one_m_gamma * self.dc_drx_neg_inp[l]**2
-            self.vel_ry_neg_inp[l] = gamma * self.vel_ry_neg_inp[l] + one_m_gamma * self.dc_dry_neg_inp[l]**2
-            self.vel_rz_neg_inp[l] = gamma * self.vel_rz_neg_inp[l] + one_m_gamma * self.dc_drz_neg_inp[l]**2
+            self.vel_rx_inp[l] = gamma * self.vel_rx_inp[l] + one_m_gamma * self.dc_drx_inp[l]**2
+            self.vel_ry_inp[l] = gamma * self.vel_ry_inp[l] + one_m_gamma * self.dc_dry_inp[l]**2
 
             self.vel_rx_pos_out[l] = gamma * self.vel_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l]**2
             self.vel_ry_pos_out[l] = gamma * self.vel_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l]**2
-            self.vel_rz_pos_out[l] = gamma * self.vel_rz_pos_out[l] + one_m_gamma * self.dc_drz_pos_out[l]**2
             self.vel_rx_neg_out[l] = gamma * self.vel_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l]**2
             self.vel_ry_neg_out[l] = gamma * self.vel_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l]**2
-            self.vel_rz_neg_out[l] = gamma * self.vel_rz_neg_out[l] + one_m_gamma * self.dc_drz_neg_out[l]**2
 
             layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
             layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
 
-            layer.rx_pos_inp += -self.alpha * self.dc_drx_pos_inp[l] / np.sqrt(self.vel_rx_pos_inp[l] + epsilon)
-            layer.ry_pos_inp += -self.alpha * self.dc_dry_pos_inp[l] / np.sqrt(self.vel_ry_pos_inp[l] + epsilon)
-            layer.rz_pos_inp += -self.alpha * self.dc_drz_pos_inp[l] / np.sqrt(self.vel_rz_pos_inp[l] + epsilon)
-            layer.rx_neg_inp += -self.alpha * self.dc_drx_neg_inp[l] / np.sqrt(self.vel_rx_neg_inp[l] + epsilon)
-            layer.ry_neg_inp += -self.alpha * self.dc_dry_neg_inp[l] / np.sqrt(self.vel_ry_neg_inp[l] + epsilon)
-            layer.rz_neg_inp += -self.alpha * self.dc_drz_neg_inp[l] / np.sqrt(self.vel_rz_neg_inp[l] + epsilon)
+            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
+            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
 
             layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.vel_rx_pos_out[l] + epsilon)
             layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.vel_ry_pos_out[l] + epsilon)
-            layer.rz_pos_out += -self.alpha * self.dc_drz_pos_out[l] / np.sqrt(self.vel_rz_pos_out[l] + epsilon)
             layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.vel_rx_neg_out[l] + epsilon)
             layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.vel_ry_neg_out[l] + epsilon)
-            layer.rz_neg_out += -self.alpha * self.dc_drz_neg_out[l] / np.sqrt(self.vel_rz_neg_out[l] + epsilon)
 
     def weight_update_adagrad(self, network):
         """
@@ -382,70 +292,46 @@ class Particle2DipoleSGD(Optimizer):
         """
         epsilon = 10e-8
 
-        # Initialize velocities/MSE to zero for momentum
+        # Initialize velocities to zero for momentum
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
             self.vel_q = []
-            self.vel_rx_pos_inp = []
-            self.vel_ry_pos_inp = []
-            self.vel_rz_pos_inp = []
-            self.vel_rx_neg_inp = []
-            self.vel_ry_neg_inp = []
-            self.vel_rz_neg_inp = []
+            self.vel_rx_inp = []
+            self.vel_ry_inp = []
             self.vel_rx_pos_out = []
             self.vel_ry_pos_out = []
-            self.vel_rz_pos_out = []
             self.vel_rx_neg_out = []
             self.vel_ry_neg_out = []
-            self.vel_rz_neg_out = []
             for l, layer in enumerate(network.layers):
                 self.vel_b.append(np.zeros(layer.b.shape))
                 self.vel_q.append(np.zeros(layer.q.shape))
-                self.vel_rx_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_pos_inp.append(np.zeros(layer.input_size))
-                self.vel_rx_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_neg_inp.append(np.zeros(layer.input_size))
-                self.vel_rz_neg_inp.append(np.zeros(layer.input_size))
+                self.vel_rx_inp.append(np.zeros(layer.input_size))
+                self.vel_ry_inp.append(np.zeros(layer.input_size))
                 self.vel_rx_pos_out.append(np.zeros(layer.output_size))
                 self.vel_ry_pos_out.append(np.zeros(layer.output_size))
-                self.vel_rz_pos_out.append(np.zeros(layer.output_size))
                 self.vel_rx_neg_out.append(np.zeros(layer.output_size))
                 self.vel_ry_neg_out.append(np.zeros(layer.output_size))
-                self.vel_rz_neg_out.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] += self.dc_db[l] ** 2
             self.vel_q[l] += self.dc_dq[l] ** 2
 
-            self.vel_rx_pos_inp[l] += self.dc_drx_pos_inp[l] ** 2
-            self.vel_ry_pos_inp[l] += self.dc_dry_pos_inp[l] ** 2
-            self.vel_rz_pos_inp[l] += self.dc_drz_pos_inp[l] ** 2
-            self.vel_rx_neg_inp[l] += self.dc_drx_neg_inp[l] ** 2
-            self.vel_ry_neg_inp[l] += self.dc_dry_neg_inp[l] ** 2
-            self.vel_rz_neg_inp[l] += self.dc_drz_neg_inp[l] ** 2
+            self.vel_rx_inp[l] += self.dc_drx_inp[l] ** 2
+            self.vel_ry_inp[l] += self.dc_dry_inp[l] ** 2
 
             self.vel_rx_pos_out[l] += self.dc_drx_pos_out[l] ** 2
             self.vel_ry_pos_out[l] += self.dc_dry_pos_out[l] ** 2
-            self.vel_rz_pos_out[l] += self.dc_drz_pos_out[l] ** 2
             self.vel_rx_neg_out[l] += self.dc_drx_neg_out[l] ** 2
             self.vel_ry_neg_out[l] += self.dc_dry_neg_out[l] ** 2
-            self.vel_rz_neg_out[l] += self.dc_drz_neg_out[l] ** 2
 
             layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
             layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
 
-            layer.rx_pos_inp += -self.alpha * self.dc_drx_pos_inp[l] / np.sqrt(self.vel_rx_pos_inp[l] + epsilon)
-            layer.ry_pos_inp += -self.alpha * self.dc_dry_pos_inp[l] / np.sqrt(self.vel_ry_pos_inp[l] + epsilon)
-            layer.rz_pos_inp += -self.alpha * self.dc_drz_pos_inp[l] / np.sqrt(self.vel_rz_pos_inp[l] + epsilon)
-            layer.rx_neg_inp += -self.alpha * self.dc_drx_neg_inp[l] / np.sqrt(self.vel_rx_neg_inp[l] + epsilon)
-            layer.ry_neg_inp += -self.alpha * self.dc_dry_neg_inp[l] / np.sqrt(self.vel_ry_neg_inp[l] + epsilon)
-            layer.rz_neg_inp += -self.alpha * self.dc_drz_neg_inp[l] / np.sqrt(self.vel_rz_neg_inp[l] + epsilon)
+            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
+            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
 
             layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.vel_rx_pos_out[l] + epsilon)
             layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.vel_ry_pos_out[l] + epsilon)
-            layer.rz_pos_out += -self.alpha * self.dc_drz_pos_out[l] / np.sqrt(self.vel_rz_pos_out[l] + epsilon)
             layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.vel_rx_neg_out[l] + epsilon)
             layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.vel_ry_neg_out[l] + epsilon)
-            layer.rz_neg_out += -self.alpha * self.dc_drz_neg_out[l] / np.sqrt(self.vel_rz_neg_out[l] + epsilon)
 

@@ -9,7 +9,7 @@ class Particle2Dipole(object):
     Dipole approximated as 2 coupled charges of equal magnitude, uncoupled
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0, cut=3.0,
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", k_bond=1.0, k_eq=0.1, s=1.0, cut=10.0,
                  q=None, b=None):
 
         self.input_size = input_size
@@ -73,15 +73,15 @@ class Particle2Dipole(object):
             dz = self.rz_pos_inp - self.rz_neg_out[j]
             potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
-            dx = self.rx_neg_inp - self.rx_pos_out[j]
-            dy = self.ry_neg_inp - self.ry_pos_out[j]
-            dz = self.rz_neg_inp - self.rz_pos_out[j]
-            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+            # dx = self.rx_neg_inp - self.rx_pos_out[j]
+            # dy = self.ry_neg_inp - self.ry_pos_out[j]
+            # dz = self.rz_neg_inp - self.rz_pos_out[j]
+            # potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
-            dx = self.rx_neg_inp - self.rx_neg_out[j]
-            dy = self.ry_neg_inp - self.ry_neg_out[j]
-            dz = self.rz_neg_inp - self.rz_neg_out[j]
-            potential += np.exp(-(dx**2 + dy**2 + dz**2))
+            # dx = self.rx_neg_inp - self.rx_neg_out[j]
+            # dy = self.ry_neg_inp - self.ry_neg_out[j]
+            # dz = self.rz_neg_inp - self.rz_neg_out[j]
+            # potential += np.exp(-(dx**2 + dy**2 + dz**2))
 
             z[j] = self.b[0][j] + self.q[j] * potential.dot(atrans)
         return z.transpose()
@@ -105,15 +105,15 @@ class Particle2Dipole(object):
             dz = self.rz_pos_inp - self.rz_neg_out[j]
             potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
-            dx = self.rx_neg_inp - self.rx_pos_out[j]
-            dy = self.ry_neg_inp - self.ry_pos_out[j]
-            dz = self.rz_neg_inp - self.rz_pos_out[j]
-            potential -= np.exp(-(dx**2 + dy**2 + dz**2))
+            # dx = self.rx_neg_inp - self.rx_pos_out[j]
+            # dy = self.ry_neg_inp - self.ry_pos_out[j]
+            # dz = self.rz_neg_inp - self.rz_pos_out[j]
+            # potential -= np.exp(-(dx**2 + dy**2 + dz**2))
 
-            dx = self.rx_neg_inp - self.rx_neg_out[j]
-            dy = self.ry_neg_inp - self.ry_neg_out[j]
-            dz = self.rz_neg_inp - self.rz_neg_out[j]
-            potential += np.exp(-(dx**2 + dy**2 + dz**2))
+            # dx = self.rx_neg_inp - self.rx_neg_out[j]
+            # dy = self.ry_neg_inp - self.ry_neg_out[j]
+            # dz = self.rz_neg_inp - self.rz_neg_out[j]
+            # potential += np.exp(-(dx**2 + dy**2 + dz**2))
 
             potential = self.q[j] * potential
             for i in range(self.input_size):
