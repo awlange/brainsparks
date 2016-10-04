@@ -37,6 +37,10 @@ class Particle3SGD(Optimizer):
             self.weight_update_func = self.weight_update_adagrad
         if weight_update == "rmsprop":
             self.weight_update_func = self.weight_update_rmsprop
+        if weight_update == "rmsprop_momentum":
+            self.weight_update_func = self.weight_update_rmsprop_momentum
+        if weight_update == "conjugate_gradient":
+            self.weight_update_func = self.weight_update_conjugate_gradient
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -57,10 +61,24 @@ class Particle3SGD(Optimizer):
         self.vel_ry_pos_out = None
         self.vel_rx_neg_out = None
         self.vel_ry_neg_out = None
+        
+        # Mean squares
+        self.ms_b = None
+        self.ms_q = None
+        self.ms_rx_inp = None
+        self.ms_ry_inp = None
+        self.ms_rx_pos_out = None
+        self.ms_ry_pos_out = None
+        self.ms_rx_neg_out = None
+        self.ms_ry_neg_out = None
 
         self.n_threads = n_threads
         self.chunk_size = chunk_size
         self.pool = None
+
+        self.numerator = None
+        self.denominator = None
+
 
     def get_pool(self):
         if self.pool is None:
@@ -189,6 +207,82 @@ class Particle3SGD(Optimizer):
             layer.rx_neg_out -= self.alpha * self.dc_drx_neg_out[l]
             layer.ry_neg_out -= self.alpha * self.dc_dry_neg_out[l]
 
+    def weight_update_conjugate_gradient(self, network):
+        """
+        Update weights and biases according to conjugate gradient
+        """
+        # compute beta: Fletcher-Reeves
+        num = 0.0
+        for l, layer in enumerate(network.layers):
+            num += np.sum(self.dc_db[l] ** 2)
+            num += np.sum(self.dc_dq[l] ** 2)
+            num += np.sum(self.dc_drx_inp[l] ** 2)
+            num += np.sum(self.dc_dry_inp[l] ** 2)
+            num += np.sum(self.dc_drx_pos_out[l] ** 2)
+            num += np.sum(self.dc_dry_pos_out[l] ** 2)
+            num += np.sum(self.dc_drx_neg_out[l] ** 2)
+            num += np.sum(self.dc_dry_neg_out[l] ** 2)
+
+        # Initialize velocities to zero for momentum
+        if self.vel_b is None or self.vel_q is None:
+            self.ms_b = []
+            self.ms_q = []
+            self.ms_rx_inp = []
+            self.ms_ry_inp = []
+            self.ms_rx_pos_out = []
+            self.ms_ry_pos_out = []
+            self.ms_rx_neg_out = []
+            self.ms_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.ms_b.append(np.zeros(layer.b.shape))
+                self.ms_q.append(np.zeros(layer.q.shape))
+                self.ms_rx_inp.append(np.zeros(layer.input_size))
+                self.ms_ry_inp.append(np.zeros(layer.input_size))
+                self.ms_rx_pos_out.append(np.zeros(layer.output_size))
+                self.ms_ry_pos_out.append(np.zeros(layer.output_size))
+                self.ms_rx_neg_out.append(np.zeros(layer.output_size))
+                self.ms_ry_neg_out.append(np.zeros(layer.output_size))
+
+            # Take steepest descent step
+            for l, layer in enumerate(network.layers):
+                layer.b -= self.alpha * self.dc_db[l]
+                layer.q -= self.alpha * self.dc_dq[l]
+                layer.rx_inp -= self.alpha * self.dc_drx_inp[l]
+                layer.ry_inp -= self.alpha * self.dc_dry_inp[l]
+                layer.rx_pos_out -= self.alpha * self.dc_drx_pos_out[l]
+                layer.ry_pos_out -= self.alpha * self.dc_dry_pos_out[l]
+                layer.rx_neg_out -= self.alpha * self.dc_drx_neg_out[l]
+                layer.ry_neg_out -= self.alpha * self.dc_dry_neg_out[l]
+
+        else:
+            # compute beta
+            beta = num / self.denominator
+
+            # compute s_n
+            for l, layer in enumerate(network.layers):
+                self.ms_b[l] = -self.alpha * self.dc_db[l] + beta * self.ms_b[l]
+                self.ms_q[l] = -self.alpha * self.dc_dq[l] + beta * self.ms_q[l]
+                self.ms_rx_inp[l] = -self.alpha * self.dc_drx_inp[l] + beta * self.ms_rx_inp[l]
+                self.ms_ry_inp[l] = -self.alpha * self.dc_dry_inp[l] + beta * self.ms_ry_inp[l]
+                self.ms_rx_pos_out[l] = -self.alpha * self.dc_drx_pos_out[l] + beta * self.ms_rx_pos_out[l]
+                self.ms_ry_pos_out[l] = -self.alpha * self.dc_dry_pos_out[l] + beta * self.ms_ry_pos_out[l]
+                self.ms_rx_neg_out[l] = -self.alpha * self.dc_drx_neg_out[l] + beta * self.ms_rx_neg_out[l]
+                self.ms_ry_neg_out[l] = -self.alpha * self.dc_dry_neg_out[l] + beta * self.ms_ry_neg_out[l]
+
+            # Take step
+            for l, layer in enumerate(network.layers):
+                layer.b += self.alpha * self.ms_b[l]
+                layer.q += self.alpha * self.ms_q[l]
+                layer.rx_inp += self.alpha * self.ms_rx_inp[l]
+                layer.ry_inp += self.alpha * self.ms_ry_inp[l]
+                layer.rx_pos_out += self.alpha * self.ms_rx_pos_out[l]
+                layer.ry_pos_out += self.alpha * self.ms_ry_pos_out[l]
+                layer.rx_neg_out += self.alpha * self.ms_rx_neg_out[l]
+                layer.ry_neg_out += self.alpha * self.ms_ry_neg_out[l]
+
+        # store num for next iteration to be used as denominator
+        self.denominator = num
+
     def weight_update_steepest_descent_with_momentum(self, network):
         """
         Update weights and biases according to steepest descent
@@ -243,48 +337,47 @@ class Particle3SGD(Optimizer):
         gamma = self.gamma
         one_m_gamma = 1.0 - gamma
 
-        # Initialize velocities to zero for momentum
-        if self.vel_b is None or self.vel_q is None:
-            self.vel_b = []
-            self.vel_q = []
-            self.vel_rx_inp = []
-            self.vel_ry_inp = []
-            self.vel_rx_pos_out = []
-            self.vel_ry_pos_out = []
-            self.vel_rx_neg_out = []
-            self.vel_ry_neg_out = []
+        if self.ms_b is None or self.ms_q is None:
+            self.ms_b = []
+            self.ms_q = []
+            self.ms_rx_inp = []
+            self.ms_ry_inp = []
+            self.ms_rx_pos_out = []
+            self.ms_ry_pos_out = []
+            self.ms_rx_neg_out = []
+            self.ms_ry_neg_out = []
             for l, layer in enumerate(network.layers):
-                self.vel_b.append(np.zeros(layer.b.shape))
-                self.vel_q.append(np.zeros(layer.q.shape))
-                self.vel_rx_inp.append(np.zeros(layer.input_size))
-                self.vel_ry_inp.append(np.zeros(layer.input_size))
-                self.vel_rx_pos_out.append(np.zeros(layer.output_size))
-                self.vel_ry_pos_out.append(np.zeros(layer.output_size))
-                self.vel_rx_neg_out.append(np.zeros(layer.output_size))
-                self.vel_ry_neg_out.append(np.zeros(layer.output_size))
+                self.ms_b.append(np.zeros(layer.b.shape))
+                self.ms_q.append(np.zeros(layer.q.shape))
+                self.ms_rx_inp.append(np.zeros(layer.input_size))
+                self.ms_ry_inp.append(np.zeros(layer.input_size))
+                self.ms_rx_pos_out.append(np.zeros(layer.output_size))
+                self.ms_ry_pos_out.append(np.zeros(layer.output_size))
+                self.ms_rx_neg_out.append(np.zeros(layer.output_size))
+                self.ms_ry_neg_out.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
-            self.vel_b[l] = gamma * self.vel_b[l] + one_m_gamma * self.dc_db[l]**2
-            self.vel_q[l] = gamma * self.vel_q[l] + one_m_gamma * self.dc_dq[l]**2
+            self.ms_b[l] = gamma * self.ms_b[l] + one_m_gamma * self.dc_db[l]**2
+            self.ms_q[l] = gamma * self.ms_q[l] + one_m_gamma * self.dc_dq[l]**2
 
-            self.vel_rx_inp[l] = gamma * self.vel_rx_inp[l] + one_m_gamma * self.dc_drx_inp[l]**2
-            self.vel_ry_inp[l] = gamma * self.vel_ry_inp[l] + one_m_gamma * self.dc_dry_inp[l]**2
+            self.ms_rx_inp[l] = gamma * self.ms_rx_inp[l] + one_m_gamma * self.dc_drx_inp[l]**2
+            self.ms_ry_inp[l] = gamma * self.ms_ry_inp[l] + one_m_gamma * self.dc_dry_inp[l]**2
 
-            self.vel_rx_pos_out[l] = gamma * self.vel_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l]**2
-            self.vel_ry_pos_out[l] = gamma * self.vel_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l]**2
-            self.vel_rx_neg_out[l] = gamma * self.vel_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l]**2
-            self.vel_ry_neg_out[l] = gamma * self.vel_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l]**2
+            self.ms_rx_pos_out[l] = gamma * self.ms_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l]**2
+            self.ms_ry_pos_out[l] = gamma * self.ms_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l]**2
+            self.ms_rx_neg_out[l] = gamma * self.ms_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l]**2
+            self.ms_ry_neg_out[l] = gamma * self.ms_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l]**2
 
-            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
-            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
+            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.ms_b[l] + epsilon)
+            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.ms_q[l] + epsilon)
 
-            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
-            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
+            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.ms_rx_inp[l] + epsilon)
+            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.ms_ry_inp[l] + epsilon)
 
-            layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.vel_rx_pos_out[l] + epsilon)
-            layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.vel_ry_pos_out[l] + epsilon)
-            layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.vel_rx_neg_out[l] + epsilon)
-            layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.vel_ry_neg_out[l] + epsilon)
+            layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.ms_rx_pos_out[l] + epsilon)
+            layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.ms_ry_pos_out[l] + epsilon)
+            layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.ms_rx_neg_out[l] + epsilon)
+            layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.ms_ry_neg_out[l] + epsilon)
 
     def weight_update_adagrad(self, network):
         """
@@ -292,6 +385,76 @@ class Particle3SGD(Optimizer):
         """
         epsilon = 10e-8
 
+        if self.ms_b is None or self.ms_q is None:
+            self.ms_b = []
+            self.ms_q = []
+            self.ms_rx_inp = []
+            self.ms_ry_inp = []
+            self.ms_rx_pos_out = []
+            self.ms_ry_pos_out = []
+            self.ms_rx_neg_out = []
+            self.ms_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.ms_b.append(np.zeros(layer.b.shape))
+                self.ms_q.append(np.zeros(layer.q.shape))
+                self.ms_rx_inp.append(np.zeros(layer.input_size))
+                self.ms_ry_inp.append(np.zeros(layer.input_size))
+                self.ms_rx_pos_out.append(np.zeros(layer.output_size))
+                self.ms_ry_pos_out.append(np.zeros(layer.output_size))
+                self.ms_rx_neg_out.append(np.zeros(layer.output_size))
+                self.ms_ry_neg_out.append(np.zeros(layer.output_size))
+
+        for l, layer in enumerate(network.layers):
+            self.ms_b[l] += self.dc_db[l] ** 2
+            self.ms_q[l] += self.dc_dq[l] ** 2
+
+            self.ms_rx_inp[l] += self.dc_drx_inp[l] ** 2
+            self.ms_ry_inp[l] += self.dc_dry_inp[l] ** 2
+
+            self.ms_rx_pos_out[l] += self.dc_drx_pos_out[l] ** 2
+            self.ms_ry_pos_out[l] += self.dc_dry_pos_out[l] ** 2
+            self.ms_rx_neg_out[l] += self.dc_drx_neg_out[l] ** 2
+            self.ms_ry_neg_out[l] += self.dc_dry_neg_out[l] ** 2
+
+            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.ms_b[l] + epsilon)
+            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.ms_q[l] + epsilon)
+
+            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.ms_rx_inp[l] + epsilon)
+            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.ms_ry_inp[l] + epsilon)
+
+            layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.ms_rx_pos_out[l] + epsilon)
+            layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.ms_ry_pos_out[l] + epsilon)
+            layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.ms_rx_neg_out[l] + epsilon)
+            layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.ms_ry_neg_out[l] + epsilon)
+
+    def weight_update_rmsprop_momentum(self, network):
+        """
+        Update weights and biases according to rmsprop with momentum
+        """
+        epsilon = 10e-8
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        beta = self.beta
+
+        if self.ms_b is None or self.ms_q is None:
+            self.ms_b = []
+            self.ms_q = []
+            self.ms_rx_inp = []
+            self.ms_ry_inp = []
+            self.ms_rx_pos_out = []
+            self.ms_ry_pos_out = []
+            self.ms_rx_neg_out = []
+            self.ms_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.ms_b.append(np.zeros(layer.b.shape))
+                self.ms_q.append(np.zeros(layer.q.shape))
+                self.ms_rx_inp.append(np.zeros(layer.input_size))
+                self.ms_ry_inp.append(np.zeros(layer.input_size))
+                self.ms_rx_pos_out.append(np.zeros(layer.output_size))
+                self.ms_ry_pos_out.append(np.zeros(layer.output_size))
+                self.ms_rx_neg_out.append(np.zeros(layer.output_size))
+                self.ms_ry_neg_out.append(np.zeros(layer.output_size))
+
         # Initialize velocities to zero for momentum
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
@@ -313,25 +476,39 @@ class Particle3SGD(Optimizer):
                 self.vel_ry_neg_out.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
-            self.vel_b[l] += self.dc_db[l] ** 2
-            self.vel_q[l] += self.dc_dq[l] ** 2
+            self.ms_b[l] = gamma * self.ms_b[l] + one_m_gamma * self.dc_db[l] ** 2
+            self.ms_q[l] = gamma * self.ms_q[l] + one_m_gamma * self.dc_dq[l] ** 2
+            self.ms_rx_inp[l] = gamma * self.ms_rx_inp[l] + one_m_gamma * self.dc_drx_inp[l] ** 2
+            self.ms_ry_inp[l] = gamma * self.ms_ry_inp[l] + one_m_gamma * self.dc_dry_inp[l] ** 2
+            self.ms_rx_pos_out[l] = gamma * self.ms_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l] ** 2
+            self.ms_ry_pos_out[l] = gamma * self.ms_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l] ** 2
+            self.ms_rx_neg_out[l] = gamma * self.ms_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l] ** 2
+            self.ms_ry_neg_out[l] = gamma * self.ms_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l] ** 2
 
-            self.vel_rx_inp[l] += self.dc_drx_inp[l] ** 2
-            self.vel_ry_inp[l] += self.dc_dry_inp[l] ** 2
+            self.vel_b[l] *= beta
+            self.vel_q[l] *= beta
+            self.vel_rx_inp[l] *= beta
+            self.vel_ry_inp[l] *= beta
+            self.vel_rx_pos_out[l] *= beta
+            self.vel_ry_pos_out[l] *= beta
+            self.vel_rx_neg_out[l] *= beta
+            self.vel_ry_neg_out[l] *= beta
 
-            self.vel_rx_pos_out[l] += self.dc_drx_pos_out[l] ** 2
-            self.vel_ry_pos_out[l] += self.dc_dry_pos_out[l] ** 2
-            self.vel_rx_neg_out[l] += self.dc_drx_neg_out[l] ** 2
-            self.vel_ry_neg_out[l] += self.dc_dry_neg_out[l] ** 2
+            self.vel_b[l] += -self.alpha * self.dc_db[l] / np.sqrt(self.ms_b[l] + epsilon)
+            self.vel_q[l] += -self.alpha * self.dc_dq[l] / np.sqrt(self.ms_q[l] + epsilon)
+            self.vel_rx_inp[l] += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.ms_rx_inp[l] + epsilon)
+            self.vel_ry_inp[l] += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.ms_ry_inp[l] + epsilon)
+            self.vel_rx_pos_out[l] += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.ms_rx_pos_out[l] + epsilon)
+            self.vel_ry_pos_out[l] += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.ms_ry_pos_out[l] + epsilon)
+            self.vel_rx_neg_out[l] += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.ms_rx_neg_out[l] + epsilon)
+            self.vel_ry_neg_out[l] += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.ms_ry_neg_out[l] + epsilon)
 
-            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
-            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
-
-            layer.rx_inp += -self.alpha * self.dc_drx_inp[l] / np.sqrt(self.vel_rx_inp[l] + epsilon)
-            layer.ry_inp += -self.alpha * self.dc_dry_inp[l] / np.sqrt(self.vel_ry_inp[l] + epsilon)
-
-            layer.rx_pos_out += -self.alpha * self.dc_drx_pos_out[l] / np.sqrt(self.vel_rx_pos_out[l] + epsilon)
-            layer.ry_pos_out += -self.alpha * self.dc_dry_pos_out[l] / np.sqrt(self.vel_ry_pos_out[l] + epsilon)
-            layer.rx_neg_out += -self.alpha * self.dc_drx_neg_out[l] / np.sqrt(self.vel_rx_neg_out[l] + epsilon)
-            layer.ry_neg_out += -self.alpha * self.dc_dry_neg_out[l] / np.sqrt(self.vel_ry_neg_out[l] + epsilon)
+            layer.b += self.vel_b[l]
+            layer.q += self.vel_q[l]
+            layer.rx_inp += self.vel_rx_inp[l]
+            layer.ry_inp += self.vel_ry_inp[l]
+            layer.rx_pos_out += self.vel_rx_pos_out[l]
+            layer.ry_pos_out += self.vel_ry_pos_out[l]
+            layer.rx_neg_out += self.vel_rx_neg_out[l]
+            layer.ry_neg_out += self.vel_ry_neg_out[l]
 

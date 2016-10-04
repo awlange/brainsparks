@@ -2,10 +2,9 @@
 Script entry point
 """
 
-from src.calrissian.particle3_network import Particle3Network
-from src.calrissian.layers.particle3 import Particle3
-from src.calrissian.optimizers.particle3_sgd import Particle3SGD
-from src.calrissian.regularization.particle3_regularize_l2 import Particle3RegularizeL2
+from src.calrissian.particle4_network import Particle4Network
+from src.calrissian.layers.particle4 import Particle4
+from src.calrissian.optimizers.particle4_sgd import Particle4SGD
 
 import numpy as np
 
@@ -18,9 +17,9 @@ def main():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = Particle3Network(cost="mse")
-    net.append(Particle3(2, 5, activation="sigmoid"))
-    net.append(Particle3(5, 3, activation="sigmoid"))
+    net = Particle4Network(cost="mse")
+    net.append(Particle4(2, 5, activation="sigmoid"))
+    net.append(Particle4(5, 3, activation="sigmoid"))
 
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
@@ -29,14 +28,14 @@ def main():
 
 def main2():
 
-    sgd = Particle3SGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="momentum", beta=0.5)
+    sgd = Particle4SGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="momentum", beta=0.5)
 
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = Particle3Network(cost="mse")
-    net.append(Particle3(2, 5, activation="sigmoid"))
-    net.append(Particle3(5, 3, activation="sigmoid"))
+    net = Particle4Network(cost="mse")
+    net.append(Particle4(2, 5, activation="sigmoid"))
+    net.append(Particle4(5, 3, activation="sigmoid"))
 
     sgd.optimize(net, train_X, train_Y)
 
@@ -46,9 +45,9 @@ def main3():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = Particle3Network(cost="mse")
-    net.append(Particle3(2, 5, activation="sigmoid"))
-    net.append(Particle3(5, 3, activation="sigmoid"))
+    net = Particle4Network(cost="mse")
+    net.append(Particle4(2, 5, activation="sigmoid"))
+    net.append(Particle4(5, 3, activation="sigmoid"))
 
     print(net.predict(train_X))
     #
@@ -68,17 +67,16 @@ def fd():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = Particle3Network(cost="categorical_cross_entropy", regularizer=Particle3RegularizeL2(coeff_lambda=1.7))
-    # net = Particle3Network(cost="categorical_cross_entropy")
-    net.append(Particle3(2, 5, activation="sigmoid", potential="lorentzian"))
-    net.append(Particle3(5, 4, activation="sigmoid"))
-    net.append(Particle3(4, 3, activation="softmax"))
+    net = Particle4Network(cost="categorical_cross_entropy", regularizer=None)
+    net.append(Particle4(2, 5, activation="sigmoid"))
+    net.append(Particle4(5, 4, activation="sigmoid"))
+    net.append(Particle4(4, 3, activation="softmax"))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dq, drx_inp, dry_inp, drx_pos_out, dry_pos_out, drx_neg_out, dry_neg_out = net.cost_gradient(train_X, train_Y)
+    db, dq, drx_pos_inp, dry_pos_inp, drx_neg_inp, dry_neg_inp, drx_pos_out, dry_pos_out, drx_neg_out, dry_neg_out = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -122,12 +120,12 @@ def fd():
     for x in fd_q:
         print(x)
 
-    print("analytic x input")
-    for layer in drx_inp:
+    print("analytic x pos input")
+    for layer in drx_pos_inp:
         print(layer)
 
-    print("analytic y input")
-    for layer in dry_inp:
+    print("analytic y pos input")
+    for layer in dry_pos_inp:
         print(layer)
 
     fd_r_x = []
@@ -138,30 +136,73 @@ def fd():
         lr_y = []
         for i in range(layer.input_size):
             # x
-            orig = layer.rx_inp[i]
-            layer.rx_inp[i] += h
+            orig = layer.rx_pos_inp[i]
+            layer.rx_pos_inp[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.rx_inp[i] -= 2*h
+            layer.rx_pos_inp[i] -= 2*h
             fm = net.cost(train_X, train_Y)
             lr_x.append((fp - fm) / (2*h))
-            layer.rx_inp[i] = orig
+            layer.rx_pos_inp[i] = orig
 
             # y
-            orig = layer.ry_inp[i]
-            layer.ry_inp[i] += h
+            orig = layer.ry_pos_inp[i]
+            layer.ry_pos_inp[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.ry_inp[i] -= 2*h
+            layer.ry_pos_inp[i] -= 2*h
             fm = net.cost(train_X, train_Y)
             lr_y.append((fp - fm) / (2*h))
-            layer.ry_inp[i] = orig
+            layer.ry_pos_inp[i] = orig
 
         fd_r_x.append(lr_x)
         fd_r_y.append(lr_y)
 
-    print("numerical r x input")
+    print("numerical pos x input")
     for f in fd_r_x:
         print(f)
-    print("numerical r y input")
+    print("numerical pos y input")
+    for f in fd_r_y:
+        print(f)
+
+    print("analytic x neg input")
+    for layer in drx_neg_inp:
+        print(layer)
+
+    print("analytic y neg input")
+    for layer in dry_neg_inp:
+        print(layer)
+
+    fd_r_x = []
+    fd_r_y = []
+
+    for layer in net.layers:
+        lr_x = []
+        lr_y = []
+        for i in range(layer.input_size):
+            # x
+            orig = layer.rx_neg_inp[i]
+            layer.rx_neg_inp[i] += h
+            fp = net.cost(train_X, train_Y)
+            layer.rx_neg_inp[i] -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lr_x.append((fp - fm) / (2*h))
+            layer.rx_neg_inp[i] = orig
+
+            # y
+            orig = layer.ry_neg_inp[i]
+            layer.ry_neg_inp[i] += h
+            fp = net.cost(train_X, train_Y)
+            layer.ry_neg_inp[i] -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lr_y.append((fp - fm) / (2*h))
+            layer.ry_neg_inp[i] = orig
+
+        fd_r_x.append(lr_x)
+        fd_r_y.append(lr_y)
+
+    print("numerical neg x input")
+    for f in fd_r_x:
+        print(f)
+    print("numerical neg y input")
     for f in fd_r_y:
         print(f)
 

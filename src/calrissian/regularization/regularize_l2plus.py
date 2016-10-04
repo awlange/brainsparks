@@ -40,8 +40,8 @@ class RegularizeL2Plus(object):
             wt = layer.w.transpose()
             for j in range(layer.output_size):
                 for k in range(layer.output_size):
-                    c += np.abs(wt[j].dot(wt[k]))
-                    # c += (wt[j].dot(wt[k]))**2
+                    # c += np.abs(wt[j].dot(wt[k]))
+                    c += (wt[j].dot(wt[k]))**2
         return self.coeff_lambda * c
 
     def cost_gradient(self, layers, dc_db, dc_dw):
@@ -91,8 +91,8 @@ class RegularizeL2Plus(object):
             tmp = np.zeros_like(wt)
             for j in range(layer.output_size):
                 for k in range(layer.output_size):
-                    s = 2 * np.sign(wt[j].dot(wt[k]))
-                    # s = 2 * wt[j].dot(wt[k])
+                    # s = 2 * np.sign(wt[j].dot(wt[k]))
+                    s = 2 * wt[j].dot(wt[k])
                     tmp[j] += wt[k] * s
             dc_dw[l] += self.coeff_lambda * tmp.transpose()
 

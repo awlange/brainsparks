@@ -1,12 +1,12 @@
 from .cost import Cost
 
-from .layers.particle2_dipole import Particle2Dipole
+from .layers.particle3 import Particle3
 
 import numpy as np
 import json
 
 
-class Particle2DipoleNetwork(object):
+class Particle4Network(object):
 
     def __init__(self, cost="mse", regularizer=None):
         self.layers = []
@@ -105,16 +105,12 @@ class Particle2DipoleNetwork(object):
         dc_dq = []
         dc_drx_pos_inp = []
         dc_dry_pos_inp = []
-        dc_drz_pos_inp = []
         dc_drx_neg_inp = []
         dc_dry_neg_inp = []
-        dc_drz_neg_inp = []
         dc_drx_pos_out = []
         dc_dry_pos_out = []
-        dc_drz_pos_out = []
         dc_drx_neg_out = []
         dc_dry_neg_out = []
-        dc_drz_neg_out = []
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -122,16 +118,12 @@ class Particle2DipoleNetwork(object):
             dc_dq.append(np.zeros(layer.q.shape))
             dc_drx_pos_inp.append(np.zeros(layer.input_size))
             dc_dry_pos_inp.append(np.zeros(layer.input_size))
-            dc_drz_pos_inp.append(np.zeros(layer.input_size))
             dc_drx_neg_inp.append(np.zeros(layer.input_size))
             dc_dry_neg_inp.append(np.zeros(layer.input_size))
-            dc_drz_neg_inp.append(np.zeros(layer.input_size))
             dc_drx_pos_out.append(np.zeros(layer.output_size))
             dc_dry_pos_out.append(np.zeros(layer.output_size))
-            dc_drz_pos_out.append(np.zeros(layer.output_size))
             dc_drx_neg_out.append(np.zeros(layer.output_size))
             dc_dry_neg_out.append(np.zeros(layer.output_size))
-            dc_drz_neg_out.append(np.zeros(layer.output_size))
 
         sigma_Z = []
         A = [data_X]  # Note: A has one more element than sigma_Z
@@ -151,19 +143,12 @@ class Particle2DipoleNetwork(object):
         for layer in self.layers:
             layer.rx_pos_inp = layer.rx_pos_inp.reshape((layer.input_size, 1))
             layer.ry_pos_inp = layer.ry_pos_inp.reshape((layer.input_size, 1))
-            layer.rz_pos_inp = layer.rz_pos_inp.reshape((layer.input_size, 1))
-
             layer.rx_neg_inp = layer.rx_neg_inp.reshape((layer.input_size, 1))
             layer.ry_neg_inp = layer.ry_neg_inp.reshape((layer.input_size, 1))
-            layer.rz_neg_inp = layer.rz_neg_inp.reshape((layer.input_size, 1))
-
             layer.rx_pos_out = layer.rx_pos_out.reshape((layer.output_size, 1))
             layer.ry_pos_out = layer.ry_pos_out.reshape((layer.output_size, 1))
-            layer.rz_pos_out = layer.rz_pos_out.reshape((layer.output_size, 1))
-
             layer.rx_neg_out = layer.rx_neg_out.reshape((layer.output_size, 1))
             layer.ry_neg_out = layer.ry_neg_out.reshape((layer.output_size, 1))
-            layer.rz_neg_out = layer.rz_neg_out.reshape((layer.output_size, 1))
 
         l = -1
         layer = self.layers[l]
@@ -185,78 +170,75 @@ class Particle2DipoleNetwork(object):
 
             dx_pos_pos = (layer.rx_pos_inp - layer.rx_pos_out[j])
             dy_pos_pos = (layer.ry_pos_inp - layer.ry_pos_out[j])
-            dz_pos_pos = (layer.rz_pos_inp - layer.rz_pos_out[j])
-            tmp = np.exp(-(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2))
+            tmp = np.exp(-(dx_pos_pos**2 + dy_pos_pos**2))
             dx_pos_pos *= tmp
             dy_pos_pos *= tmp
-            dz_pos_pos *= tmp
             potential = tmp
 
             dx_pos_neg = (layer.rx_pos_inp - layer.rx_neg_out[j])
             dy_pos_neg = (layer.ry_pos_inp - layer.ry_neg_out[j])
-            dz_pos_neg = (layer.rz_pos_inp - layer.rz_neg_out[j])
-            tmp = -np.exp(-(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2))
+            tmp = -np.exp(-(dx_pos_neg**2 + dy_pos_neg**2))
             dx_pos_neg *= tmp
             dy_pos_neg *= tmp
-            dz_pos_neg *= tmp
             potential += tmp
 
             dx_neg_pos = (layer.rx_neg_inp - layer.rx_pos_out[j])
             dy_neg_pos = (layer.ry_neg_inp - layer.ry_pos_out[j])
-            dz_neg_pos = (layer.rz_neg_inp - layer.rz_pos_out[j])
-            tmp = -np.exp(-(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2))
+            tmp = -np.exp(-(dx_neg_pos**2 + dy_neg_pos**2))
             dx_neg_pos *= tmp
             dy_neg_pos *= tmp
-            dz_neg_pos *= tmp
             potential += tmp
 
             dx_neg_neg = (layer.rx_neg_inp - layer.rx_neg_out[j])
             dy_neg_neg = (layer.ry_neg_inp - layer.ry_neg_out[j])
-            dz_neg_neg = (layer.rz_neg_inp - layer.rz_neg_out[j])
-            tmp = np.exp(-(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2))
+            tmp = np.exp(-(dx_neg_neg**2 + dy_neg_neg**2))
             dx_neg_neg *= tmp
             dy_neg_neg *= tmp
-            dz_neg_neg *= tmp
             potential += tmp
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * potential * trans_sigma_Z_l
 
             # Charge gradient
-            dq = potential * Al_trans * trans_delta_L_j
+            atj = Al_trans * trans_delta_L_j
+            dq = potential * atj
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
-            # tmp = qj * dq / potential
-            tmp = 2 * qj * (Al_trans * trans_delta_L_j)
+            tmp = 2.0 * qj * atj
 
             dc_drx_pos_out[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
             dc_dry_pos_out[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
-            dc_drz_pos_out[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
 
             dc_drx_pos_inp[l] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
             dc_dry_pos_inp[l] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-            dc_drz_pos_inp[l] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
 
             dc_drx_neg_out[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
             dc_dry_neg_out[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
-            dc_drz_neg_out[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
 
             dc_drx_neg_inp[l] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
             dc_dry_neg_inp[l] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
-            dc_drz_neg_inp[l] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
-            # dc_drx_pos_out[l][j] += np.sum((dx_pos_pos) * tmp)
-            # dc_dry_pos_out[l][j] += np.sum((dy_pos_pos) * tmp)
-            # dc_drz_pos_out[l][j] += np.sum((dz_pos_pos) * tmp)
+            # if self.regularizer is not None:
+            #     # ----- L2 regularized w_ij
+            #     coeff_lambda = self.regularizer.coeff_lambda
+            #     w_ij = qj * potential
             #
-            # dc_drx_pos_inp[l] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
-            # dc_dry_pos_inp[l] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-            # dc_drz_pos_inp[l] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+            #     # Charge gradient
+            #     dq = 2.0 * coeff_lambda * w_ij * potential
+            #     dc_dq[l][j] += np.sum(dq)
             #
-            # dc_drx_neg_out[l][j] += np.sum((dx_pos_neg) * tmp)
-            # dc_dry_neg_out[l][j] += np.sum((dy_pos_neg) * tmp)
-            # dc_drz_neg_out[l][j] += np.sum((dz_pos_neg) * tmp)
+            #     # Position gradient
+            #     tmp = 2.0 * qj * (2.0 * coeff_lambda * w_ij)
+            #
+            #     dc_drx_pos_out[l][j] += np.sum(dx_pos * tmp)
+            #     dc_dry_pos_out[l][j] += np.sum(dy_pos * tmp)
+            #
+            #     dc_drx_pos_inp[l] -= np.sum((dx_pos + dx_neg) * tmp, axis=1)
+            #     dc_dry_pos_inp[l] -= np.sum((dy_pos + dy_neg) * tmp, axis=1)
+            #
+            #     dc_drx_neg_out[l][j] += np.sum(dx_neg * tmp)
+            #     dc_dry_neg_out[l][j] += np.sum(dy_neg * tmp)
 
         l = -1
         while -l < len(self.layers):
@@ -283,101 +265,94 @@ class Particle2DipoleNetwork(object):
 
                 dx_pos_pos = (layer.rx_pos_inp - layer.rx_pos_out[j])
                 dy_pos_pos = (layer.ry_pos_inp - layer.ry_pos_out[j])
-                dz_pos_pos = (layer.rz_pos_inp - layer.rz_pos_out[j])
-                tmp = np.exp(-(dx_pos_pos**2 + dy_pos_pos**2 + dz_pos_pos**2))
+                tmp = np.exp(-(dx_pos_pos ** 2 + dy_pos_pos ** 2))
                 dx_pos_pos *= tmp
                 dy_pos_pos *= tmp
-                dz_pos_pos *= tmp
                 potential = tmp
 
                 dx_pos_neg = (layer.rx_pos_inp - layer.rx_neg_out[j])
                 dy_pos_neg = (layer.ry_pos_inp - layer.ry_neg_out[j])
-                dz_pos_neg = (layer.rz_pos_inp - layer.rz_neg_out[j])
-                tmp = -np.exp(-(dx_pos_neg**2 + dy_pos_neg**2 + dz_pos_neg**2))
+                tmp = -np.exp(-(dx_pos_neg ** 2 + dy_pos_neg ** 2))
                 dx_pos_neg *= tmp
                 dy_pos_neg *= tmp
-                dz_pos_neg *= tmp
                 potential += tmp
 
                 dx_neg_pos = (layer.rx_neg_inp - layer.rx_pos_out[j])
                 dy_neg_pos = (layer.ry_neg_inp - layer.ry_pos_out[j])
-                dz_neg_pos = (layer.rz_neg_inp - layer.rz_pos_out[j])
-                tmp = -np.exp(-(dx_neg_pos**2 + dy_neg_pos**2 + dz_neg_pos**2))
+                tmp = -np.exp(-(dx_neg_pos ** 2 + dy_neg_pos ** 2))
                 dx_neg_pos *= tmp
                 dy_neg_pos *= tmp
-                dz_neg_pos *= tmp
                 potential += tmp
 
                 dx_neg_neg = (layer.rx_neg_inp - layer.rx_neg_out[j])
                 dy_neg_neg = (layer.ry_neg_inp - layer.ry_neg_out[j])
-                dz_neg_neg = (layer.rz_neg_inp - layer.rz_neg_out[j])
-                tmp = np.exp(-(dx_neg_neg**2 + dy_neg_neg**2 + dz_neg_neg**2))
+                tmp = np.exp(-(dx_neg_neg ** 2 + dy_neg_neg ** 2))
                 dx_neg_neg *= tmp
                 dy_neg_neg *= tmp
-                dz_neg_neg *= tmp
                 potential += tmp
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * potential * trans_sigma_Z_l
 
                 # Charge gradient
-                dq = potential * Al_trans * this_delta_j
+                atj = Al_trans * this_delta_j
+                dq = potential * atj
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
-                # tmp = qj * dq / potential
-                tmp = 2 * qj * (Al_trans * this_delta_j)
-
+                tmp = 2.0 * qj * atj
                 dc_drx_pos_out[l][j] += np.sum((dx_pos_pos + dx_neg_pos) * tmp)
                 dc_dry_pos_out[l][j] += np.sum((dy_pos_pos + dy_neg_pos) * tmp)
-                dc_drz_pos_out[l][j] += np.sum((dz_pos_pos + dz_neg_pos) * tmp)
 
                 dc_drx_pos_inp[l] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
                 dc_dry_pos_inp[l] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-                dc_drz_pos_inp[l] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
 
                 dc_drx_neg_out[l][j] += np.sum((dx_pos_neg + dx_neg_neg) * tmp)
                 dc_dry_neg_out[l][j] += np.sum((dy_pos_neg + dy_neg_neg) * tmp)
-                dc_drz_neg_out[l][j] += np.sum((dz_pos_neg + dz_neg_neg) * tmp)
 
                 dc_drx_neg_inp[l] -= np.sum((dx_neg_pos + dx_neg_neg) * tmp, axis=1)
                 dc_dry_neg_inp[l] -= np.sum((dy_neg_pos + dy_neg_neg) * tmp, axis=1)
-                dc_drz_neg_inp[l] -= np.sum((dz_neg_pos + dz_neg_neg) * tmp, axis=1)
 
-                # dc_drx_pos_out[l][j] += np.sum((dx_pos_pos) * tmp)
-                # dc_dry_pos_out[l][j] += np.sum((dy_pos_pos) * tmp)
-                # dc_drz_pos_out[l][j] += np.sum((dz_pos_pos) * tmp)
+                # if self.regularizer is not None:
+                #     # ----- L2 regularized w_ij
+                #     coeff_lambda = self.regularizer.coeff_lambda
+                #     w_ij = qj * potential
                 #
-                # dc_drx_pos_inp[l] -= np.sum((dx_pos_pos + dx_pos_neg) * tmp, axis=1)
-                # dc_dry_pos_inp[l] -= np.sum((dy_pos_pos + dy_pos_neg) * tmp, axis=1)
-                # dc_drz_pos_inp[l] -= np.sum((dz_pos_pos + dz_pos_neg) * tmp, axis=1)
+                #     # Charge gradient
+                #     dq = 2.0 * coeff_lambda * w_ij * potential
+                #     dc_dq[l][j] += np.sum(dq)
                 #
-                # dc_drx_neg_out[l][j] += np.sum((dx_pos_neg) * tmp)
-                # dc_dry_neg_out[l][j] += np.sum((dy_pos_neg) * tmp)
-                # dc_drz_neg_out[l][j] += np.sum((dz_pos_neg) * tmp)
+                #     # Position gradient
+                #     tmp = 2.0 * qj * (2.0 * coeff_lambda * w_ij)
+                #
+                #     dc_drx_pos_out[l][j] += np.sum(dx_pos * tmp)
+                #     dc_dry_pos_out[l][j] += np.sum(dy_pos * tmp)
+                #
+                #     dc_drx_pos_inp[l] -= np.sum((dx_pos + dx_neg) * tmp, axis=1)
+                #     dc_dry_pos_inp[l] -= np.sum((dy_pos + dy_neg) * tmp, axis=1)
+                #
+                #     dc_drx_neg_out[l][j] += np.sum(dx_neg * tmp)
+                #     dc_dry_neg_out[l][j] += np.sum(dy_neg * tmp)
 
         # Reshape positions
         for layer in self.layers:
-            # TODO: temporarily zeroing out z for 2D
             layer.rx_pos_inp = layer.rx_pos_inp.reshape((layer.input_size, ))
             layer.ry_pos_inp = layer.ry_pos_inp.reshape((layer.input_size, ))
-            layer.rz_pos_inp = layer.rz_pos_inp.reshape((layer.input_size, )) * 0.0
-
             layer.rx_neg_inp = layer.rx_neg_inp.reshape((layer.input_size, ))
             layer.ry_neg_inp = layer.ry_neg_inp.reshape((layer.input_size, ))
-            layer.rz_neg_inp = layer.rz_neg_inp.reshape((layer.input_size, )) * 0.0
-
             layer.rx_pos_out = layer.rx_pos_out.reshape((layer.output_size, ))
             layer.ry_pos_out = layer.ry_pos_out.reshape((layer.output_size, ))
-            layer.rz_pos_out = layer.rz_pos_out.reshape((layer.output_size, )) * 0.0
-
             layer.rx_neg_out = layer.rx_neg_out.reshape((layer.output_size, ))
             layer.ry_neg_out = layer.ry_neg_out.reshape((layer.output_size, ))
-            layer.rz_neg_out = layer.rz_neg_out.reshape((layer.output_size, )) * 0.0
+
+        if self.regularizer is not None:
+            dc_dq = self.regularizer.cost_gradient(self.layers, dc_dq)
 
         return dc_db, dc_dq, \
-               dc_drx_pos_inp, dc_dry_pos_inp, dc_drz_pos_inp, dc_drx_neg_inp, dc_dry_neg_inp, dc_drz_neg_inp, \
-               dc_drx_pos_out, dc_dry_pos_out, dc_drz_pos_out, dc_drx_neg_out, dc_dry_neg_out, dc_drz_neg_out
+               dc_drx_pos_inp, dc_dry_pos_inp, \
+               dc_drx_neg_inp, dc_dry_neg_inp, \
+               dc_drx_pos_out, dc_dry_pos_out, \
+               dc_drx_neg_out, dc_dry_neg_out
 
     def fit(self, data_X, data_Y, optimizer):
         """

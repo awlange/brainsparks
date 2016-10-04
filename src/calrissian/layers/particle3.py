@@ -1,5 +1,6 @@
 from .layer import Layer
 from ..activation import Activation
+from ..potential import Potential
 
 import numpy as np
 
@@ -9,13 +10,15 @@ class Particle3(object):
     2D monopole input, dipole output
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", s=1.0, q=None, b=None):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian", s=1.0, q=None, b=None):
 
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
+        self.potential = Potential.get(potential)
+        self.d_potential = Potential.get_d(potential)
 
         self.w = None
 
@@ -47,11 +50,15 @@ class Particle3(object):
         for j in range(self.output_size):
             dx = self.rx_inp - self.rx_pos_out[j]
             dy = self.ry_inp - self.ry_pos_out[j]
-            potential = np.exp(-(dx**2 + dy**2))
+            # potential = np.exp(-(dx**2 + dy**2))
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            potential = self.potential(r)
 
             dx = self.rx_inp - self.rx_neg_out[j]
             dy = self.ry_inp - self.ry_neg_out[j]
-            potential -= np.exp(-(dx**2 + dy**2))
+            # potential -= np.exp(-(dx**2 + dy**2))
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            potential -= self.potential(r)
 
             z[j] = self.b[0][j] + self.q[j] * potential.dot(atrans)
         return z.transpose()
@@ -67,11 +74,15 @@ class Particle3(object):
         for j in range(self.output_size):
             dx = self.rx_inp - self.rx_pos_out[j]
             dy = self.ry_inp - self.ry_pos_out[j]
-            potential = np.exp(-(dx**2 + dy**2))
+            # potential = np.exp(-(dx**2 + dy**2))
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            potential = self.potential(r)
 
             dx = self.rx_inp - self.rx_neg_out[j]
             dy = self.ry_inp - self.ry_neg_out[j]
-            potential -= np.exp(-(dx**2 + dy**2))
+            # potential -= np.exp(-(dx**2 + dy**2))
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            potential -= self.potential(r)
 
             potential = self.q[j] * potential
             for i in range(self.input_size):
@@ -79,3 +90,18 @@ class Particle3(object):
 
         self.w = w
         return w
+
+    def compute_w_sum_square(self):
+        total = 0.0
+        for j in range(self.output_size):
+            dx = self.rx_inp - self.rx_pos_out[j]
+            dy = self.ry_inp - self.ry_pos_out[j]
+            potential = np.exp(-(dx**2 + dy**2))
+
+            dx = self.rx_inp - self.rx_neg_out[j]
+            dy = self.ry_inp - self.ry_neg_out[j]
+            potential -= np.exp(-(dx**2 + dy**2))
+
+            potential = self.q[j] * potential
+            total += np.sum(potential * potential)
+        return total
