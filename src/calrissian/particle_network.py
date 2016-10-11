@@ -2,6 +2,9 @@ from .cost import Cost
 
 from .layers.particle import Particle
 from .layers.particle import ParticleInput
+from .regularization.particle_regularize_l2 import ParticleRegularizeL2
+from .regularization.particle_regularize_l2plus import ParticleRegularizeL2Plus
+from .regularization.particle_regularize_orthogonal import ParticleRegularizeOrthogonal
 
 import numpy as np
 import json
@@ -109,6 +112,7 @@ class ParticleNetwork(object):
         dc_dr_y = [np.zeros(self.particle_input.output_size)]
         dc_dr_z = [np.zeros(self.particle_input.output_size)]
         dc_dt = [np.zeros(self.particle_input.output_size)]
+        # dc_dzeta = [np.zeros(self.particle_input.output_size)]
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -118,12 +122,22 @@ class ParticleNetwork(object):
             dc_dr_y.append(np.zeros(len(layer.q)))
             dc_dr_z.append(np.zeros(len(layer.q)))
             dc_dt.append(np.zeros(layer.theta.shape))
+            # dc_dzeta.append(np.zeros(layer.zeta.shape))
+
+        # Regularization options
+        l2 = self.regularizer is not None and isinstance(self.regularizer, ParticleRegularizeL2)
+        # L2plus
+        l2plus = self.regularizer is not None and isinstance(self.regularizer, ParticleRegularizeL2Plus)
+        # Ortho
+        ortho = self.regularizer is not None and isinstance(self.regularizer, ParticleRegularizeOrthogonal)
 
         sigma_Z = []
         A_scaled, _ = self.particle_input.feed_forward(data_X)
         A = [A_scaled]  # Note: A has one more element than sigma_Z
         prev_layer_rr = self.particle_input.get_rxyz()
         for l, layer in enumerate(self.layers):
+            if l2plus:
+                layer.compute_w(prev_layer_rr)
             z = layer.compute_z(A[l], prev_layer_rr)
             a = layer.compute_a(z)
             A.append(a)
@@ -142,9 +156,22 @@ class ParticleNetwork(object):
         for di, data in enumerate(data_X):
             dc_db[-1] += delta_L[di]
 
+        # Reshape positions
+        self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, 1))
+        self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, 1))
+        self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, 1))
+        # self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, 1))
+        self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, 1))
+        for layer in self.layers:
+            layer.rx = layer.rx.reshape((layer.output_size, 1))
+            layer.ry = layer.ry.reshape((layer.output_size, 1))
+            layer.rz = layer.rz.reshape((layer.output_size, 1))
+            # layer.zeta = layer.zeta.reshape((layer.output_size, 1))
+            layer.theta = layer.theta.reshape((layer.output_size, 1))
+
         l = -1
         layer = self.layers[l]
-        prev_layer = self.layers[l-1]
+        prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
 
         Al = A[l-1]
         Al_trans = Al.transpose()
@@ -155,21 +182,33 @@ class ParticleNetwork(object):
 
         next_delta = np.zeros((len(prev_layer.rx), len(data_X)))
 
+        # Ortho help
+        wt = None
+        dd = None
+        if ortho:
+            wt = layer.w.transpose().copy()
+            dd = np.zeros(layer.output_size)
+            for j in range(layer.output_size):
+                dd[j] = np.sqrt(wt[j].dot(wt[j]))
+                wt[j] = wt[j] / dd[j]
+
         # Position gradient
         for j in range(layer.output_size):
             qj = layer.q[j]
             trans_delta_L_j = trans_delta_L[j]
-            trans_sigma_Z_l = trans_sigma_Z[l-1]
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
 
-            dx = (prev_layer.rx - layer.rx[j]).reshape((prev_layer.output_size, 1))
-            dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
-            dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
+            dx = (prev_layer.rx - layer.rx[j])
+            dy = (prev_layer.ry - layer.ry[j])
+            dz = (prev_layer.rz - layer.rz[j])
             d2 = dx**2 + dy**2 + dz**2
-            exp_dij = np.exp(-layer.zeta * d2)
+            # zeta_i = prev_layer.zeta
+            # zeta_ij = zeta_i * layer.zeta[j]
+            exp_dij = np.exp(-d2)
 
             dt = 0.0
             if layer.phase_enabled and prev_layer.phase_enabled:
-                dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
+                dt = (prev_layer.theta - layer.theta[j])
                 exp_dij *= np.cos(dt)
 
             # Next delta
@@ -180,37 +219,7 @@ class ParticleNetwork(object):
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
-            tmp = 2.0 * layer.zeta * qj * dq
-            tx = dx * tmp
-            ty = dy * tmp
-            tz = dz * tmp
-
-            dc_dr_x[l][j] += np.sum(tx)
-            dc_dr_y[l][j] += np.sum(ty)
-            dc_dr_z[l][j] += np.sum(tz)
-
-            dc_dr_x[l-1] -= np.sum(tx, axis=1)
-            dc_dr_y[l-1] -= np.sum(ty, axis=1)
-            dc_dr_z[l-1] -= np.sum(tz, axis=1)
-
-            if layer.phase_enabled and prev_layer.phase_enabled:
-                # Phase gradient
-                # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                dq *= -np.tan(dt)
-                tmp = qj * dq
-                dc_dt[l][j] -= np.sum(tmp)
-                dc_dt[l-1] += np.sum(tmp, axis=1)
-
-            # ----- L2 regularized w_ij by position
-            coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-            w_ij = qj * exp_dij * np.cos(dt)
-
-            # Charge gradient
-            dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
-            # dq = coeff_lambda * np.sign(w_ij) np.abs(w_ij / qj)
-            dc_dq[l][j] += np.sum(dq)
-
-            # Position gradient
+            # tmp = 2.0 * zeta_ij * qj * dq
             tmp = 2.0 * qj * dq
             tx = dx * tmp
             ty = dy * tmp
@@ -224,84 +233,112 @@ class ParticleNetwork(object):
             dc_dr_y[l-1] -= np.sum(ty, axis=1)
             dc_dr_z[l-1] -= np.sum(tz, axis=1)
 
-            # Phase
+            # # Width gradient
+            # tmp = -qj * dq * d2
+            # dc_dzeta[l][j] += np.sum(tmp * zeta_i)
+            # dc_dzeta[l-1] += np.sum(tmp * layer.zeta[j], axis=1)
+
             if layer.phase_enabled and prev_layer.phase_enabled:
+                # Phase gradient
+                # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
                 dq *= -np.tan(dt)
                 tmp = qj * dq
                 dc_dt[l][j] -= np.sum(tmp)
                 dc_dt[l-1] += np.sum(tmp, axis=1)
 
-        l = -1
-        while -l < len(self.layers):
-            l -= 1
-            # Gradient computation
-            layer = self.layers[l]
-            prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
+            # Ortho help
+            s = None
+            if ortho:
+                s = 2 * self.regularizer.coeff_lambda * (np.eye(len(wt[j])) - np.outer(wt[j], wt[j])) / dd[j]
 
-            Al = A[l-1]
-            Al_trans = Al.transpose()
+            # ----- L2 regularized w_ij by position
+            if l2plus:
+                coeff_lambda = self.regularizer.coeff_lambda
+                # Should be computed from before
+                wt = layer.w.transpose()
 
-            this_delta = next_delta
-            next_delta = np.zeros((prev_layer.output_size, len(data_X)))
-            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
+                for kk in range(layer.output_size):
+                    if j == kk:
+                        continue
 
-            # Bias gradient
-            trans_delta = this_delta.transpose()
-            for di, data in enumerate(data_X):
-                dc_db[l] += trans_delta[di]
+                    s = np.sign(wt[j].dot(wt[kk]))
+                    # s = 2 * wt[j].dot(wt[kk])
+                    dq = 2 * coeff_lambda * s * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
 
-            # Position gradient
-            for j in range(layer.output_size):
-                qj = layer.q[j]
-                this_delta_j = this_delta[j]
+                    # Charge
+                    dc_dq[l][j] += np.sum(dq)
 
-                dx = (prev_layer.rx - layer.rx[j]).reshape((prev_layer.output_size, 1))
-                dy = (prev_layer.ry - layer.ry[j]).reshape((prev_layer.output_size, 1))
-                dz = (prev_layer.rz - layer.rz[j]).reshape((prev_layer.output_size, 1))
-                d2 = dx**2 + dy**2 + dz**2
-                exp_dij = np.exp(-layer.zeta * d2)
+                    # Position
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
 
-                dt = 0.0
-                if layer.phase_enabled and prev_layer.phase_enabled:
-                    dt = (prev_layer.theta - layer.theta[j]).reshape((prev_layer.output_size, 1))
-                    exp_dij *= np.cos(dt)
+                    dc_dr_x[l][j] += np.sum(tx)
+                    dc_dr_y[l][j] += np.sum(ty)
+                    dc_dr_z[l][j] += np.sum(tz)
 
-                # Next delta
-                next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
+                    dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                    dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                    dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+                    # Phase
+                    if layer.phase_enabled and prev_layer.phase_enabled:
+                        dq *= -np.tan(dt)
+                        tmp = qj * dq
+                        dc_dt[l][j] -= np.sum(tmp)
+                        dc_dt[l - 1] += np.sum(tmp, axis=1)
+
+            elif ortho:
+                coeff_lambda = self.regularizer.coeff_lambda
+
+                # Should be computed from before
+                # wt = layer.w.transpose()
+
+                for kk in range(layer.output_size):
+                    if j == kk:
+                        continue
+
+                    # dj = np.sqrt(wt[j].dot(wt[j]))
+                    # wtj = wt[j] / dj
+                    # s = 2 * coeff_lambda * (np.eye(len(wtj)) - np.outer(wtj, wtj)) / dj
+                    #
+                    # dk = np.sqrt(wt[kk].dot(wt[kk]))
+                    # wtk = wt[kk] / dk
+                    # dq = (wtk.dot(s) * np.sign(wtj.dot(wtk))).reshape((prev_layer.output_size, 1)) * exp_dij
+
+                    dq = (wt[kk].dot(s) * np.sign(wt[j].dot(wt[kk]))).reshape((prev_layer.output_size, 1)) * exp_dij
+
+                    # Charge
+                    dc_dq[l][j] += np.sum(dq)
+
+                    # Position
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
+
+                    dc_dr_x[l][j] += np.sum(tx)
+                    dc_dr_y[l][j] += np.sum(ty)
+                    dc_dr_z[l][j] += np.sum(tz)
+
+                    dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                    dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                    dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+                    # Phase
+                    if layer.phase_enabled and prev_layer.phase_enabled:
+                        dq *= -np.tan(dt)
+                        tmp = qj * dq
+                        dc_dt[l][j] -= np.sum(tmp)
+                        dc_dt[l - 1] += np.sum(tmp, axis=1)
+
+            elif l2:
+                coeff_lambda = self.regularizer.coeff_lambda
+                w_ij = qj * exp_dij
 
                 # Charge gradient
-                dq = exp_dij * Al_trans * this_delta_j
-                dc_dq[l][j] += np.sum(dq)
-
-                # Position gradient
-                tmp = 2.0 * layer.zeta * qj * dq
-                tx = dx * tmp
-                ty = dy * tmp
-                tz = dz * tmp
-
-                dc_dr_x[l][j] += np.sum(tx)
-                dc_dr_y[l][j] += np.sum(ty)
-                dc_dr_z[l][j] += np.sum(tz)
-
-                dc_dr_x[l-1] -= np.sum(tx, axis=1)
-                dc_dr_y[l-1] -= np.sum(ty, axis=1)
-                dc_dr_z[l-1] -= np.sum(tz, axis=1)
-
-                # Phase gradient
-                if layer.phase_enabled and prev_layer.phase_enabled:
-                    # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                    dq *= -np.tan(dt)  # could use tan but being explicit here
-                    tmp = qj * dq
-                    dc_dt[l][j] -= np.sum(tmp)
-                    dc_dt[l-1] += np.sum(tmp, axis=1)
-
-                # ----- L2 regularized w_ij by position
-                coeff_lambda = self.regularizer.coeff_lambda / self.regularizer.n
-                w_ij = qj * exp_dij * np.cos(dt)
-
-                # Charge gradient
-                dq = 2 * coeff_lambda * w_ij * exp_dij * np.cos(dt)
-                # dq = coeff_lambda * np.sign(w_ij) / qj
+                dq = 2 * coeff_lambda * w_ij * exp_dij
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
@@ -325,12 +362,210 @@ class ParticleNetwork(object):
                     dc_dt[l][j] -= np.sum(tmp)
                     dc_dt[l-1] += np.sum(tmp, axis=1)
 
-        # Zero out z for 2D
-        # for i, d in enumerate(dc_dr_z):
-        #     dc_dr_z[i] = np.zeros_like(d)
+        l = -1
+        while -l < len(self.layers):
+            l -= 1
+            # Gradient computation
+            layer = self.layers[l]
+            prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
+
+            Al = A[l-1]
+            Al_trans = Al.transpose()
+
+            this_delta = next_delta
+            next_delta = np.zeros((prev_layer.output_size, len(data_X)))
+            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
+
+            # Bias gradient
+            trans_delta = this_delta.transpose()
+            for di, data in enumerate(data_X):
+                dc_db[l] += trans_delta[di]
+
+            # Ortho help
+            wt = None
+            dd = None
+            if ortho:
+                wt = layer.w.transpose().copy()
+                dd = np.zeros(layer.output_size)
+                for j in range(layer.output_size):
+                    dd[j] = np.sqrt(wt[j].dot(wt[j]))
+                    wt[j] = wt[j] / dd[j]
+
+            # Position gradient
+            for j in range(layer.output_size):
+                qj = layer.q[j]
+                this_delta_j = this_delta[j]
+
+                dx = (prev_layer.rx - layer.rx[j])
+                dy = (prev_layer.ry - layer.ry[j])
+                dz = (prev_layer.rz - layer.rz[j])
+                d2 = dx**2 + dy**2 + dz**2
+                # zeta_i = prev_layer.zeta
+                # zeta_ij = zeta_i * layer.zeta[j]
+                # exp_dij = np.exp(-zeta_ij * d2)
+                exp_dij = np.exp(-d2)
+
+                dt = 0.0
+                if layer.phase_enabled and prev_layer.phase_enabled:
+                    dt = (prev_layer.theta - layer.theta[j])
+                    exp_dij *= np.cos(dt)
+
+                # Next delta
+                next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
+
+                # Charge gradient
+                dq = exp_dij * Al_trans * this_delta_j
+                dc_dq[l][j] += np.sum(dq)
+
+                # Position gradient
+                # tmp = 2.0 * zeta_ij * qj * dq
+                tmp = 2.0 * qj * dq
+                tx = dx * tmp
+                ty = dy * tmp
+                tz = dz * tmp
+
+                dc_dr_x[l][j] += np.sum(tx)
+                dc_dr_y[l][j] += np.sum(ty)
+                dc_dr_z[l][j] += np.sum(tz)
+
+                dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+                # # Width gradient
+                # tmp = -qj * dq * d2
+                # dc_dzeta[l][j] += np.sum(tmp * zeta_i)
+                # dc_dzeta[l-1] += np.sum(tmp * layer.zeta[j], axis=1)
+
+                # Phase gradient
+                if layer.phase_enabled and prev_layer.phase_enabled:
+                    # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
+                    dq *= -np.tan(dt)
+                    tmp = qj * dq
+                    dc_dt[l][j] -= np.sum(tmp)
+                    dc_dt[l-1] += np.sum(tmp, axis=1)
+
+                # Ortho help
+                s = None
+                if ortho:
+                    s = 2 * self.regularizer.coeff_lambda * (np.eye(len(wt[j])) - np.outer(wt[j], wt[j])) / dd[j]
+
+                # ----- L2 regularized w_ij by position
+                if l2plus:
+                    coeff_lambda = self.regularizer.coeff_lambda
+                    wt = layer.w.transpose()
+                    for kk in range(layer.output_size):
+                        if j == kk:
+                            continue
+
+                        s = np.sign(wt[j].dot(wt[kk]))
+                        # s = 2 * wt[j].dot(wt[kk])
+                        dq = 2 * coeff_lambda * s * wt[kk].reshape((prev_layer.output_size, 1)) * exp_dij
+
+                        # Charge
+                        dc_dq[l][j] += np.sum(dq)
+
+                        # Position
+                        tmp = 2.0 * qj * dq
+                        tx = dx * tmp
+                        ty = dy * tmp
+                        tz = dz * tmp
+
+                        dc_dr_x[l][j] += np.sum(tx)
+                        dc_dr_y[l][j] += np.sum(ty)
+                        dc_dr_z[l][j] += np.sum(tz)
+
+                        dc_dr_x[l - 1] -= np.sum(tx, axis=1)
+                        dc_dr_y[l - 1] -= np.sum(ty, axis=1)
+                        dc_dr_z[l - 1] -= np.sum(tz, axis=1)
+
+                        # Phase
+                        if layer.phase_enabled and prev_layer.phase_enabled:
+                            dq *= -np.tan(dt)
+                            tmp = qj * dq
+                            dc_dt[l][j] -= np.sum(tmp)
+                            dc_dt[l - 1] += np.sum(tmp, axis=1)
+
+                elif ortho:
+                    coeff_lambda = self.regularizer.coeff_lambda
+
+                    # Should be computed from before
+                    # wt = layer.w.transpose()
+
+                    for kk in range(layer.output_size):
+                        if j == kk:
+                            continue
+
+                        dq = (wt[kk].dot(s) * np.sign(wt[j].dot(wt[kk]))).reshape((prev_layer.output_size, 1)) * exp_dij
+
+                        # Charge
+                        dc_dq[l][j] += np.sum(dq)
+
+                        # Position
+                        tmp = 2.0 * qj * dq
+                        tx = dx * tmp
+                        ty = dy * tmp
+                        tz = dz * tmp
+
+                        dc_dr_x[l][j] += np.sum(tx)
+                        dc_dr_y[l][j] += np.sum(ty)
+                        dc_dr_z[l][j] += np.sum(tz)
+
+                        dc_dr_x[l - 1] -= np.sum(tx, axis=1)
+                        dc_dr_y[l - 1] -= np.sum(ty, axis=1)
+                        dc_dr_z[l - 1] -= np.sum(tz, axis=1)
+
+                        # Phase
+                        if layer.phase_enabled and prev_layer.phase_enabled:
+                            dq *= -np.tan(dt)
+                            tmp = qj * dq
+                            dc_dt[l][j] -= np.sum(tmp)
+                            dc_dt[l - 1] += np.sum(tmp, axis=1)
+
+                elif l2:
+                    coeff_lambda = self.regularizer.coeff_lambda
+                    w_ij = qj * exp_dij
+
+                    # Charge gradient
+                    dq = 2 * coeff_lambda * w_ij * exp_dij
+                    dc_dq[l][j] += np.sum(dq)
+
+                    # Position gradient
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
+
+                    dc_dr_x[l][j] += np.sum(tx)
+                    dc_dr_y[l][j] += np.sum(ty)
+                    dc_dr_z[l][j] += np.sum(tz)
+
+                    dc_dr_x[l-1] -= np.sum(tx, axis=1)
+                    dc_dr_y[l-1] -= np.sum(ty, axis=1)
+                    dc_dr_z[l-1] -= np.sum(tz, axis=1)
+
+                    # Phase
+                    if layer.phase_enabled and prev_layer.phase_enabled:
+                        dq *= -np.tan(dt)
+                        tmp = qj * dq
+                        dc_dt[l][j] -= np.sum(tmp)
+                        dc_dt[l-1] += np.sum(tmp, axis=1)
 
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
+
+        # Restore shapes
+        self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, ))
+        self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, ))
+        self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, ))
+        # self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, ))
+        self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, ))
+        for layer in self.layers:
+            layer.rx = layer.rx.reshape((layer.output_size, ))
+            layer.ry = layer.ry.reshape((layer.output_size, ))
+            layer.rz = layer.rz.reshape((layer.output_size, ))
+            # layer.zeta = layer.zeta.reshape((layer.output_size, ))
+            layer.theta = layer.theta.reshape((layer.output_size, ))
 
         # Perform charge regularization if needed
         if self.regularizer is not None:

@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ParticleRegularize(object):
+class ParticleRegularizeL2(object):
     """
     L2 regularizer for charges
     """
@@ -52,17 +52,11 @@ class ParticleRegularize(object):
         # c /= n
 
         # Compute the matrices
-        self.n = 0
-        cc = 0.0
         r = particle_input.get_rxyz()
         for i, layer in enumerate(layers):
             w = layer.compute_w(r)
-            cc += np.sum(w * w)
-            # c += np.sum(np.abs(w))
+            c += np.sum(w * w)
             r = layer.get_rxyz()
-            self.n += w.size
-
-        c += cc / self.n
 
         return self.coeff_lambda * c
 

@@ -5,6 +5,8 @@ Script entry point
 from src.calrissian.particle_dipole_network import ParticleDipoleNetwork
 from src.calrissian.layers.particle_dipole import ParticleDipole
 from src.calrissian.layers.particle_dipole import ParticleDipoleInput
+from src.calrissian.regularization.particle_dipole_regularize import ParticleDipoleRegularize
+
 
 import numpy as np
 
@@ -26,9 +28,11 @@ def fd():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = ParticleDipoleNetwork(cost="categorical_cross_entropy", particle_input=ParticleDipoleInput(2))
+    net = ParticleDipoleNetwork(cost="categorical_cross_entropy", particle_input=ParticleDipoleInput(2),
+                                regularizer=ParticleDipoleRegularize(coeff_lambda=0.03))
     net.append(ParticleDipole(2, 5, activation="sigmoid", k_eq=0.1, k_bond=10.0))
-    net.append(ParticleDipole(5, 3, activation="softmax", k_eq=0.1, k_bond=10.0))
+    net.append(ParticleDipole(5, 6, activation="sigmoid", k_eq=0.1, k_bond=10.0))
+    net.append(ParticleDipole(6, 3, activation="softmax", k_eq=0.1, k_bond=10.0))
 
     db, dq, drx_pos, dry_pos, drz_pos, drx_neg, dry_neg, drz_neg = net.cost_gradient(train_X, train_Y)
 

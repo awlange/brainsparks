@@ -171,7 +171,6 @@ class Network(object):
                 dc_db[l] += dc_db_l
                 dc_dw[l] += dc_dw_l
 
-
         # Perform weight regularization if needed
         if self.regularizer is not None:
             dc_db, dc_dw = self.regularizer.cost_gradient(self.layers, dc_db, dc_dw)

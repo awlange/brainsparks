@@ -14,7 +14,7 @@ np.random.seed(n_seed)
 state = np.random.get_state()
 
 # MNIST data
-raw_data_train = pd.read_csv("/Users/alange/programming/MNIST/data/mnist_train.csv", header=None)
+raw_data_train = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_train.csv", header=None)
 print("data loaded")
 
 # Prepare data
@@ -33,17 +33,17 @@ X_sub = X[:n_sub, :]
 Y_sub = Y[:n_sub, :]
 
 net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(784))
-net.append(Particle(784, 128, activation="sigmoid"))
-net.append(Particle(128, 10, activation="softmax"))
+net.append(Particle(784, 64, activation="sigmoid"))
+net.append(Particle(64, 10, activation="softmax"))
 
 print("starting predict")
 times = []
 nt = 3
 for _ in range(nt):
     ts = time.time()
-    c = net.cost(X, Y)
-    # c = 1.0
-    # net.cost_gradient(X_sub, Y_sub)
+    # c = net.cost(X, Y)
+    c = 1.0
+    net.cost_gradient(X_sub, Y_sub)
     t = time.time() - ts
     print("Cost: {} time: {}".format(c, t))
     times.append(t)
