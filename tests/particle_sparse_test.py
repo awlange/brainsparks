@@ -31,10 +31,13 @@ def main():
 def fd():
 
     train_X = np.asarray([{0: 0.45, 1: 3.33}, {1: 2.22}, {0: -0.9}])
+    # train_X = np.asarray([{0: 0.45, 1: 3.33}])
     train_Y = np.asarray([{1: 1.0}, {2: 1.0}, {0: 1.0}])
 
     net = ParticleSparseNetwork(cost="mse_sparse", particle_input=ParticleSparseInput(2))
-    net.append(ParticleSparse(2, 3))
+    net.append(ParticleSparse(2, 5, ktop=1))
+    net.append(ParticleSparse(5, 3))
+    # net.append(ParticleSparse(6, 3))
 
     # Finite difference checking
 

@@ -137,7 +137,7 @@ class ParticleSparseNetwork(object):
         # For each piece of data
         for di, data in enumerate(data_X):
             for k, v in delta_L[di].items():
-                dc_db[-1][0][k] += delta_L[di].get(k, 0.0)
+                dc_db[-1][0][k] += v * sigma_Z[-1][di].get(k, 0.0)
 
         # Reshape positions
         self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, 1))
@@ -155,35 +155,94 @@ class ParticleSparseNetwork(object):
         prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
 
         Al = A[l-1]
-        # Al_trans = Al.transpose()
-        # trans_delta_L = delta_L.transpose()
-        trans_sigma_Z = []
-        for sz in sigma_Z:
-            trans_sigma_Z.append(np.asarray(sz).transpose())
-
-        next_delta = np.zeros((len(prev_layer.rx), len(data_X)))
-        trans_sigma_Z_l = trans_sigma_Z[l - 1] if -(l - 1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
+        next_delta = [{} for _ in range(len(data_X))]
 
         for di, data in enumerate(data_X):
-            for j in range(layer.output_size):
+            j_set = set(delta_L[di].keys())
+            for j in j_set:
                 qj = layer.q[j]
-                if j in delta_L[di].keys():
-                    trans_delta_L_j = delta_L[di].get(j)
+                trans_delta_L_j = delta_L[di].get(j, 0.0)
+                for i in range(prev_layer.output_size):
+                    dx = (prev_layer.rx[i] - layer.rx[j])
+                    dy = (prev_layer.ry[i] - layer.ry[j])
+                    dz = (prev_layer.rz[i] - layer.rz[j])
+                    d2 = dx**2 + dy**2 + dz**2
+                    exp_dij = np.exp(-d2)
+
+                    dt = (prev_layer.theta[i] - layer.theta[j])
+                    exp_dij *= np.cos(dt)
+
+                    # Next delta
+                    factor = sigma_Z[l][di].get(j, 0.0)
+                    if -(l - 1) <= len(self.layers):
+                        next_delta[di][i] = (qj * trans_delta_L_j) * exp_dij * sigma_Z[l][di].get(j, 0.0) + next_delta[di].get(i, 0.0)
+                    else:
+                        next_delta[di][i] = (qj * trans_delta_L_j) * exp_dij + next_delta[di].get(i, 0.0)
+
+                    # Charge gradient
+                    dq = exp_dij * Al[di].get(i, 0.0) * trans_delta_L_j * factor
+                    dc_dq[l][j] += dq
+
+                    # Position gradient
+                    tmp = 2.0 * qj * dq
+                    tx = dx * tmp
+                    ty = dy * tmp
+                    tz = dz * tmp
+
+                    dc_dr_x[l][j] += tx
+                    dc_dr_y[l][j] += ty
+                    dc_dr_z[l][j] += tz
+
+                    dc_dr_x[l-1][i] -= tx
+                    dc_dr_y[l-1][i] -= ty
+                    dc_dr_z[l-1][i] -= tz
+
+                    # Phase gradient
+                    dq *= -np.tan(dt)
+                    tmp = qj * dq
+                    dc_dt[l][j] -= tmp
+                    dc_dt[l-1][i] += tmp
+
+        l = -1
+        while -l < len(self.layers):
+            l -= 1
+            # Gradient computation
+            layer = self.layers[l]
+            prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
+
+            Al = A[l-1]
+            this_delta = next_delta
+            next_delta = [{} for _ in range(len(data_X))]
+
+            # Bias gradient
+            for di, data in enumerate(data_X):
+                for k, v in this_delta[di].items():
+                    dc_db[l][0][k] += v * sigma_Z[l][di].get(k, 0.0)
+
+            for di, data in enumerate(data_X):
+                j_set = set(this_delta[di].keys())
+                for j in j_set:
+                    qj = layer.q[j]
+                    trans_delta_j = this_delta[di].get(j)
                     for i in range(prev_layer.output_size):
                         dx = (prev_layer.rx[i] - layer.rx[j])
                         dy = (prev_layer.ry[i] - layer.ry[j])
                         dz = (prev_layer.rz[i] - layer.rz[j])
-                        d2 = dx**2 + dy**2 + dz**2
+                        d2 = dx ** 2 + dy ** 2 + dz ** 2
                         exp_dij = np.exp(-d2)
 
                         dt = (prev_layer.theta[i] - layer.theta[j])
                         exp_dij *= np.cos(dt)
 
                         # Next delta
-                        next_delta[i][di] += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l[i][di]
+                        factor = sigma_Z[l][di].get(j, 0.0)
+                        if -(l - 1) <= len(self.layers):
+                            next_delta[di][i] = (qj * trans_delta_j) * exp_dij * sigma_Z[l][di].get(j, 0.0) + next_delta[di].get(i, 0.0)
+                        else:
+                            next_delta[di][i] = (qj * trans_delta_j) * exp_dij + next_delta[di].get(i, 0.0)
 
                         # Charge gradient
-                        dq = exp_dij * Al[di].get(i, 0.0) * trans_delta_L_j
+                        dq = exp_dij * Al[di].get(i, 0.0) * trans_delta_j * factor
                         dc_dq[l][j] += dq
 
                         # Position gradient
@@ -196,76 +255,15 @@ class ParticleSparseNetwork(object):
                         dc_dr_y[l][j] += ty
                         dc_dr_z[l][j] += tz
 
-                        dc_dr_x[l-1] -= tx
-                        dc_dr_y[l-1] -= ty
-                        dc_dr_z[l-1] -= tz
+                        dc_dr_x[l - 1][i] -= tx
+                        dc_dr_y[l - 1][i] -= ty
+                        dc_dr_z[l - 1][i] -= tz
 
                         # Phase gradient
                         dq *= -np.tan(dt)
                         tmp = qj * dq
                         dc_dt[l][j] -= tmp
-                        dc_dt[l-1] += tmp
-
-        # l = -1
-        # while -l < len(self.layers):
-        #     l -= 1
-        #     # Gradient computation
-        #     layer = self.layers[l]
-        #     prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
-        #
-        #     Al = A[l-1]
-        #     Al_trans = Al.transpose()
-        #
-        #     this_delta = next_delta
-        #     next_delta = np.zeros((prev_layer.output_size, len(data_X)))
-        #     trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
-        #
-        #     # Bias gradient
-        #     trans_delta = this_delta.transpose()
-        #     for di, data in enumerate(data_X):
-        #         for k, v in delta_L[di].items():
-        #             dc_db[l][0][k] += trans_delta[di].get(k, 0.0)
-        #
-        #     # Position gradient
-        #     for j in range(layer.output_size):
-        #         qj = layer.q[j]
-        #         this_delta_j = this_delta[j]
-        #
-        #         dx = (prev_layer.rx - layer.rx[j])
-        #         dy = (prev_layer.ry - layer.ry[j])
-        #         dz = (prev_layer.rz - layer.rz[j])
-        #         d2 = dx**2 + dy**2 + dz**2
-        #         exp_dij = np.exp(-d2)
-        #
-        #         dt = (prev_layer.theta - layer.theta[j])
-        #         exp_dij *= np.cos(dt)
-        #
-        #         # Next delta
-        #         next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
-        #
-        #         # Charge gradient
-        #         dq = exp_dij * Al_trans * this_delta_j
-        #         dc_dq[l][j] += np.sum(dq)
-        #
-        #         # Position gradient
-        #         tmp = 2.0 * qj * dq
-        #         tx = dx * tmp
-        #         ty = dy * tmp
-        #         tz = dz * tmp
-        #
-        #         dc_dr_x[l][j] += np.sum(tx)
-        #         dc_dr_y[l][j] += np.sum(ty)
-        #         dc_dr_z[l][j] += np.sum(tz)
-        #
-        #         dc_dr_x[l-1] -= np.sum(tx, axis=1)
-        #         dc_dr_y[l-1] -= np.sum(ty, axis=1)
-        #         dc_dr_z[l-1] -= np.sum(tz, axis=1)
-        #
-        #         # Phase gradient
-        #         dq *= -np.tan(dt)
-        #         tmp = qj * dq
-        #         dc_dt[l][j] -= np.sum(tmp)
-        #         dc_dt[l-1] += np.sum(tmp, axis=1)
+                        dc_dt[l - 1][i] += tmp
 
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)

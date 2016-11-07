@@ -110,6 +110,6 @@ class ParticleSparse(object):
     def compute_da(self, z):
         a = self.compute_a(z)
         for i, amap in enumerate(a):
-            for k, v in amap.items():
+            for k in amap.keys():
                 a[i][k] = 1.0
         return a
