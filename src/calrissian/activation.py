@@ -138,6 +138,8 @@ class Activation(object):
 
     def softplus(self, x):
         return np.log(1.0 + np.exp(x))
+        # Prevent overflow
+        # return np.asarray([a if a > 10.0 else np.log(1 + np.exp(a)) for a in x.flatten()]).reshape(x.shape)
 
     def d_softplus(self, x):
         return Activation().sigmoid(x)

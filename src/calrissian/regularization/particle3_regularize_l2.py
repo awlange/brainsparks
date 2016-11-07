@@ -25,8 +25,8 @@ class Particle3RegularizeL2(object):
             wt = w.transpose()
             for j in range(layer.output_size):
                 for k in range(layer.output_size):
-                    if j == k:
-                        continue
+                    # if j == k:
+                    #     continue
                     c += wt[j].dot(wt[k])**2
                     # c += np.abs(wt[j].dot(wt[k]))
         return self.coeff_lambda * c

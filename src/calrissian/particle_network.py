@@ -112,7 +112,7 @@ class ParticleNetwork(object):
         dc_dr_y = [np.zeros(self.particle_input.output_size)]
         dc_dr_z = [np.zeros(self.particle_input.output_size)]
         dc_dt = [np.zeros(self.particle_input.output_size)]
-        # dc_dzeta = [np.zeros(self.particle_input.output_size)]
+        dc_dzeta = [np.zeros(self.particle_input.output_size)]
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -122,7 +122,7 @@ class ParticleNetwork(object):
             dc_dr_y.append(np.zeros(len(layer.q)))
             dc_dr_z.append(np.zeros(len(layer.q)))
             dc_dt.append(np.zeros(layer.theta.shape))
-            # dc_dzeta.append(np.zeros(layer.zeta.shape))
+            dc_dzeta.append(np.zeros(layer.zeta.shape))
 
         # Regularization options
         l2 = self.regularizer is not None and isinstance(self.regularizer, ParticleRegularizeL2)
@@ -160,13 +160,13 @@ class ParticleNetwork(object):
         self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, 1))
         self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, 1))
         self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, 1))
-        # self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, 1))
+        self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, 1))
         self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, 1))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, 1))
             layer.ry = layer.ry.reshape((layer.output_size, 1))
             layer.rz = layer.rz.reshape((layer.output_size, 1))
-            # layer.zeta = layer.zeta.reshape((layer.output_size, 1))
+            layer.zeta = layer.zeta.reshape((layer.output_size, 1))
             layer.theta = layer.theta.reshape((layer.output_size, 1))
 
         l = -1
@@ -204,6 +204,7 @@ class ParticleNetwork(object):
             d2 = dx**2 + dy**2 + dz**2
             # zeta_i = prev_layer.zeta
             # zeta_ij = zeta_i * layer.zeta[j]
+            # exp_dij = np.exp(-zeta_ij * d2)
             exp_dij = np.exp(-d2)
 
             dt = 0.0
@@ -558,20 +559,20 @@ class ParticleNetwork(object):
         self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, ))
         self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, ))
         self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, ))
-        # self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, ))
+        self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, ))
         self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, ))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, ))
             layer.ry = layer.ry.reshape((layer.output_size, ))
             layer.rz = layer.rz.reshape((layer.output_size, ))
-            # layer.zeta = layer.zeta.reshape((layer.output_size, ))
+            layer.zeta = layer.zeta.reshape((layer.output_size, ))
             layer.theta = layer.theta.reshape((layer.output_size, ))
 
         # Perform charge regularization if needed
         if self.regularizer is not None:
             dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
 
-        return dc_db, dc_dq, dc_dr, dc_dt
+        return dc_db, dc_dq, dc_dr, dc_dt, dc_dzeta
 
     def fit(self, data_X, data_Y, optimizer):
         """

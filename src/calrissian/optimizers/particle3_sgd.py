@@ -12,7 +12,7 @@ class Particle3SGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, gamma=0.9, alpha_decay=1.0, n_threads=1, chunk_size=1):
+                 cost_freq=2, gamma=0.9, alpha_decay=1.0, n_threads=1, chunk_size=1, epsilon=10e-8):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -21,6 +21,7 @@ class Particle3SGD(Optimizer):
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
+        self.epsilon = epsilon
         self.n_epochs = n_epochs
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
@@ -33,8 +34,12 @@ class Particle3SGD(Optimizer):
         self.weight_update_func = self.weight_update_steepest_descent
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
+        if weight_update == "nesterov":
+            self.weight_update_func = self.weight_update_nesterov
         if weight_update == "adagrad":
             self.weight_update_func = self.weight_update_adagrad
+        if weight_update == "adadelta":
+            self.weight_update_func = self.weight_update_adadelta
         if weight_update == "rmsprop":
             self.weight_update_func = self.weight_update_rmsprop
         if weight_update == "rmsprop_momentum":
@@ -61,6 +66,16 @@ class Particle3SGD(Optimizer):
         self.vel_ry_pos_out = None
         self.vel_rx_neg_out = None
         self.vel_ry_neg_out = None
+
+        # Deltas
+        self.del_b = None
+        self.del_q = None
+        self.del_rx_inp = None
+        self.del_ry_inp = None
+        self.del_rx_pos_out = None
+        self.del_ry_pos_out = None
+        self.del_rx_neg_out = None
+        self.del_ry_neg_out = None
         
         # Mean squares
         self.ms_b = None
@@ -78,7 +93,6 @@ class Particle3SGD(Optimizer):
 
         self.numerator = None
         self.denominator = None
-
 
     def get_pool(self):
         if self.pool is None:
@@ -154,6 +168,10 @@ class Particle3SGD(Optimizer):
             for m in range(len(data_X) // self.mini_batch_size):  # not guaranteed to divide perfectly, might miss a few
                 mini_X = shuffle_X[m:(m+self.mini_batch_size)]
                 mini_Y = shuffle_Y[m:(m+self.mini_batch_size)]
+
+                # For Nesterov, we take a step in the velocity direction before computing the gradient
+                if self.weight_update == "nesterov":
+                    self.nesterov_step(network)
 
                 # Compute gradient for mini-batch
                 if self.n_threads > 1:
@@ -329,6 +347,75 @@ class Particle3SGD(Optimizer):
             layer.rx_neg_out += self.vel_rx_neg_out[l]
             layer.ry_neg_out += self.vel_ry_neg_out[l]
 
+    def nesterov_step(self, network):
+        """
+        Take step in direction of velocity before computing gradient
+        """
+        # Initialize velocities to zero
+        if self.vel_b is None or self.vel_q is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_rx_inp = []
+            self.vel_ry_inp = []
+            self.vel_rx_pos_out = []
+            self.vel_ry_pos_out = []
+            self.vel_rx_neg_out = []
+            self.vel_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.zeros(layer.b.shape))
+                self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_rx_inp.append(np.zeros(layer.input_size))
+                self.vel_ry_inp.append(np.zeros(layer.input_size))
+                self.vel_rx_pos_out.append(np.zeros(layer.output_size))
+                self.vel_ry_pos_out.append(np.zeros(layer.output_size))
+                self.vel_rx_neg_out.append(np.zeros(layer.output_size))
+                self.vel_ry_neg_out.append(np.zeros(layer.output_size))
+
+        for l, layer in enumerate(network.layers):
+            layer.b += self.beta * self.vel_b[l]
+            layer.q += self.beta * self.vel_q[l]
+            layer.rx_inp += self.beta * self.vel_rx_inp[l]
+            layer.ry_inp += self.beta * self.vel_ry_inp[l]
+            layer.rx_pos_out += self.beta * self.vel_rx_pos_out[l]
+            layer.ry_pos_out += self.beta * self.vel_ry_pos_out[l]
+            layer.rx_neg_out += self.beta * self.vel_rx_neg_out[l]
+            layer.ry_neg_out += self.beta * self.vel_ry_neg_out[l]
+
+    def weight_update_nesterov(self, network):
+        """
+        Update weights and biases according to Nesterov
+        """
+        # Before updating, take step back with current velocity
+        for l, layer in enumerate(network.layers):
+            layer.b -= self.beta * self.vel_b[l]
+            layer.q -= self.beta * self.vel_q[l]
+            layer.rx_inp -= self.beta * self.vel_rx_inp[l]
+            layer.ry_inp -= self.beta * self.vel_ry_inp[l]
+            layer.rx_pos_out -= self.beta * self.vel_rx_pos_out[l]
+            layer.ry_pos_out -= self.beta * self.vel_ry_pos_out[l]
+            layer.rx_neg_out -= self.beta * self.vel_rx_neg_out[l]
+            layer.ry_neg_out -= self.beta * self.vel_ry_neg_out[l]
+
+        # Now update
+        for l, layer in enumerate(network.layers):
+            self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
+            self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
+            self.vel_rx_inp[l] = -self.alpha * self.dc_drx_inp[l] + self.beta * self.vel_rx_inp[l]
+            self.vel_ry_inp[l] = -self.alpha * self.dc_dry_inp[l] + self.beta * self.vel_ry_inp[l]
+            self.vel_rx_pos_out[l] = -self.alpha * self.dc_drx_pos_out[l] + self.beta * self.vel_rx_pos_out[l]
+            self.vel_ry_pos_out[l] = -self.alpha * self.dc_dry_pos_out[l] + self.beta * self.vel_ry_pos_out[l]
+            self.vel_rx_neg_out[l] = -self.alpha * self.dc_drx_neg_out[l] + self.beta * self.vel_rx_neg_out[l]
+            self.vel_ry_neg_out[l] = -self.alpha * self.dc_dry_neg_out[l] + self.beta * self.vel_ry_neg_out[l]
+
+            layer.b += self.vel_b[l]
+            layer.q += self.vel_q[l]
+            layer.rx_inp += self.vel_rx_inp[l]
+            layer.ry_inp += self.vel_ry_inp[l]
+            layer.rx_pos_out += self.vel_rx_pos_out[l]
+            layer.ry_pos_out += self.vel_ry_pos_out[l]
+            layer.rx_neg_out += self.vel_rx_neg_out[l]
+            layer.ry_neg_out += self.vel_ry_neg_out[l]
+
     def weight_update_rmsprop(self, network):
         """
         Update weights and biases according to AdaGrad
@@ -431,7 +518,7 @@ class Particle3SGD(Optimizer):
         """
         Update weights and biases according to rmsprop with momentum
         """
-        epsilon = 10e-8
+        epsilon = self.epsilon
         gamma = self.gamma
         one_m_gamma = 1.0 - gamma
         beta = self.beta
@@ -512,3 +599,89 @@ class Particle3SGD(Optimizer):
             layer.rx_neg_out += self.vel_rx_neg_out[l]
             layer.ry_neg_out += self.vel_ry_neg_out[l]
 
+    def sqrt_eps(self, x):
+        return np.sqrt(x + 10e-8)
+
+    def weight_update_adadelta(self, network):
+        """
+        Update weights and biases according to rmsprop with momentum
+        """
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        small = 0.001
+
+        if self.ms_b is None or self.ms_q is None:
+            self.ms_b = []
+            self.ms_q = []
+            self.ms_rx_inp = []
+            self.ms_ry_inp = []
+            self.ms_rx_pos_out = []
+            self.ms_ry_pos_out = []
+            self.ms_rx_neg_out = []
+            self.ms_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.ms_b.append(np.zeros(layer.b.shape))
+                self.ms_q.append(np.zeros(layer.q.shape))
+                self.ms_rx_inp.append(np.zeros(layer.input_size))
+                self.ms_ry_inp.append(np.zeros(layer.input_size))
+                self.ms_rx_pos_out.append(np.zeros(layer.output_size))
+                self.ms_ry_pos_out.append(np.zeros(layer.output_size))
+                self.ms_rx_neg_out.append(np.zeros(layer.output_size))
+                self.ms_ry_neg_out.append(np.zeros(layer.output_size))
+
+        # Initialize deltas to one such that first step is approximately equivalent to RMSprop
+        if self.del_b is None or self.del_q is None:
+            self.del_b = []
+            self.del_q = []
+            self.del_rx_inp = []
+            self.del_ry_inp = []
+            self.del_rx_pos_out = []
+            self.del_ry_pos_out = []
+            self.del_rx_neg_out = []
+            self.del_ry_neg_out = []
+            for l, layer in enumerate(network.layers):
+                self.del_b.append(np.ones(layer.b.shape) * small)
+                self.del_q.append(np.ones(layer.q.shape) * small)
+                self.del_rx_inp.append(np.ones(layer.input_size) * small)
+                self.del_ry_inp.append(np.ones(layer.input_size) * small)
+                self.del_rx_pos_out.append(np.ones(layer.output_size) * small)
+                self.del_ry_pos_out.append(np.ones(layer.output_size) * small)
+                self.del_rx_neg_out.append(np.ones(layer.output_size) * small)
+                self.del_ry_neg_out.append(np.ones(layer.output_size) * small)
+
+        for l, layer in enumerate(network.layers):
+            self.ms_b[l] = gamma * self.ms_b[l] + one_m_gamma * self.dc_db[l] ** 2
+            self.ms_q[l] = gamma * self.ms_q[l] + one_m_gamma * self.dc_dq[l] ** 2
+            self.ms_rx_inp[l] = gamma * self.ms_rx_inp[l] + one_m_gamma * self.dc_drx_inp[l] ** 2
+            self.ms_ry_inp[l] = gamma * self.ms_ry_inp[l] + one_m_gamma * self.dc_dry_inp[l] ** 2
+            self.ms_rx_pos_out[l] = gamma * self.ms_rx_pos_out[l] + one_m_gamma * self.dc_drx_pos_out[l] ** 2
+            self.ms_ry_pos_out[l] = gamma * self.ms_ry_pos_out[l] + one_m_gamma * self.dc_dry_pos_out[l] ** 2
+            self.ms_rx_neg_out[l] = gamma * self.ms_rx_neg_out[l] + one_m_gamma * self.dc_drx_neg_out[l] ** 2
+            self.ms_ry_neg_out[l] = gamma * self.ms_ry_neg_out[l] + one_m_gamma * self.dc_dry_neg_out[l] ** 2
+
+            del_b = -self.alpha * self.dc_db[l] * self.sqrt_eps(self.del_b[l]) / self.sqrt_eps(self.ms_b[l])
+            del_q = -self.alpha * self.dc_dq[l] * self.sqrt_eps(self.del_q[l]) / self.sqrt_eps(self.ms_q[l])
+            del_rx_inp = -self.alpha * self.dc_drx_inp[l] * self.sqrt_eps(self.del_rx_inp[l]) / self.sqrt_eps(self.ms_rx_inp[l])
+            del_ry_inp = -self.alpha * self.dc_dry_inp[l] * self.sqrt_eps(self.del_ry_inp[l]) / self.sqrt_eps(self.ms_ry_inp[l])
+            del_rx_pos_out = -self.alpha * self.dc_drx_pos_out[l] * self.sqrt_eps(self.del_rx_pos_out[l]) / self.sqrt_eps(self.ms_rx_pos_out[l])
+            del_ry_pos_out = -self.alpha * self.dc_dry_pos_out[l] * self.sqrt_eps(self.del_ry_pos_out[l]) / self.sqrt_eps(self.ms_ry_pos_out[l])
+            del_rx_neg_out = -self.alpha * self.dc_drx_neg_out[l] * self.sqrt_eps(self.del_rx_neg_out[l]) / self.sqrt_eps(self.ms_rx_neg_out[l])
+            del_ry_neg_out = -self.alpha * self.dc_dry_neg_out[l] * self.sqrt_eps(self.del_ry_neg_out[l]) / self.sqrt_eps(self.ms_ry_neg_out[l])
+
+            layer.b += del_b
+            layer.q += del_q
+            layer.rx_inp += del_rx_inp
+            layer.ry_inp += del_ry_inp
+            layer.rx_pos_out += del_rx_pos_out
+            layer.ry_pos_out += del_ry_pos_out
+            layer.rx_neg_out += del_rx_neg_out
+            layer.ry_neg_out += del_ry_neg_out
+            
+            self.del_b[l] = gamma * self.del_b[l] + one_m_gamma * del_b ** 2
+            self.del_q[l] = gamma * self.del_q[l] + one_m_gamma * del_q ** 2
+            self.del_rx_inp[l] = gamma * self.del_rx_inp[l] + one_m_gamma * del_rx_inp ** 2
+            self.del_ry_inp[l] = gamma * self.del_ry_inp[l] + one_m_gamma * del_ry_inp ** 2
+            self.del_rx_pos_out[l] = gamma * self.del_rx_pos_out[l] + one_m_gamma * del_rx_pos_out ** 2
+            self.del_ry_pos_out[l] = gamma * self.del_ry_pos_out[l] + one_m_gamma * del_ry_pos_out ** 2
+            self.del_rx_neg_out[l] = gamma * self.del_rx_neg_out[l] + one_m_gamma * del_rx_neg_out ** 2
+            self.del_ry_neg_out[l] = gamma * self.del_ry_neg_out[l] + one_m_gamma * del_ry_neg_out ** 2

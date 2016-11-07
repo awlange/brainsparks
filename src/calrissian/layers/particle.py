@@ -22,10 +22,11 @@ class ParticleInput(object):
             self.theta = np.random.uniform(0, 2*np.pi, output_size)
 
         # Gaussian width
-        # self.zeta = np.random.uniform(0.9, 1.1, output_size)
+        # self.zeta = np.random.uniform(0.5, 2.0, output_size)
+        self.zeta = np.zeros(output_size)
 
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.theta
+        return self.rx, self.ry, self.rz, self.theta, self.zeta
 
     def feed_forward(self, a_in):
         """
@@ -73,13 +74,14 @@ class Particle(object):
             self.theta = np.random.uniform(0, 2*np.pi, output_size)
 
         # Gaussian width
-        # self.zeta = np.random.uniform(0.9, 1.1, output_size)
+        # self.zeta = np.random.uniform(0.5, 2.0, output_size)
+        self.zeta = np.zeros(output_size)
 
         # Matrix
         self.w = None
 
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.theta
+        return self.rx, self.ry, self.rz, self.theta, self.zeta
 
     def feed_forward(self, a_in, r_in):
         return self.compute_a(self.compute_z(a_in, r_in)), (self.get_rxyz())
@@ -98,6 +100,7 @@ class Particle(object):
         r_in_y = r_in[1]
         r_in_z = r_in[2]
         r_in_theta = r_in[3]
+        r_in_zeta = r_in[4]
 
         if self.phase_enabled:
             for j in range(self.output_size):

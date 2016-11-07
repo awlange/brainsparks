@@ -10,7 +10,8 @@ class Particle3(object):
     2D monopole input, dipole output
     """
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian", s=1.0, q=None, b=None):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian", s=1.0, q=None, b=None,
+                 qoff=0.0):
 
         self.input_size = input_size
         self.output_size = output_size
@@ -31,7 +32,7 @@ class Particle3(object):
         # Charges
         if q is None:
             q = g
-        self.q = np.random.uniform(-q, q, output_size)
+        self.q = np.random.uniform(-q, q, output_size) + qoff
 
         self.rx_inp = np.random.uniform(-s, s, input_size)
         self.ry_inp = np.random.uniform(-s, s, input_size)

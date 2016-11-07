@@ -230,8 +230,8 @@ class Particle3Network(object):
                 wt = layer.w.transpose()
 
                 for kk in range(layer.output_size):
-                    if j == kk:
-                        continue
+                    # if j == kk:
+                    #     continue
 
                     # s = np.sign(wt[j].dot(wt[kk]))
                     s = 2 * wt[j].dot(wt[kk])
@@ -342,8 +342,8 @@ class Particle3Network(object):
                     wt = layer.w.transpose()
 
                     for kk in range(layer.output_size):
-                        if j == kk:
-                            continue
+                        # if j == kk:
+                        #     continue
 
                         # s = np.sign(wt[j].dot(wt[kk]))
                         s = 2 * wt[j].dot(wt[kk])

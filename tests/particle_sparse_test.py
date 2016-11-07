@@ -2,15 +2,9 @@
 Script entry point
 """
 
-from src.calrissian.particle_network import ParticleNetwork
-from src.calrissian.layers.particle import Particle
-from src.calrissian.layers.particle import ParticleInput
-from src.calrissian.optimizers.particle_sgd import ParticleSGD
-from src.calrissian.optimizers.particle_rprop import ParticleRPROP
-from src.calrissian.regularization.particle_regularize_l2 import ParticleRegularizeL2
-from src.calrissian.regularization.particle_regularize_distance import ParticleRegularizeDistance
-from src.calrissian.regularization.particle_regularize_l2plus import ParticleRegularizeL2Plus
-from src.calrissian.regularization.particle_regularize_orthogonal import ParticleRegularizeOrthogonal
+from src.calrissian.particle_sparse_network import ParticleSparseNetwork
+from src.calrissian.layers.particle_sparse import ParticleSparse
+from src.calrissian.layers.particle_sparse import ParticleSparseInput
 
 import numpy as np
 
@@ -20,97 +14,33 @@ def main():
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    # train_X = np.asarray([{0: 0.45, 1: 3.33}, {1: 2.22}])
-    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    train_X = np.asarray([{0: 0.45, 1: 3.33}, {1: 2.22}])
+    train_Y = np.asarray([{1: 1.0}, {2: 1.0}])
 
-    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2, phase_enabled=True))
-    net.append(Particle(2, 3, activation="sigmoid", phase_enabled=True))
-    # net.append(Particle(5, 3, activation="sigmoid"))
+    net = ParticleSparseNetwork(cost="mse_sparse", particle_input=ParticleSparseInput(2))
+    net.append(ParticleSparse(2, 3))
+    # net.append(ParticleSparse(5, 3))
 
     print(net.particle_input.get_rxyz())
 
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
-    # print(net.cost_gradient(train_X, train_Y))
-
-
-def main2():
-
-    sgd = ParticleSGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="momentum", beta=0.5)
-    # sgd = ParticleSGD(alpha=0.2, n_epochs=1, mini_batch_size=1, verbosity=2)
-
-    train_X = np.asarray([[0.2, -0.3]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0]])
-
-    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
-    net.append(Particle(2, 5, activation="sigmoid"))
-    net.append(Particle(5, 3, activation="sigmoid"))
-
-    sgd.optimize(net, train_X, train_Y)
-
-
-def main3():
-
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
-
-    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
-    net.append(Particle(2, 5, activation="sigmoid"))
-    net.append(Particle(5, 3, activation="sigmoid"))
-
-    print(net.predict(train_X))
-
-    with open("/Users/alange/network.json", "w") as f:
-        net.write_to_json(f)
-
-    with open("/Users/alange/network.json", "r") as f:
-        new_net = ParticleNetwork.read_from_json(f)
-        print(new_net.predict(train_X))
-
-
-def main4():
-
-    rprop = ParticleRPROP(n_epochs=1, verbosity=0, cost_freq=25, init_delta=0.01, eta_minus=0.5, eta_plus=1.2,
-                          delta_max=0.5, delta_min=1e-6, manhattan=False, n_threads=2)
-
-    train_X = np.asarray([[0.2, -0.3], [0.2, -0.4], [0.1, 0.1], [0.9, 1.1], [2.2, 4.4]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
-
-    phase = False
-
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
-    net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
-    net.append(Particle(5, 7, activation="sigmoid", phase_enabled=phase))
-    net.append(Particle(7, 3, activation="softmax", phase_enabled=phase))
-
-    print(net.cost(train_X, train_Y))
-
-    # rprop.optimize(net, train_X, train_Y)
+    print(net.cost_gradient(train_X, train_Y))
 
 
 def fd():
 
-    # train_X = np.asarray([[0.2, -0.3]])
-    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
+    train_X = np.asarray([{0: 0.45, 1: 3.33}, {1: 2.22}, {0: -0.9}])
+    train_Y = np.asarray([{1: 1.0}, {2: 1.0}, {0: 1.0}])
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
-
-    phase = True
-
-    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
-    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(1.0))
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeDistance(0.3))
-    net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
-    net.append(Particle(5, 4, activation="sigmoid", phase_enabled=phase))
-    net.append(Particle(4, 3, activation="softmax", phase_enabled=phase))
+    net = ParticleSparseNetwork(cost="mse_sparse", particle_input=ParticleSparseInput(2))
+    net.append(ParticleSparse(2, 3))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dq, dr, dt, dzeta = net.cost_gradient(train_X, train_Y)
+    db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
 
     h = 0.00001
 
@@ -187,41 +117,6 @@ def fd():
 
     print("numerical theta")
     for x in fd_t:
-        print(x)
-
-    print("analytic zeta")
-    for x in dzeta:
-        print(x)
-
-    # input layer
-    fd_zeta = []
-    layer = net.particle_input
-    lt = []
-    for i in range(len(layer.zeta)):
-        orig = layer.zeta[i]
-        layer.zeta[i] += h
-        fp = net.cost(train_X, train_Y)
-        layer.zeta[i] -= 2*h
-        fm = net.cost(train_X, train_Y)
-        lt.append((fp - fm) / (2*h))
-        layer.zeta[i] = orig
-    fd_zeta.append(lt)
-
-    # layers
-    for l in range(len(net.layers)):
-        lt = []
-        for i in range(len(net.layers[l].zeta)):
-            orig = net.layers[l].zeta[i]
-            net.layers[l].zeta[i] += h
-            fp = net.cost(train_X, train_Y)
-            net.layers[l].zeta[i] -= 2*h
-            fm = net.cost(train_X, train_Y)
-            lt.append((fp - fm) / (2*h))
-            net.layers[l].zeta[i] = orig
-        fd_zeta.append(lt)
-
-    print("numerical zeta")
-    for x in fd_zeta:
         print(x)
 
     fd_r_x = []
@@ -329,8 +224,8 @@ if __name__ == "__main__":
     # Ensure same seed
     np.random.seed(100)
 
-    main()
+    # main()
     # main2()
     # main3()
     # main4()
-    # fd()
+    fd()
