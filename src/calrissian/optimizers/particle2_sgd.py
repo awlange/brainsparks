@@ -84,8 +84,8 @@ class Particle2SGD(Optimizer):
 
             # Split into mini-batches
             for m in range(len(data_X) // self.mini_batch_size):  # not guaranteed to divide perfectly, might miss a few
-                mini_X = shuffle_X[m:(m+self.mini_batch_size)]
-                mini_Y = shuffle_Y[m:(m+self.mini_batch_size)]
+                mini_X = shuffle_X[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
+                mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
                 self.dc_db, self.dc_dq, self.dc_dr_inp, self.dc_dr_out, self.dc_dt_inp, self.dc_dt_out = network.cost_gradient(mini_X, mini_Y)

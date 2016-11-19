@@ -14,6 +14,8 @@ class Cost(object):
         nl = name.lower()
         if nl == "quadratic" or nl == "l2" or nl == "mean_square_error" or nl == "mse":
             return Cost().quadratic
+        if nl == "mse_sparse":
+            return Cost().quadratic_sparse
         if nl == "l1" or nl == "mean_absolute_error" or nl == "mae":
             return Cost().mae
         if nl == "categorical_cross_entropy":
@@ -28,6 +30,8 @@ class Cost(object):
         nl = name.lower()
         if nl == "quadratic" or nl == "l2" or nl == "mean_square_error" or nl == "mse":
             return Cost().d_quadratic
+        if nl == "mse_sparse":
+            return Cost().d_quadratic_sparse
         if nl == "l1" or nl == "mean_absolute_error" or nl == "mae":
             return Cost().d_mae
         if nl == "categorical_cross_entropy":
@@ -92,3 +96,19 @@ class Cost(object):
         # z not used but here to maintain common interface
         # Not to be used with softmax. This gradient is wrong for that... would probably need to compute Jacobian...
         return a - y
+
+    def quadratic_sparse(self, y, a):
+        # Is not taking mean per data point, but whatevs
+        total = 0.0
+        for i, amap in enumerate(a):
+            for k, av in amap.items():
+                total += (av - y[i].get(k, 0.0))**2
+        total *= 0.5 / len(y)
+        return total
+
+    def d_quadratic_sparse(self, y, a, z):
+        result = [{} for _ in range(len(z))]
+        for i, amap in enumerate(a):
+            for k, av in amap.items():
+                result[i][k] = (av - y[i].get(k, 0.0)) * z[i][k] / len(y)
+        return result

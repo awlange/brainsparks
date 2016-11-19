@@ -62,14 +62,16 @@ class SGD(Optimizer):
         for epoch in range(self.n_epochs):
             epoch_start_time = time.time()
 
+            # TODO: Doubles memory usage of data by having a copy. Figure out how to shuffle data_X with data_Y
             # Shuffle data by index
             np.random.shuffle(indexes)  # in-place shuffle
-            shuffled_mini_batch_indexes = np.array_split(indexes, len(data_X) // self.mini_batch_size)
+            shuffle_X = np.asarray([data_X[i] for i in indexes])
+            shuffle_Y = np.asarray([data_Y[i] for i in indexes])
 
             # Split into mini-batches
-            for m, mini_batch_indexes in enumerate(shuffled_mini_batch_indexes):
-                mini_X = np.asarray([data_X[i] for i in mini_batch_indexes])
-                mini_Y = np.asarray([data_Y[i] for i in mini_batch_indexes])
+            for m in range(len(data_X) // self.mini_batch_size):  # not guaranteed to divide perfectly, might miss a few
+                mini_X = shuffle_X[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
+                mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
                 self.dc_db, self.dc_dw = network.cost_gradient(mini_X, mini_Y)

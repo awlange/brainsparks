@@ -8,6 +8,7 @@ from src.calrissian.layers.particle import ParticleInput
 from src.calrissian.optimizers.particle_sgd import ParticleSGD
 from src.calrissian.optimizers.particle_rprop import ParticleRPROP
 from src.calrissian.regularization.particle_regularize_l2 import ParticleRegularizeL2
+from src.calrissian.regularization.particle_regularize_l2_charge import ParticleRegularizeL2Charge
 from src.calrissian.regularization.particle_regularize_distance import ParticleRegularizeDistance
 from src.calrissian.regularization.particle_regularize_l2plus import ParticleRegularizeL2Plus
 from src.calrissian.regularization.particle_regularize_orthogonal import ParticleRegularizeOrthogonal
@@ -20,12 +21,15 @@ def main():
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
+    # train_X = np.asarray([{0: 0.45, 1: 3.33}, {1: 2.22}])
+    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2))
-    net.append(Particle(2, 5, activation="sigmoid"))
-    net.append(Particle(5, 3, activation="sigmoid"))
+    net = ParticleNetwork(cost="mse", particle_input=ParticleInput(2, phase_enabled=True))
+    net.append(Particle(2, 3, activation="sigmoid", phase_enabled=True))
+    # net.append(Particle(5, 3, activation="sigmoid"))
+
+    print(net.particle_input.get_rxyz())
 
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
@@ -96,9 +100,9 @@ def fd():
 
     phase = True
 
-    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
+    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2, phase_enabled=phase))
     # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularize(1.0))
-    # net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeDistance(0.3))
+    net = ParticleNetwork(cost="categorical_cross_entropy", particle_input=ParticleInput(2), regularizer=ParticleRegularizeL2Charge(0.3))
     net.append(Particle(2, 5, activation="sigmoid", phase_enabled=phase))
     net.append(Particle(5, 4, activation="sigmoid", phase_enabled=phase))
     net.append(Particle(4, 3, activation="softmax", phase_enabled=phase))
@@ -107,9 +111,10 @@ def fd():
 
     net.cost(train_X, train_Y)
 
+    # db, dq, dr, dt, dzeta = net.cost_gradient(train_X, train_Y)
     db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
 
-    h = 0.0001
+    h = 0.00001
 
     print("analytic b")
     print(db)
