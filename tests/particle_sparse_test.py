@@ -36,8 +36,8 @@ def fd():
 
     net = ParticleSparseNetwork(cost="mse_sparse", particle_input=ParticleSparseInput(2))
     net.append(ParticleSparse(2, 5, ktop=1))
-    net.append(ParticleSparse(5, 3))
-    # net.append(ParticleSparse(6, 3))
+    net.append(ParticleSparse(5, 6))
+    net.append(ParticleSparse(6, 3))
 
     # Finite difference checking
 

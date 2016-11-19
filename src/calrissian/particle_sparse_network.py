@@ -131,24 +131,13 @@ class ParticleSparseNetwork(object):
         # IMPORTANT:
         # For threaded calls, we need to divide the cost gradient by the number threads to account for the mean being
         # taken in the cost function. When data is split, the mean is off by a factor of the number of threads.
-        if thread_scale > 1:
-            delta_L /= thread_scale
+        # if thread_scale > 1:
+        #     delta_L /= thread_scale
 
         # For each piece of data
         for di, data in enumerate(data_X):
             for k, v in delta_L[di].items():
-                dc_db[-1][0][k] += v * sigma_Z[-1][di].get(k, 0.0)
-
-        # Reshape positions
-        self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, 1))
-        self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, 1))
-        self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, 1))
-        self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, 1))
-        for layer in self.layers:
-            layer.rx = layer.rx.reshape((layer.output_size, 1))
-            layer.ry = layer.ry.reshape((layer.output_size, 1))
-            layer.rz = layer.rz.reshape((layer.output_size, 1))
-            layer.theta = layer.theta.reshape((layer.output_size, 1))
+                dc_db[-1][0][k] += v * sigma_Z[-1][di].get(k, 0.0) / thread_scale
 
         l = -1
         layer = self.layers[l]
@@ -161,8 +150,12 @@ class ParticleSparseNetwork(object):
             j_set = set(delta_L[di].keys())
             for j in j_set:
                 qj = layer.q[j]
-                trans_delta_L_j = delta_L[di].get(j, 0.0)
-                for i in range(prev_layer.output_size):
+                trans_delta_L_j = delta_L[di].get(j, 0.0) / thread_scale
+                for i in Al[di].keys():
+                    # for i in range(prev_layer.output_size):
+                    #     if i not in Al[di].keys():
+                    #         continue
+
                     dx = (prev_layer.rx[i] - layer.rx[j])
                     dy = (prev_layer.ry[i] - layer.ry[j])
                     dz = (prev_layer.rz[i] - layer.rz[j])
@@ -224,7 +217,8 @@ class ParticleSparseNetwork(object):
                 for j in j_set:
                     qj = layer.q[j]
                     trans_delta_j = this_delta[di].get(j)
-                    for i in range(prev_layer.output_size):
+                    for i in Al[di].keys():
+                        # for i in range(prev_layer.output_size):
                         dx = (prev_layer.rx[i] - layer.rx[j])
                         dy = (prev_layer.ry[i] - layer.ry[j])
                         dz = (prev_layer.rz[i] - layer.rz[j])
@@ -267,22 +261,6 @@ class ParticleSparseNetwork(object):
 
         # Position gradient list
         dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
-
-        # Restore shapes
-        self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, ))
-        self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, ))
-        self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, ))
-        self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, ))
-        for layer in self.layers:
-            layer.rx = layer.rx.reshape((layer.output_size, ))
-            layer.ry = layer.ry.reshape((layer.output_size, ))
-            layer.rz = layer.rz.reshape((layer.output_size, ))
-            layer.theta = layer.theta.reshape((layer.output_size, ))
-
-        # Perform charge regularization if needed
-        if self.regularizer is not None:
-            dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
-
         return dc_db, dc_dq, dc_dr, dc_dt
 
     def fit(self, data_X, data_Y, optimizer):

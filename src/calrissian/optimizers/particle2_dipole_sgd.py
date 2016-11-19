@@ -72,73 +72,68 @@ class Particle2DipoleSGD(Optimizer):
 
         self.n_threads = n_threads
         self.chunk_size = chunk_size
-        self.pool = None
-
-    def get_pool(self):
-        if self.pool is None:
-            self.pool = Pool(processes=self.n_threads)
-        return self.pool
 
     def cost_gradient_parallel(self, network, data_X, data_Y):
-        offset = 0
-        chunks = len(data_X) / self.chunk_size
-        while offset < len(data_X):
-            data_X_sub = data_X[offset:(offset+self.chunk_size), :]
-            data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
-            data_X_split = np.array_split(data_X_sub, self.n_threads)
-            data_Y_split = np.array_split(data_Y_sub, self.n_threads)
-            data_XY_list = [(data_X_split[i], data_Y_split[i], self.n_threads * chunks) for i in range(self.n_threads)]
+        with Pool(processes=self.n_threads) as pool:
+            offset = 0
+            chunks = len(data_X) / self.chunk_size
+            while offset < len(data_X):
+                data_X_sub = data_X[offset:(offset+self.chunk_size), :]
+                data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
+                data_X_split = np.array_split(data_X_sub, self.n_threads)
+                data_Y_split = np.array_split(data_Y_sub, self.n_threads)
+                data_XY_list = [(data_X_split[i], data_Y_split[i], self.n_threads * chunks) for i in range(self.n_threads)]
 
-            result = self.get_pool().map(network.cost_gradient_thread, data_XY_list)
+                result = pool.map(network.cost_gradient_thread, data_XY_list)
 
-            for t, gradients in enumerate(result):
-                if t == 0 and offset == 0:
-                    self.dc_db = gradients[0]
-                    self.dc_dq = gradients[1]
-                    self.dc_drx_pos_inp = gradients[2]
-                    self.dc_dry_pos_inp = gradients[3]
-                    self.dc_drz_pos_inp = gradients[4]
-                    self.dc_drx_neg_inp = gradients[5]
-                    self.dc_dry_neg_inp = gradients[6]
-                    self.dc_drz_neg_inp = gradients[7]
-                    self.dc_drx_pos_out = gradients[8]
-                    self.dc_dry_pos_out = gradients[9]
-                    self.dc_drz_pos_out = gradients[10]
-                    self.dc_drx_neg_out = gradients[11]
-                    self.dc_dry_neg_out = gradients[12]
-                    self.dc_drz_neg_out = gradients[13]
-                else:
-                    tmp_dc_db = gradients[0]
-                    tmp_dc_dq = gradients[1]
-                    tmp_dc_drx_pos_inp = gradients[2]
-                    tmp_dc_dry_pos_inp = gradients[3]
-                    tmp_dc_drz_pos_inp = gradients[4]
-                    tmp_dc_drx_neg_inp = gradients[5]
-                    tmp_dc_dry_neg_inp = gradients[6]
-                    tmp_dc_drz_neg_inp = gradients[7]
-                    tmp_dc_drx_pos_out = gradients[8]
-                    tmp_dc_dry_pos_out = gradients[9]
-                    tmp_dc_drz_pos_out = gradients[10]
-                    tmp_dc_drx_neg_out = gradients[11]
-                    tmp_dc_dry_neg_out = gradients[12]
-                    tmp_dc_drz_neg_out = gradients[13]
+                for t, gradients in enumerate(result):
+                    if t == 0 and offset == 0:
+                        self.dc_db = gradients[0]
+                        self.dc_dq = gradients[1]
+                        self.dc_drx_pos_inp = gradients[2]
+                        self.dc_dry_pos_inp = gradients[3]
+                        self.dc_drz_pos_inp = gradients[4]
+                        self.dc_drx_neg_inp = gradients[5]
+                        self.dc_dry_neg_inp = gradients[6]
+                        self.dc_drz_neg_inp = gradients[7]
+                        self.dc_drx_pos_out = gradients[8]
+                        self.dc_dry_pos_out = gradients[9]
+                        self.dc_drz_pos_out = gradients[10]
+                        self.dc_drx_neg_out = gradients[11]
+                        self.dc_dry_neg_out = gradients[12]
+                        self.dc_drz_neg_out = gradients[13]
+                    else:
+                        tmp_dc_db = gradients[0]
+                        tmp_dc_dq = gradients[1]
+                        tmp_dc_drx_pos_inp = gradients[2]
+                        tmp_dc_dry_pos_inp = gradients[3]
+                        tmp_dc_drz_pos_inp = gradients[4]
+                        tmp_dc_drx_neg_inp = gradients[5]
+                        tmp_dc_dry_neg_inp = gradients[6]
+                        tmp_dc_drz_neg_inp = gradients[7]
+                        tmp_dc_drx_pos_out = gradients[8]
+                        tmp_dc_dry_pos_out = gradients[9]
+                        tmp_dc_drz_pos_out = gradients[10]
+                        tmp_dc_drx_neg_out = gradients[11]
+                        tmp_dc_dry_neg_out = gradients[12]
+                        tmp_dc_drz_neg_out = gradients[13]
 
-                    for l, tmp_b in enumerate(tmp_dc_db): self.dc_db[l] += tmp_b
-                    for l, tmp_q in enumerate(tmp_dc_dq): self.dc_dq[l] += tmp_q
-                    for l, tmp in enumerate(tmp_dc_drx_pos_inp): self.dc_drx_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_pos_inp): self.dc_dry_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_pos_inp): self.dc_drz_pos_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drx_neg_inp): self.dc_drx_neg_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_neg_inp): self.dc_dry_neg_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_neg_inp): self.dc_drz_neg_inp[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drx_pos_out): self.dc_drx_pos_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_pos_out): self.dc_dry_pos_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_pos_out): self.dc_drz_pos_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drx_neg_out): self.dc_drx_neg_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_dry_neg_out): self.dc_dry_neg_out[l] += tmp
-                    for l, tmp in enumerate(tmp_dc_drz_neg_out): self.dc_drz_neg_out[l] += tmp
+                        for l, tmp_b in enumerate(tmp_dc_db): self.dc_db[l] += tmp_b
+                        for l, tmp_q in enumerate(tmp_dc_dq): self.dc_dq[l] += tmp_q
+                        for l, tmp in enumerate(tmp_dc_drx_pos_inp): self.dc_drx_pos_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_dry_pos_inp): self.dc_dry_pos_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drz_pos_inp): self.dc_drz_pos_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drx_neg_inp): self.dc_drx_neg_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_dry_neg_inp): self.dc_dry_neg_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drz_neg_inp): self.dc_drz_neg_inp[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drx_pos_out): self.dc_drx_pos_out[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_dry_pos_out): self.dc_dry_pos_out[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drz_pos_out): self.dc_drz_pos_out[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drx_neg_out): self.dc_drx_neg_out[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_dry_neg_out): self.dc_dry_neg_out[l] += tmp
+                        for l, tmp in enumerate(tmp_dc_drz_neg_out): self.dc_drz_neg_out[l] += tmp
 
-            offset += self.chunk_size
+                offset += self.chunk_size
 
     def optimize(self, network, data_X, data_Y):
         """
@@ -164,8 +159,8 @@ class Particle2DipoleSGD(Optimizer):
 
             # Split into mini-batches
             for m in range(len(data_X) // self.mini_batch_size):  # not guaranteed to divide perfectly, might miss a few
-                mini_X = shuffle_X[m:(m+self.mini_batch_size)]
-                mini_Y = shuffle_Y[m:(m+self.mini_batch_size)]
+                mini_X = shuffle_X[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
+                mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
                 if self.n_threads > 1:

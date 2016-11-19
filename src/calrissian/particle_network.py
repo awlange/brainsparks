@@ -572,7 +572,7 @@ class ParticleNetwork(object):
         if self.regularizer is not None:
             dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
 
-        return dc_db, dc_dq, dc_dr, dc_dt, dc_dzeta
+        return dc_db, dc_dq, dc_dr, dc_dt
 
     def fit(self, data_X, data_Y, optimizer):
         """
@@ -585,7 +585,7 @@ class ParticleNetwork(object):
 
         return optimizer.optimize(self, data_X, data_Y)
 
-    def write_to_json(self, file):
+    def write_to_json(self, file=None):
         """
         Write network data to file in JSON format
         :param file: a file open for writing
@@ -614,17 +614,24 @@ class ParticleNetwork(object):
                 l_data["theta"].append(layer.theta[i])
             network["layers"].append(l_data)
 
-        json.dump(network, file)
+        if file is not None:
+            json.dump(network, file)
+        else:
+            return json.dumps(network)
 
     @staticmethod
-    def read_from_json(file):
+    def read_from_json(file, from_string=None):
         """
         Read network data from file in JSON format, return new ParticleNetwork
         :param file: a file open for reading
         :return:
         """
 
-        data = json.load(file)
+        data = None
+        if from_string is None:
+            data = json.load(file)
+        else:
+            data = json.loads(from_string)
 
         network = ParticleNetwork(cost=data.get("cost_name"))
 
@@ -660,4 +667,3 @@ class ParticleNetwork(object):
             n_input = len(d_layer.get("rx"))
 
         return network
-

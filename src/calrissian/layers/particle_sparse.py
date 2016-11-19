@@ -103,8 +103,11 @@ class ParticleSparse(object):
         """
         a = [{} for _ in range(len(z))]
         for i, zz in enumerate(z):
-            for pair in sorted(zip(list(range(self.output_size)), list(zz)), key=(lambda x: x[1]))[:self.ktop]:
-                a[i][pair[0]] = pair[1]
+            if self.ktop == self.output_size:
+                a[i] = dict(zip(list(range(self.output_size)), list(zz)))
+            else:
+                # TODO: heap instead of full sort?
+                a[i] = dict(sorted(zip(list(range(self.output_size)), list(zz)), key=(lambda x: x[1]))[:self.ktop])
         return a
 
     def compute_da(self, z):
