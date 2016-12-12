@@ -51,40 +51,41 @@ class ParticleCG(Optimizer):
         return self.pool
 
     def cost_gradient_parallel(self, network, data_X, data_Y):
-        offset = 0
-        chunks = len(data_X) / self.chunk_size
-        while offset < len(data_X):
-            data_X_sub = data_X[offset:(offset+self.chunk_size), :]
-            data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
-            data_X_split = np.array_split(data_X_sub, self.n_threads)
-            data_Y_split = np.array_split(data_Y_sub, self.n_threads)
-            data_XY_list = [(data_X_split[i], data_Y_split[i], self.n_threads * chunks) for i in range(self.n_threads)]
+        with Pool(processes=self.n_threads) as pool:
+            offset = 0
+            chunks = len(data_X) / self.chunk_size
+            while offset < len(data_X):
+                data_X_sub = data_X[offset:(offset+self.chunk_size), :]
+                data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
+                data_X_split = np.array_split(data_X_sub, self.n_threads)
+                data_Y_split = np.array_split(data_Y_sub, self.n_threads)
+                data_XY_list = [(data_X_split[i], data_Y_split[i], self.n_threads * chunks) for i in range(self.n_threads)]
 
-            result = self.get_pool().map(network.cost_gradient_thread, data_XY_list)
+                result = pool.map(network.cost_gradient_thread, data_XY_list)
 
-            for t, result_t in enumerate(result):
-                tmp_dc_db = result_t[0]
-                tmp_dc_dq = result_t[1]
-                tmp_dc_dr = result_t[2]
-                tmp_dc_dt = result_t[3]
+                for t, result_t in enumerate(result):
+                    tmp_dc_db = result_t[0]
+                    tmp_dc_dq = result_t[1]
+                    tmp_dc_dr = result_t[2]
+                    tmp_dc_dt = result_t[3]
 
-                if t == 0 and offset == 0:
-                    self.dc_db = tmp_dc_db
-                    self.dc_dq = tmp_dc_dq
-                    self.dc_dr = tmp_dc_dr
-                    self.dc_dt = tmp_dc_dt
-                else:
-                    for l, tmp_b in enumerate(tmp_dc_db):
-                        self.dc_db[l] += tmp_b
-                    for l, tmp_q in enumerate(tmp_dc_dq):
-                        self.dc_dq[l] += tmp_q
-                    for l, tmp_t in enumerate(tmp_dc_dt):
-                        self.dc_dt[l] += tmp_t
-                    for i in range(3):
-                        for l, tmp_r in enumerate(tmp_dc_dr[i]):
-                            self.dc_dr[i][l] += tmp_r
+                    if t == 0 and offset == 0:
+                        self.dc_db = tmp_dc_db
+                        self.dc_dq = tmp_dc_dq
+                        self.dc_dr = tmp_dc_dr
+                        self.dc_dt = tmp_dc_dt
+                    else:
+                        for l, tmp_b in enumerate(tmp_dc_db):
+                            self.dc_db[l] += tmp_b
+                        for l, tmp_q in enumerate(tmp_dc_dq):
+                            self.dc_dq[l] += tmp_q
+                        for l, tmp_t in enumerate(tmp_dc_dt):
+                            self.dc_dt[l] += tmp_t
+                        for i in range(3):
+                            for l, tmp_r in enumerate(tmp_dc_dr[i]):
+                                self.dc_dr[i][l] += tmp_r
 
-            offset += self.chunk_size
+                offset += self.chunk_size
 
     def optimize(self, network, data_X, data_Y):
         """

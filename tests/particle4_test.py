@@ -4,6 +4,7 @@ Script entry point
 
 from src.calrissian.particle4_network import Particle4Network
 from src.calrissian.layers.particle4 import Particle4
+from src.calrissian.layers.particle4 import Particle4Input
 from src.calrissian.optimizers.particle4_sgd import Particle4SGD
 
 import numpy as np
@@ -11,19 +12,16 @@ import numpy as np
 
 def main():
 
-    # train_X = np.asarray([[0.2, -0.3]])
-    # train_Y = np.asarray([[0.0, 1.0, 0.0]])
-
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
+    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = Particle4Network(cost="mse")
-    net.append(Particle4(2, 5, activation="sigmoid"))
-    net.append(Particle4(5, 3, activation="sigmoid"))
+    net = Particle4Network(cost="mse", particle_input=Particle4Input(2, phase_enabled=True))
+    net.append(Particle4(2, 3, activation="sigmoid", phase_enabled=True))
+
+    print(net.particle_input.get_rxyz())
 
     print(net.predict(train_X))
     print(net.cost(train_X, train_Y))
-    # print(net.cost_gradient(train_X, train_Y))
 
 
 def main2():
@@ -33,7 +31,7 @@ def main2():
     train_X = np.asarray([[0.2, -0.3]])
     train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    net = Particle4Network(cost="mse")
+    net = Particle4Network(cost="mse", particle_input=Particle4Input(2))
     net.append(Particle4(2, 5, activation="sigmoid"))
     net.append(Particle4(5, 3, activation="sigmoid"))
 
@@ -45,18 +43,18 @@ def main3():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
-    net = Particle4Network(cost="mse")
+    net = Particle4Network(cost="mse", particle_input=Particle4Input(2))
     net.append(Particle4(2, 5, activation="sigmoid"))
     net.append(Particle4(5, 3, activation="sigmoid"))
 
     print(net.predict(train_X))
-    #
-    # with open("/Users/alange/network.json", "w") as f:
-    #     net.write_to_json(f)
-    #
-    # with open("/Users/alange/network.json", "r") as f:
-    #     new_net = Particle2Network.read_from_json(f)
-    #     print(new_net.predict(train_X))
+
+    with open("/Users/adrianlange/network.json", "w") as f:
+        net.write_to_json(f)
+
+    with open("/Users/adrianlange/network.json", "r") as f:
+        new_net = Particle4Network.read_from_json(f)
+        print(new_net.predict(train_X))
 
 
 def fd():
@@ -64,19 +62,21 @@ def fd():
     # train_X = np.asarray([[0.2, -0.3]])
     # train_Y = np.asarray([[0.0, 1.0, 0.0]])
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.33, -0.9], [0.44, -1.1]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
 
-    net = Particle4Network(cost="categorical_cross_entropy", regularizer=None)
-    net.append(Particle4(2, 5, activation="sigmoid"))
-    net.append(Particle4(5, 4, activation="sigmoid"))
-    net.append(Particle4(4, 3, activation="softmax"))
+    r_dim = 4
+
+    net = Particle4Network(cost="categorical_cross_entropy", particle_input=Particle4Input(2, r_dim=r_dim), r_dim=4)
+    net.append(Particle4(2, 5, activation="sigmoid", r_dim=r_dim))
+    net.append(Particle4(5, 4, activation="sigmoid", r_dim=r_dim))
+    net.append(Particle4(4, 3, activation="softmax", r_dim=r_dim))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dq, drx_pos_inp, dry_pos_inp, drx_neg_inp, dry_neg_inp, drx_pos_out, dry_pos_out, drx_neg_out, dry_neg_out = net.cost_gradient(train_X, train_Y)
+    db, dq, dr, dt = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -120,175 +120,77 @@ def fd():
     for x in fd_q:
         print(x)
 
-    print("analytic x pos input")
-    for layer in drx_pos_inp:
-        print(layer)
+    print("analytic theta")
+    for x in dt:
+        print(x)
 
-    print("analytic y pos input")
-    for layer in dry_pos_inp:
-        print(layer)
+    # input layer
+    fd_t = []
+    layer = net.particle_input
+    lt = []
+    for i in range(len(layer.theta)):
+        orig = layer.theta[i]
+        layer.theta[i] += h
+        fp = net.cost(train_X, train_Y)
+        layer.theta[i] -= 2*h
+        fm = net.cost(train_X, train_Y)
+        lt.append((fp - fm) / (2*h))
+        layer.theta[i] = orig
+    fd_t.append(lt)
 
-    fd_r_x = []
-    fd_r_y = []
-
-    for layer in net.layers:
-        lr_x = []
-        lr_y = []
-        for i in range(layer.input_size):
-            # x
-            orig = layer.rx_pos_inp[i]
-            layer.rx_pos_inp[i] += h
+    # layers
+    for l in range(len(net.layers)):
+        lt = []
+        for i in range(len(net.layers[l].theta)):
+            orig = net.layers[l].theta[i]
+            net.layers[l].theta[i] += h
             fp = net.cost(train_X, train_Y)
-            layer.rx_pos_inp[i] -= 2*h
+            net.layers[l].theta[i] -= 2*h
             fm = net.cost(train_X, train_Y)
-            lr_x.append((fp - fm) / (2*h))
-            layer.rx_pos_inp[i] = orig
+            lt.append((fp - fm) / (2*h))
+            net.layers[l].theta[i] = orig
+        fd_t.append(lt)
 
-            # y
-            orig = layer.ry_pos_inp[i]
-            layer.ry_pos_inp[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.ry_pos_inp[i] -= 2*h
-            fm = net.cost(train_X, train_Y)
-            lr_y.append((fp - fm) / (2*h))
-            layer.ry_pos_inp[i] = orig
+    print("numerical theta")
+    for x in fd_t:
+        print(x)
 
-        fd_r_x.append(lr_x)
-        fd_r_y.append(lr_y)
+    for dim in range(net.r_dim):
+        fd_r = []
 
-    print("numerical pos x input")
-    for f in fd_r_x:
-        print(f)
-    print("numerical pos y input")
-    for f in fd_r_y:
-        print(f)
-
-    print("analytic x neg input")
-    for layer in drx_neg_inp:
-        print(layer)
-
-    print("analytic y neg input")
-    for layer in dry_neg_inp:
-        print(layer)
-
-    fd_r_x = []
-    fd_r_y = []
-
-    for layer in net.layers:
-        lr_x = []
-        lr_y = []
-        for i in range(layer.input_size):
-            # x
-            orig = layer.rx_neg_inp[i]
-            layer.rx_neg_inp[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.rx_neg_inp[i] -= 2*h
-            fm = net.cost(train_X, train_Y)
-            lr_x.append((fp - fm) / (2*h))
-            layer.rx_neg_inp[i] = orig
-
-            # y
-            orig = layer.ry_neg_inp[i]
-            layer.ry_neg_inp[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.ry_neg_inp[i] -= 2*h
-            fm = net.cost(train_X, train_Y)
-            lr_y.append((fp - fm) / (2*h))
-            layer.ry_neg_inp[i] = orig
-
-        fd_r_x.append(lr_x)
-        fd_r_y.append(lr_y)
-
-    print("numerical neg x input")
-    for f in fd_r_x:
-        print(f)
-    print("numerical neg y input")
-    for f in fd_r_y:
-        print(f)
-
-    print("analytic pos x output")
-    for layer in drx_pos_out:
-        print(layer)
-    print("analytic pos y output")
-    for layer in dry_pos_out:
-        print(layer)
-
-    fd_r_x = []
-    fd_r_y = []
-
-    for layer in net.layers:
-        lr_x = []
-        lr_y = []
+        # input first
+        layer = net.particle_input
+        lr = []
         for i in range(layer.output_size):
-            # x
-            orig = layer.rx_pos_out[i]
-            layer.rx_pos_out[i] += h
+            orig = layer.r[i][dim]
+            layer.r[i][dim] += h
             fp = net.cost(train_X, train_Y)
-            layer.rx_pos_out[i] -= 2*h
+            layer.r[i][dim] -= 2*h
             fm = net.cost(train_X, train_Y)
-            lr_x.append((fp - fm) / (2*h))
-            layer.rx_pos_out[i] = orig
+            lr.append((fp - fm) / (2*h))
+            layer.r[i][dim] = orig
+        fd_r.append(lr)
 
-            # y
-            orig = layer.ry_pos_out[i]
-            layer.ry_pos_out[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.ry_pos_out[i] -= 2*h
-            fm = net.cost(train_X, train_Y)
-            lr_y.append((fp - fm) / (2*h))
-            layer.ry_pos_out[i] = orig
+        # layers
+        for layer in net.layers:
+            lr = []
+            for i in range(layer.output_size):
+                orig = layer.r[i][dim]
+                layer.r[i][dim] += h
+                fp = net.cost(train_X, train_Y)
+                layer.r[i][dim] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lr.append((fp - fm) / (2*h))
+                layer.r[i][dim] = orig
+            fd_r.append(lr)
 
-        fd_r_x.append(lr_x)
-        fd_r_y.append(lr_y)
+        print("analytic r {}".format(dim))
+        for lr in dr:
+            print(lr.transpose()[dim])
+        print("numerical r x")
+        for f in fd_r:
+            print(f)
 
-    print("numerical pos r x output")
-    for f in fd_r_x:
-        print(f)
-    print("numerical pos r y output")
-    for f in fd_r_y:
-        print(f)
-
-    print("analytic neg x output")
-    for layer in drx_neg_out:
-        print(layer)
-    print("analytic neg y output")
-    for layer in dry_neg_out:
-        print(layer)
-
-    fd_r_x = []
-    fd_r_y = []
-
-    for layer in net.layers:
-        lr_x = []
-        lr_y = []
-        for i in range(layer.output_size):
-            # x
-            orig = layer.rx_neg_out[i]
-            layer.rx_neg_out[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.rx_neg_out[i] -= 2 * h
-            fm = net.cost(train_X, train_Y)
-            lr_x.append((fp - fm) / (2 * h))
-            layer.rx_neg_out[i] = orig
-
-            # y
-            orig = layer.ry_neg_out[i]
-            layer.ry_neg_out[i] += h
-            fp = net.cost(train_X, train_Y)
-            layer.ry_neg_out[i] -= 2 * h
-            fm = net.cost(train_X, train_Y)
-            lr_y.append((fp - fm) / (2 * h))
-            layer.ry_neg_out[i] = orig
-
-        fd_r_x.append(lr_x)
-        fd_r_y.append(lr_y)
-
-    print("numerical neg r x output")
-    for f in fd_r_x:
-        print(f)
-    print("numerical neg r y output")
-    for f in fd_r_y:
-        print(f)
 
 if __name__ == "__main__":
 
@@ -296,6 +198,7 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    # main2()
+    main2()
     # main3()
-    fd()
+    # main4()
+    # fd()

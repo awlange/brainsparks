@@ -10,7 +10,7 @@ class ParticleDipoleSGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=0.01, alpha_r=0.01):
+                 cost_freq=2, gamma=0.99):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -22,6 +22,7 @@ class ParticleDipoleSGD(Optimizer):
         self.mini_batch_size = mini_batch_size
         self.verbosity = verbosity
         self.cost_freq = cost_freq
+        self.gamma = gamma
 
         self.alpha_b = alpha
         self.alpha_q = alpha
@@ -34,6 +35,8 @@ class ParticleDipoleSGD(Optimizer):
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
         if weight_update == "adagrad":
             self.weight_update_func = self.weight_update_adagrad
+        if weight_update == "rmsprop":
+            self.weight_update_func = self.weight_update_rmsprop
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -242,6 +245,69 @@ class ParticleDipoleSGD(Optimizer):
         self.vel_rx_neg[l] += self.dc_drx_neg[l]**2
         self.vel_ry_neg[l] += self.dc_dry_neg[l]**2
         self.vel_rz_neg[l] += self.dc_drz_neg[l]**2
+        layer.rx_pos += -self.alpha * self.dc_drx_pos[l] / np.sqrt(self.vel_rx_pos[l] + epsilon)
+        layer.ry_pos += -self.alpha * self.dc_dry_pos[l] / np.sqrt(self.vel_ry_pos[l] + epsilon)
+        layer.rz_pos += -self.alpha * self.dc_drz_pos[l] / np.sqrt(self.vel_rz_pos[l] + epsilon)
+        layer.rx_neg += -self.alpha * self.dc_drx_neg[l] / np.sqrt(self.vel_rx_neg[l] + epsilon)
+        layer.ry_neg += -self.alpha * self.dc_dry_neg[l] / np.sqrt(self.vel_ry_neg[l] + epsilon)
+        layer.rz_neg += -self.alpha * self.dc_drz_neg[l] / np.sqrt(self.vel_rz_neg[l] + epsilon)
+
+    def weight_update_rmsprop(self, network):
+        """
+        Update weights and biases according to AdaGrad
+        """
+        epsilon = 10e-8
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+
+        # Initialize velocities/MSE to zero for momentum
+        if self.vel_b is None or self.vel_q is None:
+            self.vel_b = []
+            self.vel_q = []
+            self.vel_rx_pos = [np.zeros(network.particle_input.output_size)]
+            self.vel_ry_pos = [np.zeros(network.particle_input.output_size)]
+            self.vel_rz_pos = [np.zeros(network.particle_input.output_size)]
+            self.vel_rx_neg = [np.zeros(network.particle_input.output_size)]
+            self.vel_ry_neg = [np.zeros(network.particle_input.output_size)]
+            self.vel_rz_neg = [np.zeros(network.particle_input.output_size)]
+            for l, layer in enumerate(network.layers):
+                self.vel_b.append(np.zeros(layer.b.shape))
+                self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_rx_pos.append(np.zeros(layer.output_size))
+                self.vel_ry_pos.append(np.zeros(layer.output_size))
+                self.vel_rz_pos.append(np.zeros(layer.output_size))
+                self.vel_rx_neg.append(np.zeros(layer.output_size))
+                self.vel_ry_neg.append(np.zeros(layer.output_size))
+                self.vel_rz_neg.append(np.zeros(layer.output_size))
+
+        for l, layer in enumerate(network.layers):
+            # self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
+            
+            self.vel_b[l] = gamma * self.vel_b[l] + one_m_gamma * self.dc_db[l] ** 2
+            self.vel_q[l] = gamma * self.vel_q[l] + one_m_gamma * self.dc_dq[l] ** 2
+            self.vel_rx_pos[l + 1] = gamma * self.vel_rx_pos[l+1] + one_m_gamma * self.dc_drx_pos[l + 1] ** 2
+            self.vel_ry_pos[l + 1] = gamma * self.vel_ry_pos[l+1] + one_m_gamma * self.dc_dry_pos[l + 1] ** 2
+            self.vel_rz_pos[l + 1] = gamma * self.vel_rz_pos[l+1] + one_m_gamma * self.dc_drz_pos[l + 1] ** 2
+            self.vel_rx_neg[l + 1] = gamma * self.vel_rx_neg[l+1] + one_m_gamma * self.dc_drx_neg[l + 1] ** 2
+            self.vel_ry_neg[l + 1] = gamma * self.vel_ry_neg[l+1] + one_m_gamma * self.dc_dry_neg[l + 1] ** 2
+            self.vel_rz_neg[l + 1] = gamma * self.vel_rz_neg[l+1] + one_m_gamma * self.dc_drz_neg[l + 1] ** 2
+            layer.b += -self.alpha * self.dc_db[l] / np.sqrt(self.vel_b[l] + epsilon)
+            layer.q += -self.alpha * self.dc_dq[l] / np.sqrt(self.vel_q[l] + epsilon)
+            layer.rx_pos += -self.alpha * self.dc_drx_pos[l + 1] / np.sqrt(self.vel_rx_pos[l + 1] + epsilon)
+            layer.ry_pos += -self.alpha * self.dc_dry_pos[l + 1] / np.sqrt(self.vel_ry_pos[l + 1] + epsilon)
+            layer.rz_pos += -self.alpha * self.dc_drz_pos[l + 1] / np.sqrt(self.vel_rz_pos[l + 1] + epsilon)
+            layer.rx_neg += -self.alpha * self.dc_drx_neg[l + 1] / np.sqrt(self.vel_rx_neg[l + 1] + epsilon)
+            layer.ry_neg += -self.alpha * self.dc_dry_neg[l + 1] / np.sqrt(self.vel_ry_neg[l + 1] + epsilon)
+            layer.rz_neg += -self.alpha * self.dc_drz_neg[l + 1] / np.sqrt(self.vel_rz_neg[l + 1] + epsilon)
+
+        layer = network.particle_input
+        l = 0
+        self.vel_rx_pos[l] = gamma * self.vel_rx_pos[l] + one_m_gamma * self.dc_drx_pos[l] ** 2
+        self.vel_ry_pos[l] = gamma * self.vel_ry_pos[l] + one_m_gamma * self.dc_dry_pos[l] ** 2
+        self.vel_rz_pos[l] = gamma * self.vel_rz_pos[l] + one_m_gamma * self.dc_drz_pos[l] ** 2
+        self.vel_rx_neg[l] = gamma * self.vel_rx_neg[l] + one_m_gamma * self.dc_drx_neg[l] ** 2
+        self.vel_ry_neg[l] = gamma * self.vel_ry_neg[l] + one_m_gamma * self.dc_dry_neg[l] ** 2
+        self.vel_rz_neg[l] = gamma * self.vel_rz_neg[l] + one_m_gamma * self.dc_drz_neg[l] ** 2
         layer.rx_pos += -self.alpha * self.dc_drx_pos[l] / np.sqrt(self.vel_rx_pos[l] + epsilon)
         layer.ry_pos += -self.alpha * self.dc_dry_pos[l] / np.sqrt(self.vel_ry_pos[l] + epsilon)
         layer.rz_pos += -self.alpha * self.dc_drz_pos[l] / np.sqrt(self.vel_rz_pos[l] + epsilon)
