@@ -90,14 +90,14 @@ class Activation(object):
 
     def relu2(self, x):
         xt = x.transpose()
-        xs = np.split(xt, 2, axis=1)
+        xs = np.array_split(xt, 2, axis=1)
         spos = np.maximum(0, xs[0])
         sneg = np.minimum(0, xs[1])
         return np.concatenate((spos, sneg), axis=1).transpose()
 
     def d_relu2(self, x):
         xt = x.transpose()
-        xs = np.split(xt, 2, axis=1)
+        xs = np.array_split(xt, 2, axis=1)
         spos = np.piecewise(xs[0], [xs[0] < 0.0, xs[0] >= 0], [0.0, 1.0])
         sneg = np.piecewise(xs[1], [xs[1] < 0.0, xs[1] >= 0], [1.0, 0.0])
         return np.concatenate((spos, sneg), axis=1).transpose()

@@ -38,21 +38,19 @@ class Particle2Dipole(object):
         # self.q = np.random.uniform(-q, q, output_size)
         self.q = np.random.choice([q, -q], size=output_size)
 
-        sz = 0.0
+        self.rx_pos_inp = np.random.normal(0.0, s, input_size)
+        self.ry_pos_inp = np.random.normal(0.0, s, input_size)
+        self.rz_pos_inp = np.random.normal(0.0, s, input_size)
+        self.rx_neg_inp = np.random.normal(0.0, s, input_size)
+        self.ry_neg_inp = np.random.normal(0.0, s, input_size)
+        self.rz_neg_inp = np.random.normal(0.0, s, input_size)
 
-        self.rx_pos_inp = np.random.uniform(-s, s, input_size)
-        self.ry_pos_inp = np.random.uniform(-s, s, input_size)
-        self.rz_pos_inp = np.random.uniform(-sz, sz, input_size)
-        self.rx_neg_inp = np.random.uniform(-s, s, input_size)
-        self.ry_neg_inp = np.random.uniform(-s, s, input_size)
-        self.rz_neg_inp = np.random.uniform(-sz, sz, input_size)
-
-        self.rx_pos_out = np.random.uniform(-s, s, output_size)
-        self.ry_pos_out = np.random.uniform(-s, s, output_size)
-        self.rz_pos_out = np.random.uniform(-sz, sz, output_size)
-        self.rx_neg_out = np.random.uniform(-s, s, output_size)
-        self.ry_neg_out = np.random.uniform(-s, s, output_size)
-        self.rz_neg_out = np.random.uniform(-sz, sz, output_size)
+        self.rx_pos_out = np.random.normal(0.0, s, output_size)
+        self.ry_pos_out = np.random.normal(0.0, s, output_size)
+        self.rz_pos_out = np.random.normal(0.0, s, output_size)
+        self.rx_neg_out = np.random.normal(0.0, s, output_size)
+        self.ry_neg_out = np.random.normal(0.0, s, output_size)
+        self.rz_neg_out = np.random.normal(0.0, s, output_size)
 
     def set_cut(self, cut):
         self.cut = cut

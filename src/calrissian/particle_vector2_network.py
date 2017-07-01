@@ -7,7 +7,7 @@ import numpy as np
 import json
 
 
-class ParticleVectorNetwork(object):
+class ParticleVector2Network(object):
 
     def __init__(self, particle_input=None, cost="mse", regularizer=None):
         self.layers = []
@@ -110,26 +110,30 @@ class ParticleVectorNetwork(object):
 
         # Output gradients
         dc_db = []
+        dc_dq = []
         dc_dr_x = [np.zeros(self.particle_input.output_size)]
         dc_dr_y = [np.zeros(self.particle_input.output_size)]
         dc_dr_z = [np.zeros(self.particle_input.output_size)]
-        dc_dr_w = [np.zeros(self.particle_input.output_size)]
         dc_dn_x = [np.zeros(self.particle_input.output_size)]
         dc_dn_y = [np.zeros(self.particle_input.output_size)]
         dc_dn_z = [np.zeros(self.particle_input.output_size)]
-        dc_dn_w = [np.zeros(self.particle_input.output_size)]
+        dc_dm_x = []
+        dc_dm_y = []
+        dc_dm_z = []
 
         # Initialize
         for l, layer in enumerate(self.layers):
             dc_db.append(np.zeros(layer.b.shape))
-            dc_dr_x.append(np.zeros(layer.output_size))
-            dc_dr_y.append(np.zeros(layer.output_size))
-            dc_dr_z.append(np.zeros(layer.output_size))
-            dc_dr_w.append(np.zeros(layer.output_size))
-            dc_dn_x.append(np.zeros(layer.output_size))
-            dc_dn_y.append(np.zeros(layer.output_size))
-            dc_dn_z.append(np.zeros(layer.output_size))
-            dc_dn_w.append(np.zeros(layer.output_size))
+            dc_dq.append(np.zeros(layer.q.shape))
+            dc_dr_x.append(np.zeros(len(layer.q)))
+            dc_dr_y.append(np.zeros(len(layer.q)))
+            dc_dr_z.append(np.zeros(len(layer.q)))
+            dc_dn_x.append(np.zeros(len(layer.q)))
+            dc_dn_y.append(np.zeros(len(layer.q)))
+            dc_dn_z.append(np.zeros(len(layer.q)))
+            dc_dm_x.append(np.zeros(len(layer.q)))
+            dc_dm_y.append(np.zeros(len(layer.q)))
+            dc_dm_z.append(np.zeros(len(layer.q)))
 
         sigma_Z = []
         A_scaled, _ = self.particle_input.feed_forward(data_X)
@@ -158,20 +162,19 @@ class ParticleVectorNetwork(object):
         self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, 1))
         self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, 1))
         self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, 1))
-        self.particle_input.rw = self.particle_input.rw.reshape((self.particle_input.output_size, 1))
         self.particle_input.nx = self.particle_input.nx.reshape((self.particle_input.output_size, 1))
         self.particle_input.ny = self.particle_input.ny.reshape((self.particle_input.output_size, 1))
         self.particle_input.nz = self.particle_input.nz.reshape((self.particle_input.output_size, 1))
-        self.particle_input.nw = self.particle_input.nw.reshape((self.particle_input.output_size, 1))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, 1))
             layer.ry = layer.ry.reshape((layer.output_size, 1))
             layer.rz = layer.rz.reshape((layer.output_size, 1))
-            layer.rw = layer.rw.reshape((layer.output_size, 1))
             layer.nx = layer.nx.reshape((layer.output_size, 1))
             layer.ny = layer.ny.reshape((layer.output_size, 1))
             layer.nz = layer.nz.reshape((layer.output_size, 1))
-            layer.nw = layer.nw.reshape((layer.output_size, 1))
+            layer.mx = layer.mx.reshape((layer.output_size, 1))
+            layer.my = layer.my.reshape((layer.output_size, 1))
+            layer.mz = layer.mz.reshape((layer.output_size, 1))
 
         l = -1
         layer = self.layers[l]
@@ -188,62 +191,56 @@ class ParticleVectorNetwork(object):
 
         # Position gradient
         for j in range(layer.output_size):
+            qj = layer.q[j]
             trans_delta_L_j = trans_delta_L[j]
             trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
 
             dx = (prev_layer.rx - layer.rx[j])
             dy = (prev_layer.ry - layer.ry[j])
             dz = (prev_layer.rz - layer.rz[j])
-            dw = (prev_layer.rw - layer.rw[j])
-            d2 = dx**2 + dy**2 + dz**2 + dw**2
-            r = np.sqrt(d2)
-            exp_dij = layer.potential(r)
-            dot = prev_layer.nx * layer.nx[j] + prev_layer.ny * layer.ny[j] + prev_layer.nz * layer.nz[j] + prev_layer.nw * layer.nw[j]
+            d2 = dx**2 + dy**2 + dz**2
+            exp_dij = np.exp(-d2)
+            dot = prev_layer.nx * layer.mx[j] + prev_layer.ny * layer.my[j] + prev_layer.nz * layer.mz[j]
             exp_dij *= dot
 
             # Next delta
-            next_delta += trans_delta_L_j * exp_dij * trans_sigma_Z_l
-            atj = Al_trans * trans_delta_L_j
-            dq = exp_dij * atj
+            next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
+
+            # Charge gradient
+            dq = exp_dij * Al_trans * trans_delta_L_j
+            dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
-            tmp = -dot * atj * layer.d_potential(r) / r
+            tmp = 2.0 * qj * dq
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
-            tw = dw * tmp
 
             dc_dr_x[l][j] += np.sum(tx)
             dc_dr_y[l][j] += np.sum(ty)
             dc_dr_z[l][j] += np.sum(tz)
-            dc_dr_w[l][j] += np.sum(tw)
 
             dc_dr_x[l-1] -= np.sum(tx, axis=1)
             dc_dr_y[l-1] -= np.sum(ty, axis=1)
             dc_dr_z[l-1] -= np.sum(tz, axis=1)
-            dc_dr_w[l-1] -= np.sum(tw, axis=1)
 
             # Vector gradient
-            tmp = dq / dot
+            tmp = qj * dq / dot
             tx = tmp * prev_layer.nx
             ty = tmp * prev_layer.ny
             tz = tmp * prev_layer.nz
-            tw = tmp * prev_layer.nw
 
-            dc_dn_x[l][j] += np.sum(tx)
-            dc_dn_y[l][j] += np.sum(ty)
-            dc_dn_z[l][j] += np.sum(tz)
-            dc_dn_w[l][j] += np.sum(tw)
+            dc_dm_x[l][j] += np.sum(tx)
+            dc_dm_y[l][j] += np.sum(ty)
+            dc_dm_z[l][j] += np.sum(tz)
 
-            tx = tmp * layer.nx[j]
-            ty = tmp * layer.ny[j]
-            tz = tmp * layer.nz[j]
-            tw = tmp * layer.nw[j]
+            tx = tmp * layer.mx[j]
+            ty = tmp * layer.my[j]
+            tz = tmp * layer.mz[j]
 
             dc_dn_x[l-1] += np.sum(tx, axis=1)
             dc_dn_y[l-1] += np.sum(ty, axis=1)
             dc_dn_z[l-1] += np.sum(tz, axis=1)
-            dc_dn_w[l-1] += np.sum(tw, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -266,88 +263,80 @@ class ParticleVectorNetwork(object):
 
             # Position gradient
             for j in range(layer.output_size):
+                qj = layer.q[j]
                 this_delta_j = this_delta[j]
 
                 dx = (prev_layer.rx - layer.rx[j])
                 dy = (prev_layer.ry - layer.ry[j])
                 dz = (prev_layer.rz - layer.rz[j])
-                dw = (prev_layer.rw - layer.rw[j])
-                d2 = dx**2 + dy**2 + dz**2 + dw**2
-                r = np.sqrt(d2)
-                exp_dij = layer.potential(r)
-                dot = prev_layer.nx * layer.nx[j] + prev_layer.ny * layer.ny[j] + prev_layer.nz * layer.nz[j] + prev_layer.nw * layer.nw[j]
+                d2 = dx**2 + dy**2 + dz**2
+                exp_dij = np.exp(-d2)
+                dot = prev_layer.nx * layer.mx[j] + prev_layer.ny * layer.my[j] + prev_layer.nz * layer.mz[j]
                 exp_dij *= dot
 
                 # Next delta
-                next_delta += this_delta_j * exp_dij * trans_sigma_Z_l
+                next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
 
                 # Charge gradient
-                atj = Al_trans * this_delta_j
-                dq = exp_dij * atj
+                dq = exp_dij * Al_trans * this_delta_j
+                dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
-                tmp = -dot * atj * layer.d_potential(r) / r
+                tmp = 2.0 * qj * dq
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp
-                tw = dw * tmp
 
                 dc_dr_x[l][j] += np.sum(tx)
                 dc_dr_y[l][j] += np.sum(ty)
                 dc_dr_z[l][j] += np.sum(tz)
-                dc_dr_w[l][j] += np.sum(tw)
 
                 dc_dr_x[l-1] -= np.sum(tx, axis=1)
                 dc_dr_y[l-1] -= np.sum(ty, axis=1)
                 dc_dr_z[l-1] -= np.sum(tz, axis=1)
-                dc_dr_w[l-1] -= np.sum(tw, axis=1)
 
                 # Vector gradient
-                tmp = dq / dot
+                tmp = qj * dq / dot
                 tx = tmp * prev_layer.nx
                 ty = tmp * prev_layer.ny
                 tz = tmp * prev_layer.nz
-                tw = tmp * prev_layer.nw
 
-                dc_dn_x[l][j] += np.sum(tx)
-                dc_dn_y[l][j] += np.sum(ty)
-                dc_dn_z[l][j] += np.sum(tz)
-                dc_dn_w[l][j] += np.sum(tw)
+                dc_dm_x[l][j] += np.sum(tx)
+                dc_dm_y[l][j] += np.sum(ty)
+                dc_dm_z[l][j] += np.sum(tz)
 
-                tx = tmp * layer.nx[j]
-                ty = tmp * layer.ny[j]
-                tz = tmp * layer.nz[j]
-                tw = tmp * layer.nw[j]
+                tx = tmp * layer.mx[j]
+                ty = tmp * layer.my[j]
+                tz = tmp * layer.mz[j]
 
                 dc_dn_x[l - 1] += np.sum(tx, axis=1)
                 dc_dn_y[l - 1] += np.sum(ty, axis=1)
                 dc_dn_z[l - 1] += np.sum(tz, axis=1)
-                dc_dn_w[l - 1] += np.sum(tw, axis=1)
 
         # Position gradient list
-        dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z, dc_dr_w)
-        dc_dn = (dc_dn_x, dc_dn_y, dc_dn_z, dc_dn_w)
+        dc_dr = (dc_dr_x, dc_dr_y, dc_dr_z)
+        dc_dn = (dc_dn_x, dc_dn_y, dc_dn_z)
+        dc_dm = (dc_dm_x, dc_dm_y, dc_dm_z)
 
         # Restore shapes
         self.particle_input.rx = self.particle_input.rx.reshape((self.particle_input.output_size, ))
         self.particle_input.ry = self.particle_input.ry.reshape((self.particle_input.output_size, ))
         self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, ))
-        self.particle_input.rw = self.particle_input.rw.reshape((self.particle_input.output_size, ))
         self.particle_input.nx = self.particle_input.nx.reshape((self.particle_input.output_size, ))
         self.particle_input.ny = self.particle_input.ny.reshape((self.particle_input.output_size, ))
         self.particle_input.nz = self.particle_input.nz.reshape((self.particle_input.output_size, ))
-        self.particle_input.nw = self.particle_input.nw.reshape((self.particle_input.output_size, ))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, ))
             layer.ry = layer.ry.reshape((layer.output_size, ))
             layer.rz = layer.rz.reshape((layer.output_size, ))
-            layer.rw = layer.rw.reshape((layer.output_size, ))
             layer.nx = layer.nx.reshape((layer.output_size, ))
             layer.ny = layer.ny.reshape((layer.output_size, ))
             layer.nz = layer.nz.reshape((layer.output_size, ))
-            layer.nw = layer.nw.reshape((layer.output_size, ))
+            layer.mx = layer.mx.reshape((layer.output_size, ))
+            layer.my = layer.my.reshape((layer.output_size, ))
+            layer.mz = layer.mz.reshape((layer.output_size, ))
 
-        return dc_db, dc_dr, dc_dn
+        return dc_db, dc_dq, dc_dr, dc_dn, dc_dm
 
     def fit(self, data_X, data_Y, optimizer):
         """
@@ -360,39 +349,3 @@ class ParticleVectorNetwork(object):
 
         return optimizer.optimize(self, data_X, data_Y)
 
-    def write_to_json(self, file=None):
-        """
-        Write network data to file in JSON format
-        :param file: a file open for writing
-        :return:
-        """
-
-        network = {"particle_input": {}, "layers": [], "cost_name": self.cost_name}
-
-        p_inp = {"rx": [], "ry": [], "rz": [], "nx": [], "ny": [], "nz": []}
-        for i in range(self.particle_input.output_size):
-            p_inp["rx"].append(self.particle_input.rx[i])
-            p_inp["ry"].append(self.particle_input.ry[i])
-            p_inp["rz"].append(self.particle_input.rz[i])
-            p_inp["nx"].append(self.particle_input.nx[i])
-            p_inp["ny"].append(self.particle_input.ny[i])
-            p_inp["nz"].append(self.particle_input.nz[i])
-        network["particle_input"] = p_inp
-
-        for layer in self.layers:
-            l_data = {"rx": [], "ry": [], "rz": [], "nx": [], "ny": [], "nz": [],
-                      "b": [], "activation_name": layer.activation_name}
-            for i in range(layer.output_size):
-                l_data["b"].append(layer.b[0][i])
-                l_data["rx"].append(layer.rx[i])
-                l_data["ry"].append(layer.ry[i])
-                l_data["rz"].append(layer.rz[i])
-                l_data["nx"].append(layer.nx[i])
-                l_data["ny"].append(layer.ny[i])
-                l_data["nz"].append(layer.nz[i])
-            network["layers"].append(l_data)
-
-        if file is not None:
-            json.dump(network, file)
-        else:
-            return json.dumps(network)

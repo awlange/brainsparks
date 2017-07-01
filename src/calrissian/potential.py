@@ -11,6 +11,8 @@ class Potential(object):
     @staticmethod
     def get(name):
         nl = name.lower()
+        if nl == "identity":
+            return Potential().identity
         if nl == "linear":
             return Potential().linear
         if nl == "gaussian":
@@ -25,12 +27,16 @@ class Potential(object):
             return Potential().inv_multi
         if nl == "lorentzian":
             return Potential().lorentzian
+        if nl == "triangle":
+            return Potential().triangle
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
     @staticmethod
     def get_d(name):
         nl = name.lower()
+        if nl == "identity":
+            return Potential().d_identity
         if nl == "linear":
             return Potential().d_linear
         if nl == "gaussian":
@@ -45,8 +51,18 @@ class Potential(object):
             return Potential().d_inv_multi
         if nl == "lorentzian":
             return Potential().d_lorentzian
+        if nl == "triangle":
+            return Potential().d_triangle
 
         raise NameError("Potential name {} is not implemented.".format(name))
+
+    # Identity
+
+    def identity(self, x):
+        return np.ones(x.shape)
+
+    def d_identity(self, x):
+        return np.zeros(x.shape)
 
     # Linear
 
@@ -99,3 +115,10 @@ class Potential(object):
 
     def d_lorentzian(self, x):
         return -2.0 * x / (1.0 + x*x)**2
+
+    # Triangle
+    def triangle(self, x):
+        return np.maximum(0, 1-x)
+
+    def d_triangle(self, x):
+        return np.piecewise(x, [x < 1.0, x >= 1.0], [-1.0, 0.0])
