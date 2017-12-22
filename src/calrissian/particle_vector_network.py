@@ -118,6 +118,7 @@ class ParticleVectorNetwork(object):
         dc_dn_y = [np.zeros(self.particle_input.output_size)]
         dc_dn_z = [np.zeros(self.particle_input.output_size)]
         dc_dn_w = [np.zeros(self.particle_input.output_size)]
+        dc_dzeta = [np.zeros(self.particle_input.output_size)]
 
         # Initialize
         for l, layer in enumerate(self.layers):
@@ -130,6 +131,7 @@ class ParticleVectorNetwork(object):
             dc_dn_y.append(np.zeros(layer.output_size))
             dc_dn_z.append(np.zeros(layer.output_size))
             dc_dn_w.append(np.zeros(layer.output_size))
+            dc_dzeta.append(np.zeros(layer.output_size))
 
         sigma_Z = []
         A_scaled, _ = self.particle_input.feed_forward(data_X)
@@ -163,6 +165,7 @@ class ParticleVectorNetwork(object):
         self.particle_input.ny = self.particle_input.ny.reshape((self.particle_input.output_size, 1))
         self.particle_input.nz = self.particle_input.nz.reshape((self.particle_input.output_size, 1))
         self.particle_input.nw = self.particle_input.nw.reshape((self.particle_input.output_size, 1))
+        self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, 1))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, 1))
             layer.ry = layer.ry.reshape((layer.output_size, 1))
@@ -172,6 +175,7 @@ class ParticleVectorNetwork(object):
             layer.ny = layer.ny.reshape((layer.output_size, 1))
             layer.nz = layer.nz.reshape((layer.output_size, 1))
             layer.nw = layer.nw.reshape((layer.output_size, 1))
+            layer.zeta = layer.zeta.reshape((layer.output_size, 1))
 
         l = -1
         layer = self.layers[l]
@@ -197,6 +201,8 @@ class ParticleVectorNetwork(object):
             dw = (prev_layer.rw - layer.rw[j])
             d2 = dx**2 + dy**2 + dz**2 + dw**2
             r = np.sqrt(d2)
+            zeta_ij = np.sqrt(np.abs(prev_layer.zeta * layer.zeta[j]))
+            r *= zeta_ij
             exp_dij = layer.potential(r)
             dot = prev_layer.nx * layer.nx[j] + prev_layer.ny * layer.ny[j] + prev_layer.nz * layer.nz[j] + prev_layer.nw * layer.nw[j]
             exp_dij *= dot
@@ -208,6 +214,7 @@ class ParticleVectorNetwork(object):
 
             # Position gradient
             tmp = -dot * atj * layer.d_potential(r) / r
+            tmp *= zeta_ij
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -222,6 +229,11 @@ class ParticleVectorNetwork(object):
             dc_dr_y[l-1] -= np.sum(ty, axis=1)
             dc_dr_z[l-1] -= np.sum(tz, axis=1)
             dc_dr_w[l-1] -= np.sum(tw, axis=1)
+
+            # Width gradient
+            tmp = 0.5 * dot * atj * layer.d_potential(r) * np.sqrt(d2) / zeta_ij
+            dc_dzeta[l][j] += np.sum(tmp * np.abs(prev_layer.zeta) * np.sign(layer.zeta[j]))
+            dc_dzeta[l-1] += np.sum(tmp * np.abs(layer.zeta[j]) * np.sign(prev_layer.zeta), axis=1)
 
             # Vector gradient
             tmp = dq / dot
@@ -274,6 +286,8 @@ class ParticleVectorNetwork(object):
                 dw = (prev_layer.rw - layer.rw[j])
                 d2 = dx**2 + dy**2 + dz**2 + dw**2
                 r = np.sqrt(d2)
+                zeta_ij = np.sqrt(np.abs(prev_layer.zeta * layer.zeta[j]))
+                r *= zeta_ij
                 exp_dij = layer.potential(r)
                 dot = prev_layer.nx * layer.nx[j] + prev_layer.ny * layer.ny[j] + prev_layer.nz * layer.nz[j] + prev_layer.nw * layer.nw[j]
                 exp_dij *= dot
@@ -287,6 +301,7 @@ class ParticleVectorNetwork(object):
 
                 # Position gradient
                 tmp = -dot * atj * layer.d_potential(r) / r
+                tmp *= zeta_ij
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp
@@ -301,6 +316,11 @@ class ParticleVectorNetwork(object):
                 dc_dr_y[l-1] -= np.sum(ty, axis=1)
                 dc_dr_z[l-1] -= np.sum(tz, axis=1)
                 dc_dr_w[l-1] -= np.sum(tw, axis=1)
+
+                # Width gradient
+                tmp = 0.5 * dot * atj * layer.d_potential(r) * np.sqrt(d2) / zeta_ij
+                dc_dzeta[l][j] += np.sum(tmp * np.abs(prev_layer.zeta) * np.sign(layer.zeta[j]))
+                dc_dzeta[l - 1] += np.sum(tmp * np.abs(layer.zeta[j]) * np.sign(prev_layer.zeta), axis=1)
 
                 # Vector gradient
                 tmp = dq / dot
@@ -337,6 +357,7 @@ class ParticleVectorNetwork(object):
         self.particle_input.ny = self.particle_input.ny.reshape((self.particle_input.output_size, ))
         self.particle_input.nz = self.particle_input.nz.reshape((self.particle_input.output_size, ))
         self.particle_input.nw = self.particle_input.nw.reshape((self.particle_input.output_size, ))
+        self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, ))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, ))
             layer.ry = layer.ry.reshape((layer.output_size, ))
@@ -346,8 +367,9 @@ class ParticleVectorNetwork(object):
             layer.ny = layer.ny.reshape((layer.output_size, ))
             layer.nz = layer.nz.reshape((layer.output_size, ))
             layer.nw = layer.nw.reshape((layer.output_size, ))
+            layer.zeta = layer.zeta.reshape((layer.output_size, ))
 
-        return dc_db, dc_dr, dc_dn
+        return dc_db, dc_dr, dc_dn, dc_dzeta
 
     def fit(self, data_X, data_Y, optimizer):
         """

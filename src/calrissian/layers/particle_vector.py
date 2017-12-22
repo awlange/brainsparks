@@ -6,28 +6,32 @@ import numpy as np
 
 
 class ParticleVectorInput(object):
-    def __init__(self, output_size, s=1.0):
+    def __init__(self, output_size, rs=1.0, ns=1.0):
         self.output_size = output_size
 
         # Positions
-        self.rx = np.random.normal(0.0, s, output_size)
-        self.ry = np.random.normal(0.0, s, output_size)
-        self.rz = np.random.normal(0.0, s, output_size)
+        self.rx = np.random.normal(0.0, rs, output_size)
+        self.ry = np.random.normal(0.0, rs, output_size)
+        # self.rz = np.random.normal(0.0, s, output_size)
         # self.rw = np.random.normal(0.0, s, output_size)
-        # self.rz = np.zeros(output_size)
+        self.rz = np.zeros(output_size)
         self.rw = np.zeros(output_size)
 
         # Vectors
-        self.nx = np.random.normal(0.0, s, output_size)
-        self.ny = np.random.normal(0.0, s, output_size)
-        self.nz = np.random.normal(0.0, s, output_size)
+        self.nx = np.random.normal(0.0, ns, output_size)
+        self.ny = np.random.normal(0.0, ns, output_size)
+        # self.nz = np.random.normal(0.0, s, output_size)
         # self.nw = np.random.normal(0.0, s, output_size)
-        # self.nz = np.zeros(output_size)
+        self.nz = np.zeros(output_size)
         self.nw = np.zeros(output_size)
         # self.normalize(np.sqrt(output_size))
 
+        # Widths
+        self.zeta = np.abs(np.random.normal(1.0, 0.1, output_size))
+        # self.zeta = np.ones(output_size)
+
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.rw, self.nx, self.ny, self.nz, self.nw
+        return self.rx, self.ry, self.rz, self.rw, self.nx, self.ny, self.nz, self.nw, self.zeta
 
     def feed_forward(self, a_in):
         return a_in, (self.get_rxyz())
@@ -45,7 +49,8 @@ class ParticleVectorInput(object):
 
 class ParticleVector(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian", s=1.0, q=None, b=None, boff=0.0):
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian",
+                 s=1.0, q=None, b=None, boff=0.0, rs=1.0, ns=1.0):
         self.input_size = input_size
         self.output_size = output_size
         self.activation_name = activation.lower()
@@ -61,27 +66,31 @@ class ParticleVector(object):
         self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
 
         # Positions
-        self.rx = np.random.normal(0.0, s, output_size)
-        self.ry = np.random.normal(0.0, s, output_size)
-        self.rz = np.random.normal(0.0, s, output_size)
+        self.rx = np.random.normal(0.0, rs, output_size)
+        self.ry = np.random.normal(0.0, rs, output_size)
+        # self.rz = np.random.normal(0.0, s, output_size)
         # self.rw = np.random.normal(0.0, s, output_size)
-        # self.rz = np.zeros(output_size)
+        self.rz = np.zeros(output_size)
         self.rw = np.zeros(output_size)
 
         # Vectors
-        self.nx = np.random.normal(0.0, s, output_size)
-        self.ny = np.random.normal(0.0, s, output_size)
-        self.nz = np.random.normal(0.0, s, output_size)
+        self.nx = np.random.normal(0.0, ns, output_size)
+        self.ny = np.random.normal(0.0, ns, output_size)
+        # self.nz = np.random.normal(0.0, s, output_size)
         # self.nw = np.random.normal(0.0, s, output_size)
-        # self.nz = np.zeros(output_size)
+        self.nz = np.zeros(output_size)
         self.nw = np.zeros(output_size)
         # self.normalize(np.sqrt(output_size))
+
+        # Widths
+        self.zeta = np.abs(np.random.normal(1.0, 0.1, output_size))
+        # self.zeta = np.ones(output_size)
 
         # Matrix
         self.w = None
 
     def get_rxyz(self):
-        return self.rx, self.ry, self.rz, self.rw, self.nx, self.ny, self.nz, self.nw
+        return self.rx, self.ry, self.rz, self.rw, self.nx, self.ny, self.nz, self.nw, self.zeta
 
     def feed_forward(self, a_in, r_in):
         return self.compute_a(self.compute_z(a_in, r_in)), (self.get_rxyz())
@@ -114,6 +123,7 @@ class ParticleVector(object):
         r_in_ny = r_in[5]
         r_in_nz = r_in[6]
         r_in_nw = r_in[7]
+        r_in_zeta = r_in[8]
 
         for j in range(self.output_size):
             dx = r_in_x - self.rx[j]
@@ -121,6 +131,7 @@ class ParticleVector(object):
             dz = r_in_z - self.rz[j]
             dw = r_in_w - self.rw[j]
             d = np.sqrt(dx**2 + dy**2 + dz**2 + dw**2)
+            d *= np.sqrt(np.abs(self.zeta[j] * r_in_zeta))  # width
             w_ji = self.potential(d)
             dot = r_in_nx * self.nx[j] + r_in_ny * self.ny[j] + r_in_nz * self.nz[j] + r_in_nw * self.nw[j]
             w_ji *= dot
@@ -144,6 +155,7 @@ class ParticleVector(object):
         r_in_ny = r_in[5]
         r_in_nz = r_in[6]
         r_in_nw = r_in[7]
+        r_in_zeta = r_in[8]
 
         for j in range(self.output_size):
             dx = r_in_x - self.rx[j]
@@ -151,6 +163,7 @@ class ParticleVector(object):
             dz = r_in_z - self.rz[j]
             dw = r_in_w - self.rw[j]
             d = np.sqrt(dx**2 + dy**2 + dz**2 + dw**2)
+            d *= np.sqrt(np.abs(self.zeta[j] * r_in_zeta))  # width
             w_ji = self.potential(d)
             dot = r_in_nx * self.nx[j] + r_in_ny * self.ny[j] + r_in_nz * self.nz[j] + r_in_nw * self.nw[j]
             w_ji *= dot

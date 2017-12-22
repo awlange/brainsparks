@@ -29,6 +29,10 @@ class Potential(object):
             return Potential().lorentzian
         if nl == "triangle":
             return Potential().triangle
+        if nl == "lj":
+            return Potential().lennard_jones
+        if nl == "gwell":
+            return Potential().gwell
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
@@ -53,6 +57,10 @@ class Potential(object):
             return Potential().d_lorentzian
         if nl == "triangle":
             return Potential().d_triangle
+        if nl == "lj":
+            return Potential().d_lennard_jones
+        if nl == "gwell":
+            return Potential().d_gwell
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
@@ -122,3 +130,26 @@ class Potential(object):
 
     def d_triangle(self, x):
         return np.piecewise(x, [x < 1.0, x >= 1.0], [-1.0, 0.0])
+
+    # Lennard-Jones
+    def lennard_jones(self, x):
+        a = 1.0/x
+        a2 = a*a
+        a6 = a2*a2*a2
+        a12 = a6
+        return a12 - 2.0*a6
+
+    def d_lennard_jones(self, x):
+        a = 1.0/x
+        a2 = a*a
+        a6 = a2*a2*a2
+        a12 = a6
+        return 12*(a6 - a12) * a
+
+    # Gaussian well
+
+    def gwell(self, x):
+        return np.exp(-x*x) - np.exp(-(x-2.0)**2)
+
+    def d_gwell(self, x):
+        return -2.0 * x * np.exp(-x*x) + 2.0 * (x - 2.0) * np.exp(-(x-2.0)**2)

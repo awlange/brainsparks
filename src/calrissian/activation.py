@@ -15,10 +15,14 @@ class Activation(object):
             return Activation().sigmoid
         if nl == "linear":
             return Activation().linear
+        if nl == "exp":
+            return Activation().exp
         if nl == "relu":
             return Activation().relu
         if nl == "relu2":
             return Activation().relu2
+        if nl == "relu3":
+            return Activation().relu3
         if nl == "leaky_relu":
             return Activation().leaky_relu
         if nl == "tanh":
@@ -39,10 +43,14 @@ class Activation(object):
             return Activation().d_sigmoid
         if nl == "linear":
             return Activation().d_linear
+        if nl == "exp":
+            return Activation().d_exp
         if nl == "relu":
             return Activation().d_relu
         if nl == "relu2":
             return Activation().d_relu2
+        if nl == "relu3":
+            return Activation().d_relu3
         if nl == "leaky_relu":
             return Activation().d_leaky_relu
         if nl == "tanh":
@@ -69,6 +77,14 @@ class Activation(object):
 
     def d_linear(self, x):
         return np.ones(x.shape)
+
+    # Exponential
+
+    def exp(self, x):
+        return np.exp(x)
+
+    def d_exp(self, x):
+        return np.exp(x)
 
     # ReLU
 
@@ -101,6 +117,14 @@ class Activation(object):
         spos = np.piecewise(xs[0], [xs[0] < 0.0, xs[0] >= 0], [0.0, 1.0])
         sneg = np.piecewise(xs[1], [xs[1] < 0.0, xs[1] >= 0], [1.0, 0.0])
         return np.concatenate((spos, sneg), axis=1).transpose()
+
+    # ReLU
+
+    def relu3(self, x):
+        return np.maximum(0, x + 0.5*x*x)
+
+    def d_relu3(self, x):
+        return np.piecewise(x, [x < 0.0, x >= 0], [0.0, 1.0 + x])
 
     # tanh
 
@@ -137,9 +161,9 @@ class Activation(object):
     # Softplus
 
     def softplus(self, x):
-        return np.log(1.0 + np.exp(x))
+        # return np.log(1.0 + np.exp(x))
         # Prevent overflow
-        # return np.asarray([a if a > 10.0 else np.log(1 + np.exp(a)) for a in x.flatten()]).reshape(x.shape)
+        return np.piecewise(x, [x < 10.0, x >= 10.0], [lambda x: np.log(1.0 + np.exp(x)), lambda x: x])
 
     def d_softplus(self, x):
         return Activation().sigmoid(x)

@@ -12,8 +12,10 @@ class ParticleVectorSGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=None, alpha_r=0.01, alpha_t=0.01, init_v=0.0,
-                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None, use_log=False):
+                 cost_freq=2, position_grad=True,
+                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1,
+                 alpha_decay=None,
+                 fixed_input=False):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -30,6 +32,7 @@ class ParticleVectorSGD(Optimizer):
         self.cost_freq = cost_freq
         self.position_grad = position_grad  # Turn off position gradient?
         self.alpha_decay = alpha_decay
+        self.fixed_input = fixed_input
 
         # Weight update function
         self.weight_update = weight_update
@@ -45,6 +48,7 @@ class ParticleVectorSGD(Optimizer):
         self.dc_db = None
         self.dc_dr = None
         self.dc_dn = None
+        self.dc_dzeta = None
 
         # Mean squares
         self.ms_db = None
@@ -56,6 +60,7 @@ class ParticleVectorSGD(Optimizer):
         self.ms_dny = None
         self.ms_dnz = None
         self.ms_dnw = None
+        self.ms_dzeta = None
 
         self.vel_db = None
         self.vel_drx = None
@@ -66,6 +71,7 @@ class ParticleVectorSGD(Optimizer):
         self.vel_dny = None
         self.vel_dnz = None
         self.vel_dnw = None
+        self.vel_dzeta = None
 
         self.t = 0
         self.gamma_t = 0.0
@@ -91,11 +97,13 @@ class ParticleVectorSGD(Optimizer):
                     tmp_dc_db = result_t[0]
                     tmp_dc_dr = result_t[1]
                     tmp_dc_dn = result_t[2]
+                    tmp_dc_dzeta = result_t[3]
 
                     if t == 0 and offset == 0:
                         self.dc_db = tmp_dc_db
                         self.dc_dr = tmp_dc_dr
                         self.dc_dn = tmp_dc_dn
+                        self.dc_dzeta = tmp_dc_dzeta
                     else:
                         for l, tmp_b in enumerate(tmp_dc_db):
                             self.dc_db[l] += tmp_b
@@ -104,6 +112,8 @@ class ParticleVectorSGD(Optimizer):
                                 self.dc_dr[i][l] += tmp_r
                             for l, tmp_n in enumerate(tmp_dc_dn[i]):
                                 self.dc_dn[i][l] += tmp_n
+                        for l, tmp_z in enumerate(tmp_dc_dzeta):
+                            self.dc_dzeta[l] += tmp_z
 
                 offset += self.chunk_size
 
@@ -181,15 +191,18 @@ class ParticleVectorSGD(Optimizer):
             layer.ny -= self.alpha * self.dc_dn[1][l+1]
             layer.nz -= self.alpha * self.dc_dn[2][l+1]
             layer.nw -= self.alpha * self.dc_dn[3][l+1]
+            layer.zeta -= self.alpha * self.dc_dzeta[l+1]
 
-        network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
-        network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
-        network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
-        network.particle_input.rw -= self.alpha * self.dc_dr[3][0]
+        if not self.fixed_input:
+            network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
+            network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
+            network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
+            network.particle_input.rw -= self.alpha * self.dc_dr[3][0]
         network.particle_input.nx -= self.alpha * self.dc_dn[0][0]
         network.particle_input.ny -= self.alpha * self.dc_dn[1][0]
         network.particle_input.nz -= self.alpha * self.dc_dn[2][0]
         network.particle_input.nw -= self.alpha * self.dc_dn[3][0]
+        network.particle_input.zeta -= self.alpha * self.dc_dzeta[0]
 
     def weight_update_momentum(self, network):
         if self.vel_db is None:
@@ -262,10 +275,11 @@ class ParticleVectorSGD(Optimizer):
         self.vel_dnz[0] -= self.alpha * self.dc_dn[2][0]
         self.vel_dnw[0] -= self.alpha * self.dc_dn[3][0]
 
-        network.particle_input.rx += self.vel_drx[0]
-        network.particle_input.ry += self.vel_dry[0]
-        network.particle_input.rz += self.vel_drz[0]
-        network.particle_input.rw += self.vel_drw[0]
+        if not self.fixed_input:
+            network.particle_input.rx += self.vel_drx[0]
+            network.particle_input.ry += self.vel_dry[0]
+            network.particle_input.rz += self.vel_drz[0]
+            network.particle_input.rw += self.vel_drw[0]
         network.particle_input.nx += self.vel_dnx[0]
         network.particle_input.ny += self.vel_dny[0]
         network.particle_input.nz += self.vel_dnz[0]
@@ -291,6 +305,7 @@ class ParticleVectorSGD(Optimizer):
             self.ms_dny = [np.zeros(network.particle_input.output_size)]
             self.ms_dnz = [np.zeros(network.particle_input.output_size)]
             self.ms_dnw = [np.zeros(network.particle_input.output_size)]
+            self.ms_dzeta = [np.zeros(network.particle_input.output_size)]
             for l, layer in enumerate(network.layers):
                 self.ms_db.append(np.zeros(layer.b.shape))
                 self.ms_drx.append(np.zeros(layer.output_size))
@@ -301,6 +316,7 @@ class ParticleVectorSGD(Optimizer):
                 self.ms_dny.append(np.zeros(layer.output_size))
                 self.ms_dnz.append(np.zeros(layer.output_size))
                 self.ms_dnw.append(np.zeros(layer.output_size))
+                self.ms_dzeta.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
@@ -312,16 +328,18 @@ class ParticleVectorSGD(Optimizer):
             self.ms_dny[l + 1] = gamma * self.ms_dny[l + 1] + one_m_gamma * (self.dc_dn[1][l + 1] * self.dc_dn[1][l + 1])
             self.ms_dnz[l + 1] = gamma * self.ms_dnz[l + 1] + one_m_gamma * (self.dc_dn[2][l + 1] * self.dc_dn[2][l + 1])
             self.ms_dnw[l + 1] = gamma * self.ms_dnw[l + 1] + one_m_gamma * (self.dc_dn[3][l + 1] * self.dc_dn[3][l + 1])
+            self.ms_dzeta[l + 1] = gamma * self.ms_dzeta[l + 1] + one_m_gamma * (self.dc_dzeta[l + 1] * self.dc_dzeta[l + 1])
 
             layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             layer.rx -= alpha * self.dc_dr[0][l+1] / np.sqrt(self.ms_drx[l + 1] + epsilon)
             layer.ry -= alpha * self.dc_dr[1][l+1] / np.sqrt(self.ms_dry[l + 1] + epsilon)
-            layer.rz -= alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon)
-            layer.rw -= alpha * self.dc_dr[3][l+1] / np.sqrt(self.ms_drw[l + 1] + epsilon)
+            # layer.rz -= alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon)
+            # layer.rw -= alpha * self.dc_dr[3][l+1] / np.sqrt(self.ms_drw[l + 1] + epsilon)
             layer.nx -= alpha * self.dc_dn[0][l + 1] / np.sqrt(self.ms_dnx[l + 1] + epsilon)
             layer.ny -= alpha * self.dc_dn[1][l + 1] / np.sqrt(self.ms_dny[l + 1] + epsilon)
-            layer.nz -= alpha * self.dc_dn[2][l + 1] / np.sqrt(self.ms_dnz[l + 1] + epsilon)
-            layer.nw -= alpha * self.dc_dn[3][l + 1] / np.sqrt(self.ms_dnw[l + 1] + epsilon)
+            # layer.nz -= alpha * self.dc_dn[2][l + 1] / np.sqrt(self.ms_dnz[l + 1] + epsilon)
+            # layer.nw -= alpha * self.dc_dn[3][l + 1] / np.sqrt(self.ms_dnw[l + 1] + epsilon)
+            layer.zeta -= alpha * self.dc_dzeta[l + 1] / np.sqrt(self.ms_dzeta[l + 1] + epsilon)
 
         # Input layer
         self.ms_drx[0] = gamma * self.ms_drx[0] + one_m_gamma * (self.dc_dr[0][0] * self.dc_dr[0][0])
@@ -332,14 +350,17 @@ class ParticleVectorSGD(Optimizer):
         self.ms_dny[0] = gamma * self.ms_dny[0] + one_m_gamma * (self.dc_dn[1][0] * self.dc_dn[1][0])
         self.ms_dnz[0] = gamma * self.ms_dnz[0] + one_m_gamma * (self.dc_dn[2][0] * self.dc_dn[2][0])
         self.ms_dnw[0] = gamma * self.ms_dnw[0] + one_m_gamma * (self.dc_dn[3][0] * self.dc_dn[3][0])
-        network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
-        network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
-        network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
-        network.particle_input.rw -= alpha * self.dc_dr[3][0] / np.sqrt(self.ms_drw[0] + epsilon)
+        self.ms_dzeta[0] = gamma * self.ms_dzeta[0] + one_m_gamma * (self.dc_dzeta[0] * self.dc_dzeta[0])
+        if not self.fixed_input:
+            network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
+            network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
+            # network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
+            # network.particle_input.rw -= alpha * self.dc_dr[3][0] / np.sqrt(self.ms_drw[0] + epsilon)
         network.particle_input.nx -= alpha * self.dc_dn[0][0] / np.sqrt(self.ms_dnx[0] + epsilon)
         network.particle_input.ny -= alpha * self.dc_dn[1][0] / np.sqrt(self.ms_dny[0] + epsilon)
-        network.particle_input.nz -= alpha * self.dc_dn[2][0] / np.sqrt(self.ms_dnz[0] + epsilon)
-        network.particle_input.nw -= alpha * self.dc_dn[3][0] / np.sqrt(self.ms_dnw[0] + epsilon)
+        # network.particle_input.nz -= alpha * self.dc_dn[2][0] / np.sqrt(self.ms_dnz[0] + epsilon)
+        # network.particle_input.nw -= alpha * self.dc_dn[3][0] / np.sqrt(self.ms_dnw[0] + epsilon)
+        network.particle_input.zeta -= alpha * self.dc_dzeta[0] / np.sqrt(self.ms_dzeta[0] + epsilon)
 
     def weight_update_adagrad(self, network):
         """

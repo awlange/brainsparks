@@ -214,24 +214,30 @@ class ParticleNetwork(object):
             # zeta_i = prev_layer.zeta
             # zeta_ij = np.sqrt(zeta_i**2 * layer.zeta[j]**2)
             # exp_dij = np.exp(-zeta_ij * d2)
-            exp_dij = np.exp(-d2)
+            # exp_dij = np.exp(-d2)
+            r = np.sqrt(d2)
+            exp_dij = layer.potential(r)
 
             dt = 0.0
+            cdt = 1.0
             if layer.phase_enabled and prev_layer.phase_enabled:
                 dt = (prev_layer.theta - layer.theta[j])
                 # dt = (prev_layer.theta - layer.theta_in[j])
-                exp_dij *= np.cos(dt)
+                cdt = np.cos(dt)
+                exp_dij *= cdt
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
 
             # Charge gradient
-            dq = exp_dij * Al_trans * trans_delta_L_j
+            atj = Al_trans * trans_delta_L_j
+            dq = exp_dij * atj
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
             # tmp = 2.0 * zeta_ij * qj * dq
-            tmp = 2.0 * qj * dq
+            # tmp = 2.0 * qj * dq
+            tmp = -qj * cdt * atj * layer.d_potential(r) / r
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -415,24 +421,30 @@ class ParticleNetwork(object):
                 # zeta_i = prev_layer.zeta
                 # zeta_ij = np.sqrt(zeta_i**2 * layer.zeta[j]**2)
                 # exp_dij = np.exp(-zeta_ij * d2)
-                exp_dij = np.exp(-d2)
+                # exp_dij = np.exp(-d2)
+                r = np.sqrt(d2)
+                exp_dij = layer.potential(r)
 
                 dt = 0.0
+                cdt = 1.0
                 if layer.phase_enabled and prev_layer.phase_enabled:
                     dt = (prev_layer.theta - layer.theta[j])
                     # dt = (prev_layer.theta - layer.theta_in[j])
-                    exp_dij *= np.cos(dt)
+                    cdt = np.cos(dt)
+                    exp_dij *= cdt
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
 
                 # Charge gradient
-                dq = exp_dij * Al_trans * this_delta_j
+                atj = Al_trans * this_delta_j
+                dq = exp_dij * atj
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
                 # tmp = 2.0 * zeta_ij * qj * dq
-                tmp = 2.0 * qj * dq
+                # tmp = 2.0 * qj * dq
+                tmp = -qj * cdt * atj * layer.d_potential(r) / r
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp

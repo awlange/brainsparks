@@ -251,17 +251,17 @@ class ParticleVector2SGD(Optimizer):
             self.ms_dmy[l] = gamma * self.ms_dmy[l] + one_m_gamma * (self.dc_dm[1][l] * self.dc_dm[1][l])
             self.ms_dmz[l] = gamma * self.ms_dmz[l] + one_m_gamma * (self.dc_dm[2][l] * self.dc_dm[2][l])
 
-            # layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
+            layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             # layer.q -= self.alpha_q * self.dc_dq[l] / np.sqrt(self.ms_dq[l] + epsilon)
             layer.rx -= alpha * self.dc_dr[0][l+1] / np.sqrt(self.ms_drx[l + 1] + epsilon)
             layer.ry -= alpha * self.dc_dr[1][l+1] / np.sqrt(self.ms_dry[l + 1] + epsilon)
-            # layer.rz -= alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon)
+            layer.rz -= alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon)
             layer.nx -= alpha * self.dc_dn[0][l + 1] / np.sqrt(self.ms_dnx[l + 1] + epsilon)
             layer.ny -= alpha * self.dc_dn[1][l + 1] / np.sqrt(self.ms_dny[l + 1] + epsilon)
-            # layer.nz -= alpha * self.dc_dn[2][l + 1] / np.sqrt(self.ms_dnz[l + 1] + epsilon)
+            layer.nz -= alpha * self.dc_dn[2][l + 1] / np.sqrt(self.ms_dnz[l + 1] + epsilon)
             layer.mx -= alpha * self.dc_dm[0][l] / np.sqrt(self.ms_dmx[l] + epsilon)
             layer.my -= alpha * self.dc_dm[1][l] / np.sqrt(self.ms_dmy[l] + epsilon)
-            # layer.mz -= alpha * self.dc_dm[2][l] / np.sqrt(self.ms_dmz[l] + epsilon)
+            layer.mz -= alpha * self.dc_dm[2][l] / np.sqrt(self.ms_dmz[l] + epsilon)
 
         # Input layer
         self.ms_drx[0] = gamma * self.ms_drx[0] + one_m_gamma * (self.dc_dr[0][0] * self.dc_dr[0][0])
@@ -272,10 +272,10 @@ class ParticleVector2SGD(Optimizer):
         self.ms_dnz[0] = gamma * self.ms_dnz[0] + one_m_gamma * (self.dc_dn[2][0] * self.dc_dn[2][0])
         network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
         network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
-        # network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
+        network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
         network.particle_input.nx -= alpha * self.dc_dn[0][0] / np.sqrt(self.ms_dnx[0] + epsilon)
         network.particle_input.ny -= alpha * self.dc_dn[1][0] / np.sqrt(self.ms_dny[0] + epsilon)
-        # network.particle_input.nz -= alpha * self.dc_dn[2][0] / np.sqrt(self.ms_dnz[0] + epsilon)
+        network.particle_input.nz -= alpha * self.dc_dn[2][0] / np.sqrt(self.ms_dnz[0] + epsilon)
 
     def weight_update_adagrad(self, network):
         """

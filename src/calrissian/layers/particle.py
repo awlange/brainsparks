@@ -1,5 +1,6 @@
 from .layer import Layer
 from ..activation import Activation
+from ..potential import Potential
 
 import numpy as np
 
@@ -15,9 +16,9 @@ class ParticleInput(object):
         # self.rz = np.random.uniform(-s, s, output_size)
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        self.rz = np.random.normal(0.0, s, output_size)
+        # self.rz = np.random.normal(0.0, s, output_size)
 
-        # self.rz = np.zeros(output_size)
+        self.rz = np.zeros(output_size)
 
         # Phase
         if t is not None:
@@ -28,8 +29,8 @@ class ParticleInput(object):
             self.theta_in = np.random.uniform(0, 2*np.pi, output_size)
 
         # Gaussian width
-        self.zeta = np.random.uniform(0.9, 1.1, output_size)
-        # self.zeta = np.zeros(output_size)
+        # self.zeta = np.random.uniform(0.9, 1.1, output_size)
+        self.zeta = np.zeros(output_size)
 
     def get_rxyz(self):
         return self.rx, self.ry, self.rz, self.theta
@@ -44,7 +45,8 @@ class ParticleInput(object):
 
 class Particle(object):
 
-    def __init__(self, input_size=0, output_size=0, activation="sigmoid", s=1.0, t=None, q=None, b=None, boff=0.0,
+    def __init__(self, input_size=0, output_size=0, activation="sigmoid", potential="gaussian",
+                 s=1.0, t=None, q=None, b=None, boff=0.0,
                  phase_enabled=True, qw=0.1):
         self.input_size = input_size
         self.output_size = output_size
@@ -52,6 +54,8 @@ class Particle(object):
         self.activation = Activation.get(activation)
         self.d_activation = Activation.get_d(activation)
         self.phase_enabled = phase_enabled
+        self.potential = Potential.get(potential)
+        self.d_potential = Potential.get_d(potential)
 
         # Weight initialization
         g = np.sqrt(2.0 / (input_size + output_size))
@@ -73,9 +77,9 @@ class Particle(object):
         # self.rz = np.random.uniform(-s, s, output_size)
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        self.rz = np.random.normal(0.0, s, output_size)
+        # self.rz = np.random.normal(0.0, s, output_size)
 
-        # self.rz = np.zeros(output_size)
+        self.rz = np.zeros(output_size)
 
         # Phase
         if t is not None:
@@ -87,8 +91,8 @@ class Particle(object):
         # self.theta = np.zeros(output_size)
 
         # Gaussian width
-        self.zeta = np.random.uniform(0.9, 1.1, output_size)
-        # self.zeta = np.zeros(output_size)
+        # self.zeta = np.random.uniform(0.9, 1.1, output_size)
+        self.zeta = np.zeros(output_size)
 
         # Matrix
         self.w = None
@@ -119,9 +123,9 @@ class Particle(object):
                 dx = r_in_x - self.rx[j]
                 dy = r_in_y - self.ry[j]
                 dz = r_in_z - self.rz[j]
-                w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
-                dt = r_in_theta - self.theta[j]  # normal
-                # dt = r_in_theta - self.theta_in[j]
+                r = np.sqrt(dx**2 + dy**2 + dz**2)
+                w_ji = self.potential(r)
+                dt = r_in_theta - self.theta[j]
                 w_ji *= np.cos(dt)
                 z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
         else:
@@ -129,7 +133,8 @@ class Particle(object):
                 dx = r_in_x - self.rx[j]
                 dy = r_in_y - self.ry[j]
                 dz = r_in_z - self.rz[j]
-                w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
+                r = np.sqrt(dx**2 + dy**2 + dz**2)
+                w_ji = self.potential(r)
                 z[j] = self.b[0][j] + self.q[j] * w_ji.dot(atrans)
 
         return z.transpose()
@@ -152,7 +157,8 @@ class Particle(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            w_ji = self.q[j] * np.exp(-(dx**2 + dy**2 + dz**2))
+            r = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+            w_ji = self.q[j] * self.potential(r)
             if self.phase_enabled:
                 dt = r_in_theta - self.theta[j]
                 w_ji *= np.cos(dt)

@@ -5,7 +5,7 @@ from ..potential import Potential
 import numpy as np
 
 
-class ParticleVectorNInput(object):
+class ParticleVectorNLocalConvolutionInput(object):
     def __init__(self, output_size, nr=3, nv=3, sr=1.0, sv=1.0):
         self.output_size = output_size
         self.nv = nv
@@ -39,10 +39,11 @@ class ParticleVectorNInput(object):
             self.nvectors[v] /= d
 
 
-class ParticleVectorN(object):
+class ParticleVectorNLocalConvolution(object):
 
     def __init__(self, input_size=0, output_size=0, nr=3, nv=3, activation="sigmoid", potential="gaussian",
-                 sr=1.0, sv=1.0, q=None, b=None, boff=0.0, uniform=False, p_dropout=-1.0, sigma_r=-1.0):
+                 sr=1.0, sv=1.0, q=None, b=None, boff=0.0, uniform=False, p_dropout=-1.0, sigma_r=-1.0,
+                 delta_r=0.0, apply_convolution=False):
         self.input_size = input_size
         self.output_size = output_size
         self.nr = nr
@@ -55,6 +56,8 @@ class ParticleVectorN(object):
         self.p_dropout = p_dropout
         self.dropout_mask = None
         self.sigma_r = sigma_r
+        self.delta_r = delta_r
+        self.apply_convolution = apply_convolution
 
         # Weight initialization
         g = np.sqrt(2.0 / (input_size + output_size))
@@ -80,6 +83,7 @@ class ParticleVectorN(object):
 
         # Matrix
         self.w = None
+        self.positions_cache = None
 
     def get_rxyz(self):
         return self.positions, self.nvectors
@@ -104,7 +108,7 @@ class ParticleVectorN(object):
         :return:
         """
         atrans = a_in.transpose()
-        z = np.zeros((self.output_size, len(a_in)))
+        z = None
         r_positions = r_in[0]
         r_nvectors = r_in[1]
 
@@ -112,16 +116,55 @@ class ParticleVectorN(object):
             for r in range(self.nr):
                 r_positions[r] += np.random.normal(0.0, self.sigma_r, r_positions[r].shape)
 
-        for j in range(self.output_size):
-            dd = 0.0
-            for r in range(self.nr):
-                dd += (r_positions[r] - self.positions[r][j])**2
-            d = np.sqrt(dd)
-            dot = 0.0
-            for v in range(self.nv):
-                dot += r_nvectors[v] * self.nvectors[v][j]
-            w_ji = self.potential(d) * dot
-            z[j] = self.b[0][j] + w_ji.dot(atrans)
+        if self.apply_convolution:
+            self.positions_cache = np.zeros((self.nr, self.output_size, len(a_in)))
+
+            # Let's just do 3 dimensions
+            z = np.ones((self.output_size, len(a_in))) * -99999999.9  # just some really low unlikely number
+            n_steps = [-1.0, 0.0, 1.0]
+            for j in range(self.output_size):
+
+                for ix in n_steps:
+                    for iy in n_steps:
+                        for iz in n_steps:
+
+                            pr0 = self.positions[0][j] + ix*self.delta_r
+                            pr1 = self.positions[1][j] + iy*self.delta_r
+                            pr2 = self.positions[2][j] + iz*self.delta_r
+
+                            dd = 0.0
+                            dd += (r_positions[0] - pr0)**2
+                            dd += (r_positions[1] - pr1)**2
+                            dd += (r_positions[2] - pr2)**2
+                            d = np.sqrt(dd)
+                            dot = 0.0
+                            for v in range(self.nv):
+                                dot += r_nvectors[v] * self.nvectors[v][j]
+                            w_ji = self.potential(d) * dot
+                            zj_xyz = self.b[0][j] + w_ji.dot(atrans)
+
+                            # determine if max -- keep track of offset for gradient
+                            for ja in range(len(a_in)):
+                                if zj_xyz[ja] > z[j][ja]:
+                                    self.positions_cache[0][j][ja] = pr0
+                                    self.positions_cache[1][j][ja] = pr1
+                                    self.positions_cache[2][j][ja] = pr2
+                                    z[j][ja] = zj_xyz[ja]
+
+        else:
+            z = np.zeros((self.output_size, len(a_in)))
+
+            for j in range(self.output_size):
+                dd = 0.0
+                for r in range(self.nr):
+                    dd += (r_positions[r] - self.positions[r][j]) ** 2
+                d = np.sqrt(dd)
+                dot = 0.0
+                for v in range(self.nv):
+                    dot += r_nvectors[v] * self.nvectors[v][j]
+                w_ji = self.potential(d) * dot
+                z[j] = self.b[0][j] + w_ji.dot(atrans)
+
         return z.transpose()
 
     def compute_a(self, z, apply_dropout=False):

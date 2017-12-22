@@ -11,15 +11,15 @@ class ParticleVector2Input(object):
         # Positions
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        # self.rz = np.random.normal(0.0, s, output_size)
-        self.rz = np.zeros(output_size)
+        self.rz = np.random.normal(0.0, s, output_size)
+        # self.rz = np.zeros(output_size)
 
         # Vectors
         self.nx = np.random.normal(0.0, s, output_size)
         self.ny = np.random.normal(0.0, s, output_size)
-        # self.nz = np.random.normal(0.0, s, output_size)
-        self.nz = np.zeros(output_size)
-        self.normalize()
+        self.nz = np.random.normal(0.0, s, output_size)
+        # self.nz = np.zeros(output_size)
+        # self.normalize()
 
     def get_rxyz(self):
         return self.rx, self.ry, self.rz, self.nx, self.ny, self.nz
@@ -50,8 +50,8 @@ class ParticleVector2(object):
         g = np.sqrt(2.0 / (input_size + output_size))
         if b is None:
             b = g
-        # self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
-        self.b = np.zeros((1, output_size))
+        self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
+        # self.b = np.zeros((1, output_size))
 
         # Charges
         if q is None:
@@ -62,21 +62,21 @@ class ParticleVector2(object):
         # Positions
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        # self.rz = np.random.normal(0.0, s, output_size)
-        self.rz = np.zeros(output_size)
+        self.rz = np.random.normal(0.0, s, output_size)
+        # self.rz = np.zeros(output_size)
 
         # Vectors
         self.nx = np.random.normal(0.0, s, output_size)
         self.ny = np.random.normal(0.0, s, output_size)
-        # self.nz = np.random.normal(0.0, s, output_size)
-        self.nz = np.zeros(output_size)
+        self.nz = np.random.normal(0.0, s, output_size)
+        # self.nz = np.zeros(output_size)
         # self.normalize()
         
         self.mx = np.random.normal(0.0, s, output_size)
         self.my = np.random.normal(0.0, s, output_size)
-        # self.mz = np.random.normal(0.0, s, output_size)
-        self.mz = np.zeros(output_size)
-        self.normalize()
+        self.mz = np.random.normal(0.0, s, output_size)
+        # self.mz = np.zeros(output_size)
+        # self.normalize()
 
         # Matrix
         self.w = None

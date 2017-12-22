@@ -34,17 +34,17 @@ def fd():
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
 
     net = ParticleVectorNetwork(cost="categorical_cross_entropy", particle_input=ParticleVectorInput(2))
-    net.append(ParticleVector(2, 5, activation="relu2"))
-    net.append(ParticleVector(5, 4, activation="relu2"))
+    net.append(ParticleVector(2, 5, activation="sigmoid"))
+    net.append(ParticleVector(5, 4, activation="sigmoid"))
     net.append(ParticleVector(4, 3, activation="softmax"))
 
     # Finite difference checking
 
     net.cost(train_X, train_Y)
 
-    db, dr, dn = net.cost_gradient(train_X, train_Y)
+    db, dr, dn, dzeta = net.cost_gradient(train_X, train_Y)
 
-    h = 0.001
+    h = 0.0001
 
     print("analytic b")
     print(db)
@@ -323,6 +323,42 @@ def fd():
         print(layer)
     print("numerical n w")
     for f in fd_n_w:
+        print(f)
+
+    fd_zeta = []
+
+    # input first
+    layer = net.particle_input
+    lr_zeta = []
+    for i in range(layer.output_size):
+        orig = layer.zeta[i]
+        layer.zeta[i] += h
+        fp = net.cost(train_X, train_Y)
+        layer.zeta[i] -= 2*h
+        fm = net.cost(train_X, train_Y)
+        lr_zeta.append((fp - fm) / (2*h))
+        layer.zeta[i] = orig
+    fd_zeta.append(lr_zeta)
+
+    # layers
+    for layer in net.layers:
+        lr_zeta = []
+        for i in range(layer.output_size):
+            # x
+            orig = layer.zeta[i]
+            layer.zeta[i] += h
+            fp = net.cost(train_X, train_Y)
+            layer.zeta[i] -= 2 * h
+            fm = net.cost(train_X, train_Y)
+            lr_zeta.append((fp - fm) / (2 * h))
+            layer.zeta[i] = orig
+        fd_zeta.append(lr_zeta)
+
+    print("analytic zeta")
+    for layer in dzeta:
+        print(layer)
+    print("numerical zeta")
+    for f in fd_zeta:
         print(f)
 
 

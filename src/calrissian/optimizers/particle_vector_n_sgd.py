@@ -13,7 +13,9 @@ class ParticleVectorNSGD(Optimizer):
 
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
                  cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=None, alpha_r=0.01, alpha_t=0.01, init_v=0.0,
-                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None, use_log=False):
+                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None, use_log=False,
+                 fixed_input=False, fixed_output=False,
+                 noise_input=-1.0):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -30,6 +32,10 @@ class ParticleVectorNSGD(Optimizer):
         self.cost_freq = cost_freq
         self.position_grad = position_grad  # Turn off position gradient?
         self.alpha_decay = alpha_decay
+        self.fixed_input = fixed_input
+        self.fixed_output = fixed_output
+        self.noise_input = noise_input
+        self.adagrad_n = 0
 
         # Weight update function
         self.weight_update = weight_update
@@ -38,6 +44,8 @@ class ParticleVectorNSGD(Optimizer):
             self.weight_update_func = self.weight_update_rmsprop
         if weight_update == "adagrad":
             self.weight_update_func = self.weight_update_adagrad
+        if weight_update == "adagrad_mean":
+            self.weight_update_func = self.weight_update_adagrad_mean
         if weight_update == "momentum":
             self.weight_update_func = self.weight_update_momentum
 
@@ -163,19 +171,59 @@ class ParticleVectorNSGD(Optimizer):
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
             for r in range(layer.nr):
-                layer.positions[r] -= self.alpha * self.dc_dr[l+1][r]
+                if self.fixed_output and l == len(network.layers)-1:
+                    pass
+                else:
+                    layer.positions[r] -= self.alpha * self.dc_dr[l+1][r]
             for v in range(layer.nv):
                 layer.nvectors[v] -= self.alpha * self.dc_dn[l+1][v]
 
         layer = network.particle_input
         l = -1
-        for r in range(layer.nr):
-            layer.positions[r] -= self.alpha * self.dc_dr[l+1][r]
         for v in range(layer.nv):
             layer.nvectors[v] -= self.alpha * self.dc_dn[l+1][v]
 
+        if not self.fixed_input:
+            for r in range(layer.nr):
+                layer.positions[r] -= self.alpha * self.dc_dr[l+1][r]
+
     def weight_update_momentum(self, network):
-        pass
+        alpha = self.alpha
+        beta = self.beta
+
+        if self.vel_db is None:
+            self.vel_db = []
+            self.vel_dr = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nr)]]
+            self.vel_dn = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nv)]]
+            for l, layer in enumerate(network.layers):
+                self.vel_db.append(np.zeros(layer.b.shape))
+                self.vel_dr.append([np.zeros(layer.output_size) for _ in range(layer.nr)])
+                self.vel_dn.append([np.zeros(layer.output_size) for _ in range(layer.nv)])
+
+        for l, layer in enumerate(network.layers):
+            self.vel_db[l] = beta * self.vel_db[l] - alpha * self.dc_db[l]
+            layer.b += self.vel_db[l]
+
+            for r in range(layer.nr):
+                self.vel_dr[l + 1][r] = beta * self.vel_dr[l + 1][r] - alpha * self.dc_dr[l + 1][r]
+                if self.fixed_output and l == len(network.layers)-1:
+                    pass
+                else:
+                    layer.positions[r] += self.vel_dr[l + 1][r]
+
+            for v in range(layer.nv):
+                self.vel_dn[l + 1][v] = beta * self.vel_dn[l + 1][v] - alpha * self.dc_dn[l + 1][v]
+                layer.nvectors[v] += self.vel_dn[l + 1][v]
+
+        layer = network.particle_input
+        l = -1
+        for v in range(layer.nv):
+            self.vel_dn[l + 1][v] = beta * self.vel_dn[l + 1][v] - alpha * self.dc_dn[l + 1][v]
+            layer.nvectors[v] += self.vel_dn[l + 1][v]
+        if not self.fixed_input:
+            for r in range(layer.nr):
+                self.vel_dr[l + 1][r] = beta * self.vel_dr[l + 1][r] - alpha * self.dc_dr[l + 1][r]
+                layer.positions[r] += self.vel_dr[l + 1][r]
 
     def weight_update_rmsprop(self, network):
         """
@@ -202,7 +250,10 @@ class ParticleVectorNSGD(Optimizer):
 
             for r in range(layer.nr):
                 self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
-                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
+                if self.fixed_output and l == len(network.layers)-1:
+                    pass
+                else:
+                    layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
 
             for v in range(layer.nv):
                 self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
@@ -211,19 +262,96 @@ class ParticleVectorNSGD(Optimizer):
         # Input layer
         layer = network.particle_input
         l = -1
-        for r in range(layer.nr):
-            self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (
-            self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
-            layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
-
         for v in range(layer.nv):
-            self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (
-            self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
+            self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
             layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
+
+        if not self.fixed_input:
+
+            for r in range(layer.nr):
+                self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
+                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
 
     def weight_update_adagrad(self, network):
         """
         Update weights and biases according to Adagrad
         """
-        pass
+        alpha = self.alpha
+        epsilon = self.epsilon  # small number to avoid division by zero
 
+        # Initialize RMS to zero
+        if self.ms_db is None:
+            self.ms_db = []
+            self.ms_dr = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nr)]]
+            self.ms_dn = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nv)]]
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dr.append([np.zeros(layer.output_size) for _ in range(layer.nr)])
+                self.ms_dn.append([np.zeros(layer.output_size) for _ in range(layer.nv)])
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] += self.dc_db[l] * self.dc_db[l]
+            layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
+
+            for r in range(layer.nr):
+                self.ms_dr[l + 1][r] += self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r]
+                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
+
+            for v in range(layer.nv):
+                self.ms_dn[l + 1][v] += self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v]
+                layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
+
+        # Input layer
+        layer = network.particle_input
+        l = -1
+        for v in range(layer.nv):
+            self.ms_dn[l + 1][v] += self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v]
+            layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
+
+        if not self.fixed_input:
+            for r in range(layer.nr):
+                self.ms_dr[l + 1][r] += self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r]
+                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
+
+    def weight_update_adagrad_mean(self, network):
+        """
+        Update weights and biases according to Adagrad, but take the mean of the ms
+        """
+        alpha = self.alpha
+        epsilon = self.epsilon  # small number to avoid division by zero
+        n_prev = self.adagrad_n
+        self.adagrad_n += 1
+
+        # Initialize RMS to zero
+        if self.ms_db is None:
+            self.ms_db = []
+            self.ms_dr = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nr)]]
+            self.ms_dn = [[np.zeros(network.particle_input.output_size) for _ in range(network.particle_input.nv)]]
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dr.append([np.zeros(layer.output_size) for _ in range(layer.nr)])
+                self.ms_dn.append([np.zeros(layer.output_size) for _ in range(layer.nv)])
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] = (self.ms_db[l] * n_prev + self.dc_db[l] * self.dc_db[l]) / self.adagrad_n
+            layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
+
+            for r in range(layer.nr):
+                self.ms_dr[l + 1][r] = (self.ms_dr[l + 1][r] * n_prev + self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r]) / self.adagrad_n
+                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
+
+            for v in range(layer.nv):
+                self.ms_dn[l + 1][v] = (self.ms_dn[l + 1][v] * n_prev + self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v]) / self.adagrad_n
+                layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
+
+        # Input layer
+        layer = network.particle_input
+        l = -1
+        for v in range(layer.nv):
+            self.ms_dn[l + 1][v] = (self.ms_dn[l + 1][v] * n_prev + self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v]) / self.adagrad_n
+            layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
+
+        if not self.fixed_input:
+            for r in range(layer.nr):
+                self.ms_dr[l + 1][r] = (self.ms_dr[l + 1][r] * n_prev + self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r]) / self.adagrad_n
+                layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)

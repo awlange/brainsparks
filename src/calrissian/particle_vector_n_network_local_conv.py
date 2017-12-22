@@ -1,13 +1,10 @@
 from .cost import Cost
 
-from .layers.particle_vector_n import ParticleVectorN
-from .layers.particle_vector_n import ParticleVectorNInput
-
 import numpy as np
 import json
 
 
-class ParticleVectorNNetwork(object):
+class ParticleVectorNLocalConvolutionNetwork(object):
 
     def __init__(self, particle_input=None, cost="mse", regularizer=None):
         self.layers = []
@@ -170,12 +167,22 @@ class ParticleVectorNNetwork(object):
             trans_delta_L_j = trans_delta_L[j]
             trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
 
+            d2 = None
+            lpos = None
+            if layer.apply_convolution:
+                d2 = np.zeros((len(prev_layer.positions[0]), len(data_X)))  # this is amazing stuff! numpy is the best!
+                lpos = layer.positions_cache
+
+            else:
+                d2 = np.zeros_like(prev_layer.positions[0])
+                lpos = layer.positions
+
             dr = []
-            d2 = np.zeros_like(prev_layer.positions[0])
             for r in range(layer.nr):
-                dtmp = prev_layer.positions[r] - layer.positions[r][j]
-                d2 += dtmp**2
+                dtmp = prev_layer.positions[r] - lpos[r][j]
+                d2 += dtmp ** 2
                 dr.append(dtmp)
+
             d = np.sqrt(d2)
             dot = 0.0
             for v in range(layer.nv):
@@ -192,7 +199,7 @@ class ParticleVectorNNetwork(object):
             for r in range(layer.nr):
                 tr = dr[r] * tmp
                 dc_dr[l][r][j] += np.sum(tr)
-                dc_dr[l-1][r] -= np.sum(tr, axis=1)
+                dc_dr[l - 1][r] -= np.sum(tr, axis=1)
 
             # Vector gradient
             tmp = dq / dot
@@ -200,7 +207,7 @@ class ParticleVectorNNetwork(object):
                 tv = tmp * prev_layer.nvectors[v]
                 dc_dn[l][v][j] += np.sum(tv)
                 tv = tmp * layer.nvectors[v][j]
-                dc_dn[l-1][v] += np.sum(tv, axis=1)
+                dc_dn[l - 1][v] += np.sum(tv, axis=1)
 
         l = -1
         while -l < len(self.layers):
@@ -225,10 +232,20 @@ class ParticleVectorNNetwork(object):
             for j in range(layer.output_size):
                 this_delta_j = this_delta[j]
 
+                d2 = None
+                lpos = None
+                if layer.apply_convolution:
+                    d2 = np.zeros(
+                        (len(prev_layer.positions[0]), len(data_X)))  # this is amazing stuff! numpy is the best!
+                    lpos = layer.positions_cache
+
+                else:
+                    d2 = np.zeros_like(prev_layer.positions[0])
+                    lpos = layer.positions
+
                 dr = []
-                d2 = np.zeros_like(prev_layer.positions[r])
                 for r in range(layer.nr):
-                    dtmp = prev_layer.positions[r] - layer.positions[r][j]
+                    dtmp = prev_layer.positions[r] - lpos[r][j]
                     d2 += dtmp ** 2
                     dr.append(dtmp)
                 d = np.sqrt(d2)
