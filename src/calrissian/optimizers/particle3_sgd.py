@@ -76,7 +76,7 @@ class Particle3SGD(Optimizer):
         self.del_ry_pos_out = None
         self.del_rx_neg_out = None
         self.del_ry_neg_out = None
-        
+
         # Mean squares
         self.ms_b = None
         self.ms_q = None
@@ -676,7 +676,7 @@ class Particle3SGD(Optimizer):
             layer.ry_pos_out += del_ry_pos_out
             layer.rx_neg_out += del_rx_neg_out
             layer.ry_neg_out += del_ry_neg_out
-            
+
             self.del_b[l] = gamma * self.del_b[l] + one_m_gamma * del_b ** 2
             self.del_q[l] = gamma * self.del_q[l] + one_m_gamma * del_q ** 2
             self.del_rx_inp[l] = gamma * self.del_rx_inp[l] + one_m_gamma * del_rx_inp ** 2

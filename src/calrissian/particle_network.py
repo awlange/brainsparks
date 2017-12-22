@@ -42,6 +42,12 @@ class ParticleNetwork(object):
 
         self.lock_built = True
 
+    def predict_single(self, data_X):
+        """
+        Same as predict, but only one sample
+        """
+        return self.predict(data_X.reshape((1, len(data_X))))
+
     def predict(self, data_X):
         """
         Pass given input through network to compute the output prediction
@@ -112,6 +118,7 @@ class ParticleNetwork(object):
         dc_dr_y = [np.zeros(self.particle_input.output_size)]
         dc_dr_z = [np.zeros(self.particle_input.output_size)]
         dc_dt = [np.zeros(self.particle_input.output_size)]
+        dc_dt_in = [np.zeros(self.particle_input.output_size)]  # not used but just keep for ease
         dc_dzeta = [np.zeros(self.particle_input.output_size)]
 
         # Initialize
@@ -122,6 +129,7 @@ class ParticleNetwork(object):
             dc_dr_y.append(np.zeros(len(layer.q)))
             dc_dr_z.append(np.zeros(len(layer.q)))
             dc_dt.append(np.zeros(layer.theta.shape))
+            dc_dt_in.append(np.zeros(layer.theta.shape))
             dc_dzeta.append(np.zeros(layer.zeta.shape))
 
         # Regularization options
@@ -168,6 +176,7 @@ class ParticleNetwork(object):
             layer.rz = layer.rz.reshape((layer.output_size, 1))
             layer.zeta = layer.zeta.reshape((layer.output_size, 1))
             layer.theta = layer.theta.reshape((layer.output_size, 1))
+            layer.theta_in = layer.theta_in.reshape((layer.output_size, 1))
 
         l = -1
         layer = self.layers[l]
@@ -203,25 +212,32 @@ class ParticleNetwork(object):
             dz = (prev_layer.rz - layer.rz[j])
             d2 = dx**2 + dy**2 + dz**2
             # zeta_i = prev_layer.zeta
-            # zeta_ij = zeta_i * layer.zeta[j]
+            # zeta_ij = np.sqrt(zeta_i**2 * layer.zeta[j]**2)
             # exp_dij = np.exp(-zeta_ij * d2)
-            exp_dij = np.exp(-d2)
+            # exp_dij = np.exp(-d2)
+            r = np.sqrt(d2)
+            exp_dij = layer.potential(r)
 
             dt = 0.0
+            cdt = 1.0
             if layer.phase_enabled and prev_layer.phase_enabled:
                 dt = (prev_layer.theta - layer.theta[j])
-                exp_dij *= np.cos(dt)
+                # dt = (prev_layer.theta - layer.theta_in[j])
+                cdt = np.cos(dt)
+                exp_dij *= cdt
 
             # Next delta
             next_delta += (qj * trans_delta_L_j) * exp_dij * trans_sigma_Z_l
 
             # Charge gradient
-            dq = exp_dij * Al_trans * trans_delta_L_j
+            atj = Al_trans * trans_delta_L_j
+            dq = exp_dij * atj
             dc_dq[l][j] += np.sum(dq)
 
             # Position gradient
             # tmp = 2.0 * zeta_ij * qj * dq
-            tmp = 2.0 * qj * dq
+            # tmp = 2.0 * qj * dq
+            tmp = -qj * cdt * atj * layer.d_potential(r) / r
             tx = dx * tmp
             ty = dy * tmp
             tz = dz * tmp
@@ -242,9 +258,10 @@ class ParticleNetwork(object):
             if layer.phase_enabled and prev_layer.phase_enabled:
                 # Phase gradient
                 # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                dq *= -np.tan(dt)
-                tmp = qj * dq
+                # dq *= -np.tan(dt)
+                tmp = -qj * dq * np.tan(dt)
                 dc_dt[l][j] -= np.sum(tmp)
+                # dc_dt_in[l][j] -= np.sum(tmp)
                 dc_dt[l-1] += np.sum(tmp, axis=1)
 
             # Ortho help
@@ -402,25 +419,32 @@ class ParticleNetwork(object):
                 dz = (prev_layer.rz - layer.rz[j])
                 d2 = dx**2 + dy**2 + dz**2
                 # zeta_i = prev_layer.zeta
-                # zeta_ij = zeta_i * layer.zeta[j]
+                # zeta_ij = np.sqrt(zeta_i**2 * layer.zeta[j]**2)
                 # exp_dij = np.exp(-zeta_ij * d2)
-                exp_dij = np.exp(-d2)
+                # exp_dij = np.exp(-d2)
+                r = np.sqrt(d2)
+                exp_dij = layer.potential(r)
 
                 dt = 0.0
+                cdt = 1.0
                 if layer.phase_enabled and prev_layer.phase_enabled:
                     dt = (prev_layer.theta - layer.theta[j])
-                    exp_dij *= np.cos(dt)
+                    # dt = (prev_layer.theta - layer.theta_in[j])
+                    cdt = np.cos(dt)
+                    exp_dij *= cdt
 
                 # Next delta
                 next_delta += (qj * this_delta_j) * exp_dij * trans_sigma_Z_l
 
                 # Charge gradient
-                dq = exp_dij * Al_trans * this_delta_j
+                atj = Al_trans * this_delta_j
+                dq = exp_dij * atj
                 dc_dq[l][j] += np.sum(dq)
 
                 # Position gradient
                 # tmp = 2.0 * zeta_ij * qj * dq
-                tmp = 2.0 * qj * dq
+                # tmp = 2.0 * qj * dq
+                tmp = -qj * cdt * atj * layer.d_potential(r) / r
                 tx = dx * tmp
                 ty = dy * tmp
                 tz = dz * tmp
@@ -441,10 +465,11 @@ class ParticleNetwork(object):
                 # Phase gradient
                 if layer.phase_enabled and prev_layer.phase_enabled:
                     # dq *= -np.sin(dt) / np.cos(dt)  # could use tan but being explicit here
-                    dq *= -np.tan(dt)
-                    tmp = qj * dq
+                    # dq *= -np.tan(dt)
+                    tmp = -qj * dq * np.tan(dt)
                     dc_dt[l][j] -= np.sum(tmp)
-                    dc_dt[l-1] += np.sum(tmp, axis=1)
+                    # dc_dt_in[l][j] -= np.sum(tmp)
+                    dc_dt[l - 1] += np.sum(tmp, axis=1)
 
                 # Ortho help
                 s = None
@@ -561,18 +586,20 @@ class ParticleNetwork(object):
         self.particle_input.rz = self.particle_input.rz.reshape((self.particle_input.output_size, ))
         self.particle_input.zeta = self.particle_input.zeta.reshape((self.particle_input.output_size, ))
         self.particle_input.theta = self.particle_input.theta.reshape((self.particle_input.output_size, ))
+        self.particle_input.theta_in = self.particle_input.theta_in.reshape((self.particle_input.output_size, ))
         for layer in self.layers:
             layer.rx = layer.rx.reshape((layer.output_size, ))
             layer.ry = layer.ry.reshape((layer.output_size, ))
             layer.rz = layer.rz.reshape((layer.output_size, ))
             layer.zeta = layer.zeta.reshape((layer.output_size, ))
             layer.theta = layer.theta.reshape((layer.output_size, ))
+            layer.theta_in = layer.theta_in.reshape((layer.output_size, ))
 
         # Perform charge regularization if needed
         if self.regularizer is not None:
             dc_dq, dc_db, dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dq, dc_db, dc_dr)
 
-        return dc_db, dc_dq, dc_dr, dc_dt
+        return dc_db, dc_dq, dc_dr, dc_dt, dc_dt_in
 
     def fit(self, data_X, data_Y, optimizer):
         """

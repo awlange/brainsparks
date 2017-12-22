@@ -19,9 +19,9 @@ class ParticleDipoleInput(object):
         self.cut2 = cut*cut
 
         # Positive charge positions
-        self.rx_pos = np.random.uniform(-s, s, output_size)
-        self.ry_pos = np.random.uniform(-s, s, output_size)
-        self.rz_pos = np.random.uniform(-s, s, output_size)
+        self.rx_pos = np.random.normal(0.0, s, output_size)
+        self.ry_pos = np.random.normal(0.0, s, output_size)
+        self.rz_pos = np.random.normal(0.0, s, output_size)
 
         # Negative charge positions
         # Copy of positive charge position with small added noise
@@ -30,9 +30,9 @@ class ParticleDipoleInput(object):
         # self.ry_neg = np.copy(self.ry_pos) + np.random.uniform(-s, s, output_size)
         # self.rz_neg = np.copy(self.rz_pos) + np.random.uniform(-s, s, output_size)
         # Random
-        self.rx_neg = np.random.uniform(-s, s, output_size)
-        self.ry_neg = np.random.uniform(-s, s, output_size)
-        self.rz_neg = np.random.uniform(-s, s, output_size)
+        self.rx_neg = np.random.normal(0.0, s, output_size)
+        self.ry_neg = np.random.normal(0.0, s, output_size)
+        self.rz_neg = np.random.normal(0.0, s, output_size)
 
     def set_cut(self, cut):
         self.cut = cut

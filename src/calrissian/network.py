@@ -49,6 +49,24 @@ class Network(object):
             a = layer.feed_forward(a)
         return a
 
+    def feed_to_layer(self, data_X, end_layer=0):
+        """
+        Feed data forward until given end layer. Return the resulting activation
+
+        :param data_X: input data
+        :param end_layer: the index of the ending layer
+        :return: resulting activation at end layer
+        """
+        if len(self.layers) <= end_layer < 0:
+            return None
+
+        a = data_X
+        for l, layer in enumerate(self.layers):
+            a = layer.feed_forward(a)
+            if l == end_layer:
+                return a
+        return None
+
     def cost(self, data_X, data_Y):
         """
         Compute the cost for all input data corresponding to expected output

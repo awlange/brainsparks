@@ -55,7 +55,8 @@ class ParticleRegularizeL2(object):
         r = particle_input.get_rxyz()
         for i, layer in enumerate(layers):
             w = layer.compute_w(r)
-            c += np.sum(w * w)
+            # c += np.sum(w * w)
+            c += np.mean(w * w)
             r = layer.get_rxyz()
 
         return self.coeff_lambda * c

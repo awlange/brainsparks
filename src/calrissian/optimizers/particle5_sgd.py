@@ -6,7 +6,7 @@ import time
 from multiprocessing import Pool
 
 
-class ParticleSGD(Optimizer):
+class Particle5SGD(Optimizer):
     """
     Stochastic gradient descent optimization for Atomic layers
     """
@@ -62,9 +62,11 @@ class ParticleSGD(Optimizer):
         # Weight gradients, to keep around for a step
         self.dc_db = None
         self.dc_dq = None
+        self.dc_dq2 = None
         self.dc_dr = None
+        self.dc_dr2 = None
         self.dc_dt = None
-        self.dc_dt_in = None
+        self.dc_dt2 = None
         self.dc_dzeta = None
 
         # Velocities
@@ -82,9 +84,12 @@ class ParticleSGD(Optimizer):
         self.ms_drx = None
         self.ms_dry = None
         self.ms_drz = None
+        self.ms_dq2 = None
+        self.ms_drx2 = None
+        self.ms_dry2 = None
+        self.ms_drz2 = None
         self.ms_dt = None
-        self.ms_dt_in = None
-        self.ms_dzeta = None
+        self.ms_dt2 = None
 
         self.ms_b = None
         self.ms_q = None
@@ -146,28 +151,36 @@ class ParticleSGD(Optimizer):
                 for t, result_t in enumerate(result):
                     tmp_dc_db = result_t[0]
                     tmp_dc_dq = result_t[1]
-                    tmp_dc_dr = result_t[2]
-                    tmp_dc_dt = result_t[3]
-                    tmp_dc_dt_in = result_t[3]
+                    tmp_dc_dq2 = result_t[2]
+                    tmp_dc_dr = result_t[3]
+                    tmp_dc_dr2 = result_t[4]
+                    tmp_dc_dt = result_t[5]
+                    tmp_dc_dt2 = result_t[6]
 
                     if t == 0 and offset == 0:
                         self.dc_db = tmp_dc_db
                         self.dc_dq = tmp_dc_dq
+                        self.dc_dq2 = tmp_dc_dq2
                         self.dc_dr = tmp_dc_dr
+                        self.dc_dr2 = tmp_dc_dr2
                         self.dc_dt = tmp_dc_dt
-                        self.dc_dt_in = tmp_dc_dt_in
+                        self.dc_dt2 = tmp_dc_dt2
                     else:
                         for l, tmp_b in enumerate(tmp_dc_db):
                             self.dc_db[l] += tmp_b
                         for l, tmp_q in enumerate(tmp_dc_dq):
                             self.dc_dq[l] += tmp_q
+                        for l, tmp_q in enumerate(tmp_dc_dq2):
+                            self.dc_dq2[l] += tmp_q
                         for l, tmp_t in enumerate(tmp_dc_dt):
                             self.dc_dt[l] += tmp_t
-                        for l, tmp_t in enumerate(tmp_dc_dt_in):
-                            self.dc_dt_in[l] += tmp_t
+                        for l, tmp_t in enumerate(tmp_dc_dt2):
+                            self.dc_dt2[l] += tmp_t
                         for i in range(3):
                             for l, tmp_r in enumerate(tmp_dc_dr[i]):
                                 self.dc_dr[i][l] += tmp_r
+                            for l, tmp_r in enumerate(tmp_dc_dr2[i]):
+                                self.dc_dr2[i][l] += tmp_r
 
                 offset += self.chunk_size
 
@@ -202,7 +215,7 @@ class ParticleSGD(Optimizer):
                 if self.n_threads > 1:
                     self.cost_gradient_parallel(network, mini_X, mini_Y)
                 else:
-                    self.dc_db, self.dc_dq, self.dc_dr, self.dc_dt, self.dc_dt_in = network.cost_gradient(mini_X, mini_Y)
+                    self.dc_db, self.dc_dq, self.dc_dq2, self.dc_dr, self.dc_dr2, self.dc_dt, self.dc_dt2 = network.cost_gradient(mini_X, mini_Y)
 
                 # Update weights and biases
                 self.weight_update_func(network)
@@ -216,9 +229,6 @@ class ParticleSGD(Optimizer):
                     print("Cost at epoch {} mini-batch {}: {:g}".format(epoch, m, c))
                     # TODO: could output projected time left based on mini-batch times
 
-                    # Temporary
-                    # print(np.sqrt(self.ms_dq[0]))
-
             if self.verbosity > 0:
                 c = network.cost(data_X, data_Y)
                 print("Cost after epoch {}: {:g}".format(epoch, c))
@@ -231,46 +241,6 @@ class ParticleSGD(Optimizer):
 
         return network
 
-    def remove_translational_gradients(self):
-        """
-        Subtract zeroth moment from position and phase gradients
-        """
-        # Phase
-        n_dt = 0
-        mean_dt = 0.0
-        for dt in self.dc_dt:
-            n_dt += len(dt)
-            mean_dt += np.sum(dt)
-        mean_dt /= n_dt
-
-        if self.verbosity > 2:
-            print("Mean theta gradient: {}".format(mean_dt))
-
-        for l, dt in enumerate(self.dc_dt):
-            self.dc_dt[l] -= mean_dt
-
-        # Position
-        n_dr = 0
-        mean_dx = 0.0
-        mean_dy = 0.0
-        mean_dz = 0.0
-        for l in range(len(self.dc_dr[0])):
-            n_dr += len(self.dc_dr[0][l])
-            mean_dx += np.sum(self.dc_dr[0][l])
-            mean_dy += np.sum(self.dc_dr[1][l])
-            mean_dz += np.sum(self.dc_dr[2][l])
-        mean_dx /= n_dr
-        mean_dy /= n_dr
-        mean_dz /= n_dr
-
-        if self.verbosity > 2:
-            print("Mean position gradient: {} {} {}".format(mean_dx, mean_dy, mean_dz))
-
-        for l in range(len(self.dc_dr[0])):
-            self.dc_dr[0][l] -= mean_dx
-            self.dc_dr[1][l] -= mean_dy
-            self.dc_dr[2][l] -= mean_dz
-
     def weight_update_steepest_descent(self, network):
         """
         Update weights and biases according to steepest descent
@@ -279,16 +249,23 @@ class ParticleSGD(Optimizer):
             layer.b -= self.alpha * self.dc_db[l]
             layer.q -= self.alpha * self.dc_dq[l]
             layer.theta -= self.alpha * self.dc_dt[l+1]
-            if self.position_grad:
-                layer.rx -= self.alpha * self.dc_dr[0][l+1]
-                layer.ry -= self.alpha * self.dc_dr[1][l+1]
-                layer.rz -= self.alpha * self.dc_dr[2][l+1]
+            layer.rx -= self.alpha * self.dc_dr[0][l+1]
+            layer.ry -= self.alpha * self.dc_dr[1][l+1]
+            layer.rz -= self.alpha * self.dc_dr[2][l+1]
+            layer.q2 -= self.alpha * self.dc_dq2[l]
+            layer.theta2 -= self.alpha * self.dc_dt2[l+1]
+            layer.rx2 -= self.alpha * self.dc_dr2[0][l+1]
+            layer.ry2 -= self.alpha * self.dc_dr2[1][l+1]
+            layer.rz2 -= self.alpha * self.dc_dr2[2][l+1]
 
         network.particle_input.theta -= self.alpha * self.dc_dt[0]
-        if self.position_grad:
-            network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
-            network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
-            network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
+        network.particle_input.rx -= self.alpha * self.dc_dr[0][0]
+        network.particle_input.ry -= self.alpha * self.dc_dr[1][0]
+        network.particle_input.rz -= self.alpha * self.dc_dr[2][0]
+        network.particle_input.theta2 -= self.alpha * self.dc_dt2[0]
+        network.particle_input.rx2 -= self.alpha * self.dc_dr2[0][0]
+        network.particle_input.ry2 -= self.alpha * self.dc_dr2[1][0]
+        network.particle_input.rz2 -= self.alpha * self.dc_dr2[2][0]
 
     def weight_update_steepest_descent_with_momentum(self, network):
         """
@@ -405,9 +382,7 @@ class ParticleSGD(Optimizer):
         """
         gamma = self.gamma
         one_m_gamma = 1.0 - gamma
-        # one_m_gamma = self.gamma2
         alpha = self.alpha
-        # epsilon = 10e-8  # small number to avoid division by zero
         epsilon = self.epsilon  # small number to avoid division by zero
 
         # Initialize RMS to zero
@@ -417,43 +392,67 @@ class ParticleSGD(Optimizer):
             self.ms_drx = [np.zeros(network.particle_input.output_size)]
             self.ms_dry = [np.zeros(network.particle_input.output_size)]
             self.ms_drz = [np.zeros(network.particle_input.output_size)]
+            self.ms_dq2 = []
+            self.ms_drx2 = [np.zeros(network.particle_input.output_size)]
+            self.ms_dry2 = [np.zeros(network.particle_input.output_size)]
+            self.ms_drz2 = [np.zeros(network.particle_input.output_size)]
             self.ms_dt = [np.zeros(network.particle_input.output_size)]
-            self.ms_dt_in = [np.zeros(network.particle_input.output_size)]
+            self.ms_dt2 = [np.zeros(network.particle_input.output_size)]
             for l, layer in enumerate(network.layers):
                 self.ms_db.append(np.zeros(layer.b.shape))
                 self.ms_dq.append(np.zeros(layer.q.shape))
                 self.ms_drx.append(np.zeros(layer.output_size))
                 self.ms_dry.append(np.zeros(layer.output_size))
                 self.ms_drz.append(np.zeros(layer.output_size))
+                self.ms_dq2.append(np.zeros(layer.q.shape))
+                self.ms_drx2.append(np.zeros(layer.output_size))
+                self.ms_dry2.append(np.zeros(layer.output_size))
+                self.ms_drz2.append(np.zeros(layer.output_size))
                 self.ms_dt.append(np.zeros(layer.output_size))
-                self.ms_dt_in.append(np.zeros(layer.output_size))
+                self.ms_dt2.append(np.zeros(layer.output_size))
 
         for l, layer in enumerate(network.layers):
             self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
             self.ms_dq[l] = gamma * self.ms_dq[l] + one_m_gamma * (self.dc_dq[l] * self.dc_dq[l])
+            self.ms_dq2[l] = gamma * self.ms_dq2[l] + one_m_gamma * (self.dc_dq2[l] * self.dc_dq2[l])
             self.ms_dt[l + 1] = gamma * self.ms_dt[l + 1] + one_m_gamma * (self.dc_dt[l + 1] * self.dc_dt[l + 1])
-            self.ms_dt_in[l + 1] = gamma * self.ms_dt_in[l + 1] + one_m_gamma * (self.dc_dt_in[l + 1] * self.dc_dt_in[l + 1])
+            self.ms_dt2[l + 1] = gamma * self.ms_dt2[l + 1] + one_m_gamma * (self.dc_dt2[l + 1] * self.dc_dt2[l + 1])
             self.ms_drx[l + 1] = gamma * self.ms_drx[l + 1] + one_m_gamma * (self.dc_dr[0][l + 1] * self.dc_dr[0][l + 1])
             self.ms_dry[l + 1] = gamma * self.ms_dry[l + 1] + one_m_gamma * (self.dc_dr[1][l + 1] * self.dc_dr[1][l + 1])
             self.ms_drz[l + 1] = gamma * self.ms_drz[l + 1] + one_m_gamma * (self.dc_dr[2][l + 1] * self.dc_dr[2][l + 1])
+            self.ms_drx2[l + 1] = gamma * self.ms_drx2[l + 1] + one_m_gamma * (self.dc_dr2[0][l + 1] * self.dc_dr2[0][l + 1])
+            self.ms_dry2[l + 1] = gamma * self.ms_dry2[l + 1] + one_m_gamma * (self.dc_dr2[1][l + 1] * self.dc_dr2[1][l + 1])
+            self.ms_drz2[l + 1] = gamma * self.ms_drz2[l + 1] + one_m_gamma * (self.dc_dr2[2][l + 1] * self.dc_dr2[2][l + 1])
 
             layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             layer.q -= self.alpha_q * self.dc_dq[l] / np.sqrt(self.ms_dq[l] + epsilon)
+            layer.q2 -= self.alpha_q * self.dc_dq2[l] / np.sqrt(self.ms_dq2[l] + epsilon)
             layer.theta -= alpha * self.dc_dt[l+1] / np.sqrt(self.ms_dt[l + 1] + epsilon)
-            layer.theta_in -= alpha * self.dc_dt_in[l+1] / np.sqrt(self.ms_dt_in[l + 1] + epsilon)
+            layer.theta2 -= alpha * self.dc_dt2[l+1] / np.sqrt(self.ms_dt2[l + 1] + epsilon)
             layer.rx -= alpha * self.dc_dr[0][l+1] / np.sqrt(self.ms_drx[l + 1] + epsilon)
             layer.ry -= alpha * self.dc_dr[1][l+1] / np.sqrt(self.ms_dry[l + 1] + epsilon)
             layer.rz -= alpha * self.dc_dr[2][l+1] / np.sqrt(self.ms_drz[l + 1] + epsilon)
+            layer.rx2 -= alpha * self.dc_dr2[0][l + 1] / np.sqrt(self.ms_drx2[l + 1] + epsilon)
+            layer.ry2 -= alpha * self.dc_dr2[1][l + 1] / np.sqrt(self.ms_dry2[l + 1] + epsilon)
+            layer.rz2 -= alpha * self.dc_dr2[2][l + 1] / np.sqrt(self.ms_drz2[l + 1] + epsilon)
 
         # Input layer
         self.ms_dt[0] = gamma * self.ms_dt[0] + one_m_gamma * (self.dc_dt[0] * self.dc_dt[0])
+        self.ms_dt2[0] = gamma * self.ms_dt2[0] + one_m_gamma * (self.dc_dt2[0] * self.dc_dt2[0])
         self.ms_drx[0] = gamma * self.ms_drx[0] + one_m_gamma * (self.dc_dr[0][0] * self.dc_dr[0][0])
         self.ms_dry[0] = gamma * self.ms_dry[0] + one_m_gamma * (self.dc_dr[1][0] * self.dc_dr[1][0])
         self.ms_drz[0] = gamma * self.ms_drz[0] + one_m_gamma * (self.dc_dr[2][0] * self.dc_dr[2][0])
+        self.ms_drx2[0] = gamma * self.ms_drx2[0] + one_m_gamma * (self.dc_dr2[0][0] * self.dc_dr2[0][0])
+        self.ms_dry2[0] = gamma * self.ms_dry2[0] + one_m_gamma * (self.dc_dr2[1][0] * self.dc_dr2[1][0])
+        self.ms_drz2[0] = gamma * self.ms_drz2[0] + one_m_gamma * (self.dc_dr2[2][0] * self.dc_dr2[2][0])
         network.particle_input.theta -= alpha * self.dc_dt[0] / np.sqrt(self.ms_dt[0] + epsilon)
         network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
         network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
         network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
+        network.particle_input.theta2 -= alpha * self.dc_dt2[0] / np.sqrt(self.ms_dt2[0] + epsilon)
+        network.particle_input.rx2 -= alpha * self.dc_dr2[0][0] / np.sqrt(self.ms_drx2[0] + epsilon)
+        network.particle_input.ry2 -= alpha * self.dc_dr2[1][0] / np.sqrt(self.ms_dry2[0] + epsilon)
+        network.particle_input.rz2 -= alpha * self.dc_dr2[2][0] / np.sqrt(self.ms_drz2[0] + epsilon)
 
     def weight_update_rmsprop_momentum(self, network):
         """
