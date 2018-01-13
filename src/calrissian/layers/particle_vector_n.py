@@ -60,8 +60,9 @@ class ParticleVectorN(object):
         g = np.sqrt(2.0 / (input_size + output_size))
         if b is None:
             b = g
-        self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
-        # self.b = np.random.normal(0.0, sv, (1, output_size))
+        # self.b = np.random.uniform(boff - b, boff + b, (1, output_size))
+        self.b = np.random.normal(0.0, sv, (1, output_size))
+        # self.b = np.zeros((1, output_size))
 
         # Positions
         self.positions = []

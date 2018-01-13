@@ -33,6 +33,8 @@ class Potential(object):
             return Potential().lennard_jones
         if nl == "gwell":
             return Potential().gwell
+        if nl == "gaussian_short":
+            return Potential().gaussian_short
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
@@ -61,6 +63,8 @@ class Potential(object):
             return Potential().d_lennard_jones
         if nl == "gwell":
             return Potential().d_gwell
+        if nl == "gaussian_short":
+            return Potential().d_gaussian_short
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
@@ -153,3 +157,13 @@ class Potential(object):
 
     def d_gwell(self, x):
         return -2.0 * x * np.exp(-x*x) + 2.0 * (x - 2.0) * np.exp(-(x-2.0)**2)
+
+    # Gaussian - short range
+
+    def gaussian_short(self, x):
+        a = 1.0/np.sqrt(0.1)
+        return np.exp(-a * x*x)
+
+    def d_gaussian_short(self, x):
+        a = 1.0/np.sqrt(0.1)
+        return -2.0 * a * x * np.exp(-a * x*x)

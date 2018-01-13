@@ -4,7 +4,7 @@ import numpy as np
 import json
 
 
-class ParticleVectorNLocalConvolutionNetwork(object):
+class ParticleVectorNLocalConvolution2Network(object):
 
     def __init__(self, particle_input=None, cost="mse", regularizer=None):
         self.layers = []
@@ -149,6 +149,12 @@ class ParticleVectorNLocalConvolutionNetwork(object):
             for v in range(layer.nv):
                 layer.nvectors[v] = layer.nvectors[v].reshape((layer.output_size, 1))
 
+            if layer.apply_convolution:
+                layer.positions_cache = layer.positions_cache.reshape((layer.nr, len(layer.positions_cache[0]), 1))
+                layer.nvectors_cache = layer.nvectors_cache.reshape((layer.nv, len(layer.nvectors_cache[0]), 1))
+
+        # todo: anything for position/vector caches?
+
         l = -1
         layer = self.layers[l]
         prev_layer = self.particle_input if -(l-1) > len(self.layers) else self.layers[l-1]
@@ -220,13 +226,26 @@ class ParticleVectorNLocalConvolutionNetwork(object):
             Al_trans = Al.transpose()
 
             this_delta = next_delta
-            next_delta = np.zeros((prev_layer.output_size, len(data_X)))
-            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
+            if layer.apply_convolution:
+                this_delta = this_delta.reshape((layer.output_size, layer.n_convolution, -1))
+                # Bias gradient
+                trans_delta = np.sum(this_delta, axis=1).transpose()
+                for di, data in enumerate(data_X):
+                    dc_db[l] += trans_delta[di]
+            else:
+                # Bias gradient
+                trans_delta = this_delta.transpose()
+                for di, data in enumerate(data_X):
+                    dc_db[l] += trans_delta[di]
 
-            # Bias gradient
-            trans_delta = this_delta.transpose()
-            for di, data in enumerate(data_X):
-                dc_db[l] += trans_delta[di]
+            if prev_layer.apply_convolution:
+                next_delta = np.zeros((len(prev_layer.positions_cache[0]), len(data_X)))
+                trans_sigma_Z_l = trans_sigma_Z[l - 1] if -(l - 1) <= len(self.layers) else np.ones((len(prev_layer.positions_cache[0]), len(data_X)))
+
+            else:
+                next_delta = np.zeros((prev_layer.output_size, len(data_X)))
+                trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
+
 
             # Position gradient
             for j in range(layer.output_size):
@@ -234,46 +253,117 @@ class ParticleVectorNLocalConvolutionNetwork(object):
 
                 d2 = None
                 lpos = None
+                lvec = None
+                dot = 0.0
+                dr = []
+
                 if layer.apply_convolution:
-                    d2 = np.zeros((len(prev_layer.positions[0]), len(data_X)))  # this is amazing stuff! numpy is the best!
-                    lpos = layer.positions_cache
+                    # use the non-flattened caches
+                    lpos = layer.positions_cache.reshape((layer.nr, layer.output_size, layer.n_convolution, 1))
+                    lvec = layer.nvectors_cache.reshape((layer.nv, layer.output_size, layer.n_convolution, 1))
+
+                    if prev_layer.apply_convolution:
+                        # todo
+                        pass
+
+                    else:
+                        d2 = np.zeros((layer.n_convolution, prev_layer.output_size, 1))
+                        dr = np.zeros((layer.n_convolution, layer.nr, prev_layer.output_size, 1))
+                        for c in range(layer.n_convolution):
+                            for r in range(layer.nr):
+                                dtmp = prev_layer.positions[r] - lpos[r][j][c]
+                                d2[c] += dtmp ** 2
+                                dr[c][r] += dtmp
+                            for v in range(layer.nv):
+                                dot += prev_layer.nvectors[v] * lvec[v][j][c]
+                        d = np.sqrt(d2)
 
                 else:
-                    d2 = np.zeros_like(prev_layer.positions[0])
                     lpos = layer.positions
+                    lvec = layer.nvectors
+                    if prev_layer.apply_convolution:
+                        d2 = np.zeros_like(prev_layer.positions_cache[0])
+                        for r in range(layer.nr):
+                            dtmp = prev_layer.positions_cache[r] - lpos[r][j]
+                            d2 += dtmp ** 2
+                            dr.append(dtmp)
+                        d = np.sqrt(d2)
+                        for v in range(layer.nv):
+                            dot += prev_layer.nvectors_cache[v] * lvec[v][j]
+                    else:
+                        d2 = np.zeros_like(prev_layer.positions[0])
+                        for r in range(layer.nr):
+                            dtmp = prev_layer.positions[r] - lpos[r][j]
+                            d2 += dtmp ** 2
+                            dr.append(dtmp)
+                        d = np.sqrt(d2)
+                        for v in range(layer.nv):
+                            dot += prev_layer.nvectors[v] * lvec[v][j]
 
-                dr = []
-                for r in range(layer.nr):
-                    dtmp = prev_layer.positions[r] - lpos[r][j]
-                    d2 += dtmp ** 2
-                    dr.append(dtmp)
-                d = np.sqrt(d2)
-                dot = 0.0
-                for v in range(layer.nv):
-                    dot += prev_layer.nvectors[v] * layer.nvectors[v][j]
                 exp_dij = layer.potential(d) * dot
 
                 # Next delta
-                next_delta += this_delta_j * exp_dij * trans_sigma_Z_l
+                if layer.apply_convolution:
+                    # Loop through each j-th convolution
+                    ld_pot = layer.d_potential(d) / d
 
-                # Charge gradient
-                atj = Al_trans * this_delta_j
-                dq = exp_dij * atj
+                    for c in range(layer.n_convolution):
+                        next_delta += this_delta_j[c] * exp_dij[c] * trans_sigma_Z_l
+                        atj = Al_trans * this_delta_j[c]
+                        dq = exp_dij[c] * atj
 
-                # Position gradient
-                tmp = -dot * atj * layer.d_potential(d) / d
-                for r in range(layer.nr):
-                    tr = dr[r] * tmp
-                    dc_dr[l][r][j] += np.sum(tr)
-                    dc_dr[l - 1][r] -= np.sum(tr, axis=1)
+                        jcdot = 0.0
+                        for v in range(layer.nv):
+                            jcdot += prev_layer.nvectors[v] * lvec[v][j][c]
+                        p_tmp = -jcdot * atj * ld_pot[c]  # only the dot for this j-th conv?
+                        v_tmp = dq / dot
 
-                # Vector gradient
-                tmp = dq / dot
-                for v in range(layer.nv):
-                    tv = tmp * prev_layer.nvectors[v]
-                    dc_dn[l][v][j] += np.sum(tv)
-                    tv = tmp * layer.nvectors[v][j]
-                    dc_dn[l - 1][v] += np.sum(tv, axis=1)
+                        if prev_layer.apply_convolution:
+                            pass
+                        else:
+                            for r in range(layer.nr):
+                                tr = dr[c][r] * p_tmp
+                                dc_dr[l][r][j] += np.sum(tr)
+                                dc_dr[l - 1][r] -= np.sum(tr, axis=1)
+
+                            for v in range(layer.nv):
+                                tv = v_tmp * prev_layer.nvectors[v]
+                                dc_dn[l][v][j] += np.sum(tv)
+                                tv = v_tmp * layer.nvectors[v][j]
+                                dc_dn[l - 1][v] += np.sum(tv, axis=1)
+
+                else:
+                    exp_dij = exp_dij.reshape((-1, 1))
+
+                    next_delta += this_delta_j * exp_dij * trans_sigma_Z_l
+                    atj = Al_trans * this_delta_j
+                    dq = exp_dij * atj
+
+                    p_tmp = -dot * atj * layer.d_potential(d) / d
+                    v_tmp = dq / dot
+
+                    if prev_layer.apply_convolution:
+                        for r in range(layer.nr):
+                            tr = dr[r] * p_tmp
+                            dc_dr[l][r][j] += np.sum(tr)
+                            dc_dr[l - 1][r] -= np.sum(np.sum(tr, axis=1).reshape((len(prev_layer.positions[0]), -1)), axis=1)
+
+                        for v in range(layer.nv):
+                            tv = v_tmp * prev_layer.nvectors_cache[v]
+                            dc_dn[l][v][j] += np.sum(tv)
+                            tv = v_tmp * layer.nvectors[v][j]
+                            dc_dn[l - 1][v] += np.sum(np.sum(tv, axis=1).reshape((len(prev_layer.nvectors[0]), -1)), axis=1)
+                    else:
+                        for r in range(layer.nr):
+                            tr = dr[r] * p_tmp
+                            dc_dr[l][r][j] += np.sum(tr)
+                            dc_dr[l - 1][r] -= np.sum(tr, axis=1)
+
+                        for v in range(layer.nv):
+                            tv = v_tmp * prev_layer.nvectors[v]
+                            dc_dn[l][v][j] += np.sum(tv)
+                            tv = v_tmp * layer.nvectors[v][j]
+                            dc_dn[l - 1][v] += np.sum(tv, axis=1)
 
         # Restore shapes
         for r in range(self.particle_input.nr):
@@ -286,9 +376,14 @@ class ParticleVectorNLocalConvolutionNetwork(object):
             for v in range(layer.nv):
                 layer.nvectors[v] = layer.nvectors[v].reshape((layer.output_size, ))
 
+            if layer.apply_convolution:
+                layer.positions_cache = layer.positions_cache.reshape((layer.nr, len(layer.positions_cache[0]), ))
+                layer.nvectors_cache = layer.nvectors_cache.reshape((layer.nv, len(layer.nvectors_cache[0]), ))
+
         # Regularizer
         if self.regularizer is not None:
-            dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dr)
+            # dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dr)
+            dc_dn, dc_db = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dn, dc_db)
 
         return dc_db, dc_dr, dc_dn
 

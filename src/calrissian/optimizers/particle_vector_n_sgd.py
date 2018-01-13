@@ -112,7 +112,7 @@ class ParticleVectorNSGD(Optimizer):
 
         indexes = np.arange(len(data_X))
 
-        if self.verbosity > 0:
+        if self.verbosity > 1:
             c = network.cost(data_X, data_Y)
             print("Cost before epochs: {}".format(c))
 
@@ -127,7 +127,10 @@ class ParticleVectorNSGD(Optimizer):
             shuffle_Y = np.asarray([data_Y[i] for i in indexes])
 
             # Split into mini-batches
-            for m in range(len(data_X) // self.mini_batch_size):  # not guaranteed to divide perfectly, might miss a few
+            mdiv = len(data_X) // self.mini_batch_size
+            for m in range(mdiv):  # not guaranteed to divide perfectly, might miss a few
+                mb_start_time = time.time()
+
                 mini_X = shuffle_X[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
                 mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
@@ -146,13 +149,15 @@ class ParticleVectorNSGD(Optimizer):
 
                 if self.verbosity > 1 and m % self.cost_freq == 0:
                     c = network.cost(data_X, data_Y)
-                    print("Cost at epoch {} mini-batch {}: {:g}".format(epoch, m, c))
-                    # TODO: could output projected time left based on mini-batch times
+                    print("Cost at epoch {} mini-batch {}: {:g} mini-batch time: {}".format(epoch, m, c, time.time() - mb_start_time))
+                elif self.verbosity == 1 and m % self.cost_freq == 0:
+                    c = network.cost(mini_X, mini_Y)
+                    mt = time.time() - mb_start_time
+                    emt = mt * (mdiv-1 - m)
+                    print("Estimated cost at epoch {:2d} mini-batch {:4d}: {:.6f} mini-batch time: {:.2f} estimated epoch time remaining: {:.2f}".format(
+                        epoch, m, c, mt, emt))
 
-                    # Temporary
-                    # print(np.sqrt(self.ms_dq[0]))
-
-            if self.verbosity > 0:
+            if self.verbosity > 1:
                 c = network.cost(data_X, data_Y)
                 print("Cost after epoch {}: {:g}".format(epoch, c))
                 print("Epoch time: {:g} s".format(time.time() - epoch_start_time))
