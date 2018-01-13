@@ -6,23 +6,23 @@ import numpy as np
 
 
 class ParticleVectorNInput(object):
-    def __init__(self, output_size, nr=3, nv=3, sr=1.0, sv=1.0):
+    def __init__(self, output_size, nr=3, nv=3, sr=1.0, sv=1.0, srl=None):
         self.output_size = output_size
         self.nv = nv
         self.nr = nr
 
         # Positions
         self.positions = []
+
+        srl = srl if srl else [sr for _ in range(nr)]
         for i in range(nr):
-            self.positions.append(np.random.normal(0.0, sr, output_size))
+            self.positions.append(np.random.normal(0.0, srl[i], output_size))
 
         # Vectors
         self.nvectors = []
         for i in range(nv):
-            self.nvectors.append(np.random.normal(0.0, sv, output_size))
-            # g = np.sqrt(1.0 / output_size)
-            # self.nvectors.append(np.random.uniform(-g, g, output_size))
-        # self.normalize()
+            # self.nvectors.append(np.random.normal(0.0, sv, output_size))
+            self.nvectors.append(np.random.uniform(-sv, sv, output_size))
 
     def get_rxyz(self):
         return self.positions, self.nvectors
@@ -42,7 +42,7 @@ class ParticleVectorNInput(object):
 class ParticleVectorN(object):
 
     def __init__(self, input_size=0, output_size=0, nr=3, nv=3, activation="sigmoid", potential="gaussian",
-                 sr=1.0, sv=1.0, q=None, b=None, boff=0.0, uniform=False, p_dropout=-1.0, sigma_r=-1.0):
+                 sr=1.0, sv=1.0, q=None, b=None, boff=0.0, uniform=False, p_dropout=-1.0, sigma_r=-1.0, srl=None):
         self.input_size = input_size
         self.output_size = output_size
         self.nr = nr
@@ -65,19 +65,19 @@ class ParticleVectorN(object):
         # self.b = np.zeros((1, output_size))
 
         # Positions
+        srl = srl if srl else [sr for _ in range(nr)]
         self.positions = []
         for i in range(nr):
             if uniform:
-                self.positions.append(np.random.uniform(-sr, sr, output_size))
+                self.positions.append(np.random.uniform(-srl[i], srl[i], output_size))
             else:
-                self.positions.append(np.random.normal(0.0, sr, output_size))
+                self.positions.append(np.random.normal(0.0, srl[i], output_size))
 
         # Vectors
         self.nvectors = []
         for i in range(nv):
-            self.nvectors.append(np.random.normal(0.0, sv, output_size))
-            # self.nvectors.append(np.random.uniform(-g, g, output_size))
-        # self.normalize()
+            # self.nvectors.append(np.random.normal(0.0, sv, output_size))
+            self.nvectors.append(np.random.uniform(-sv, sv, output_size))
 
         # Matrix
         self.w = None
