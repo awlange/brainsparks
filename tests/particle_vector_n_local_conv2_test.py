@@ -5,6 +5,7 @@ Script entry point
 from src.calrissian.particle_vector_n_network_local_conv2 import ParticleVectorNLocalConvolution2Network
 from src.calrissian.layers.particle_vector_n_local_conv2 import ParticleVectorNLocalConvolution2
 from src.calrissian.layers.particle_vector_n_local_conv2 import ParticleVectorNLocalConvolution2Input
+from src.calrissian.regularization.particle_vector_n_vector import ParticleVectorRegularizeVector
 
 import numpy as np
 
@@ -36,9 +37,14 @@ def fd():
     train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
     train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
 
-    net = ParticleVectorNLocalConvolution2Network(cost="categorical_cross_entropy", particle_input=ParticleVectorNLocalConvolution2Input(2))
+    # reg = None
+    reg = ParticleVectorRegularizeVector(coeff_lambda=0.02)
+
+    net = ParticleVectorNLocalConvolution2Network(cost="categorical_cross_entropy",
+                                                  particle_input=ParticleVectorNLocalConvolution2Input(2),
+                                                  regularizer=reg)
     net.append(ParticleVectorNLocalConvolution2(2, 5, activation="tanh", apply_convolution=True, delta_r=0.1))
-    net.append(ParticleVectorNLocalConvolution2(5, 4, activation="tanh"))
+    net.append(ParticleVectorNLocalConvolution2(5, 4, activation="tanh", srl=[0.1, 0.5, 0.5]))
     net.append(ParticleVectorNLocalConvolution2(4, 3, activation="softmax"))
 
     # Finite difference checking

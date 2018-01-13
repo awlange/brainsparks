@@ -321,7 +321,6 @@ class ParticleVectorNLocalConvolution2Network(object):
                         if prev_layer.apply_convolution:
                             pass
                         else:
-                            # todo - vector part is correct
                             for r in range(layer.nr):
                                 tr = dr[c][r] * p_tmp
                                 dc_dr[l][r][j] += np.sum(tr)
@@ -383,7 +382,8 @@ class ParticleVectorNLocalConvolution2Network(object):
 
         # Regularizer
         if self.regularizer is not None:
-            dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dr)
+            # dc_dr = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dr)
+            dc_dn, dc_db = self.regularizer.cost_gradient(self.particle_input, self.layers, dc_dn, dc_db)
 
         return dc_db, dc_dr, dc_dn
 
