@@ -13,7 +13,7 @@ class ParticleVector2SGD(Optimizer):
 
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
                  cost_freq=2, position_grad=True, alpha_b=0.01, alpha_q=None, alpha_r=0.01, alpha_t=0.01, init_v=0.0,
-                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None, use_log=False):
+                 n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None, use_log=False, fixed_input=False):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -30,6 +30,7 @@ class ParticleVector2SGD(Optimizer):
         self.cost_freq = cost_freq
         self.position_grad = position_grad  # Turn off position gradient?
         self.alpha_decay = alpha_decay
+        self.fixed_input = fixed_input
 
         # Could make individual learning rates if we want, but it doesn't seem to matter much
         self.alpha_b = alpha
@@ -270,9 +271,10 @@ class ParticleVector2SGD(Optimizer):
         self.ms_dnx[0] = gamma * self.ms_dnx[0] + one_m_gamma * (self.dc_dn[0][0] * self.dc_dn[0][0])
         self.ms_dny[0] = gamma * self.ms_dny[0] + one_m_gamma * (self.dc_dn[1][0] * self.dc_dn[1][0])
         self.ms_dnz[0] = gamma * self.ms_dnz[0] + one_m_gamma * (self.dc_dn[2][0] * self.dc_dn[2][0])
-        network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
-        network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
-        network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
+        if not self.fixed_input:
+            network.particle_input.rx -= alpha * self.dc_dr[0][0] / np.sqrt(self.ms_drx[0] + epsilon)
+            network.particle_input.ry -= alpha * self.dc_dr[1][0] / np.sqrt(self.ms_dry[0] + epsilon)
+            network.particle_input.rz -= alpha * self.dc_dr[2][0] / np.sqrt(self.ms_drz[0] + epsilon)
         network.particle_input.nx -= alpha * self.dc_dn[0][0] / np.sqrt(self.ms_dnx[0] + epsilon)
         network.particle_input.ny -= alpha * self.dc_dn[1][0] / np.sqrt(self.ms_dny[0] + epsilon)
         network.particle_input.nz -= alpha * self.dc_dn[2][0] / np.sqrt(self.ms_dnz[0] + epsilon)

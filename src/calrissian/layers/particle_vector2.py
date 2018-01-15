@@ -148,7 +148,7 @@ class ParticleVector2(object):
             dx = r_in_x - self.rx[j]
             dy = r_in_y - self.ry[j]
             dz = r_in_z - self.rz[j]
-            w_ji = self.q[j] * np.exp(-(dx**2 + dy**2 + dz**2))
+            w_ji = np.exp(-(dx**2 + dy**2 + dz**2))
             dot = r_in_nx * self.mx[j] + r_in_ny * self.my[j] + r_in_nz * self.mz[j]
             w_ji *= dot
             for i in range(self.input_size):
