@@ -39,7 +39,7 @@ def fd():
 
     net = ParticleVectorNLocalConvolution3Network(cost="categorical_cross_entropy",
                                                   particle_input=ParticleVectorNLocalConvolution3Input(2))
-    net.append(ParticleVectorNLocalConvolution3(2, 5, activation="tanh", apply_convolution=True, delta_r=0.1))
+    net.append(ParticleVectorNLocalConvolution3(2, 5, activation="tanh", potential="gaussian_short", apply_convolution=True, delta_r=0.1))
     net.append(ParticleVectorNLocalConvolution3(5, 4, activation="tanh", srl=[0.1, 0.5, 0.5]))
     net.append(ParticleVectorNLocalConvolution3(4, 3, activation="softmax"))
 
