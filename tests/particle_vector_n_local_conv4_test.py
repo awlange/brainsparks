@@ -7,6 +7,7 @@ from src.calrissian.layers.particle_vector_n_local_conv4 import ParticleVectorNL
 from src.calrissian.layers.particle_vector_n_local_conv4 import ParticleVectorNLocalConvolution4Input
 
 import numpy as np
+import time
 
 
 def main():
@@ -30,6 +31,34 @@ def main():
     # print(net.cost_gradient(train_X, train_Y))
 
 
+def timer():
+
+    nr = 3
+    nv = 3
+    nw = 3
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.01, 0.01], [0.03, 0.04]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+
+    net = ParticleVectorNLocalConvolution4Network(cost="categorical_cross_entropy",
+                                                  particle_input=ParticleVectorNLocalConvolution4Input(2))
+    net.append(ParticleVectorNLocalConvolution4(2, 5, activation="tanh", potential="gaussian",
+                                                apply_convolution=True, delta_r=0.4,
+                                                pool_size=[4, 4, 1], pool_stride=[0.1, 0.1, 0.1]))
+    net.append(ParticleVectorNLocalConvolution4(5, 4, activation="tanh", srl=[0.1, 0.5, 0.5]))
+    net.append(ParticleVectorNLocalConvolution4(4, 3, activation="softmax"))
+
+    # Finite difference checking
+
+    ts = time.time()
+
+    total = 0.0
+    for i in range(50):
+        db, dr, dn, dm = net.cost_gradient(train_X, train_Y)
+        total += i
+    print("Time for {}: {}".format(i+1, time.time() - ts))
+
+
 def fd():
 
     nr = 3
@@ -49,9 +78,13 @@ def fd():
 
     # Finite difference checking
 
+    ts = time.time()
+
     net.cost(train_X, train_Y)
 
     db, dr, dn, dm = net.cost_gradient(train_X, train_Y)
+
+    print("Time: {}".format(time.time() - ts))
 
     h = 0.001
 
@@ -205,4 +238,5 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    fd()
+    # fd()
+    timer()
