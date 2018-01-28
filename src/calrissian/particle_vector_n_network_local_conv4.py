@@ -251,24 +251,37 @@ class ParticleVectorNLocalConvolution4Network(object):
                 next_delta = np.zeros((prev_layer.output_size, len(data_X)))
                 trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((prev_layer.output_size, len(data_X)))
 
+            prev_n_out = prev_layer.output_size * prev_layer.n_convolution
+            lpos = None
+            lvec = None
+            if layer.apply_convolution:
+                # use the non-flattened caches
+                lpos = layer.positions_cache2.reshape((layer.nr, layer.output_size, layer.n_convolution, len(data_X), 1))  # use the max pool contributor position
+                lvec = layer.nwectors_cache.reshape((layer.nw, layer.output_size, layer.n_convolution, 1))
+            else:
+                lpos = layer.positions
+                lvec = layer.nwectors
+
             # Position gradient
             for j in range(layer.output_size):
                 this_delta_j = this_delta[j]
-
                 d2 = None
-                lpos = None
-                lvec = None
                 dot = 0.0
                 dr = []
 
                 if layer.apply_convolution:
-                    # use the non-flattened caches
-                    lpos = layer.positions_cache2.reshape((layer.nr, layer.output_size, layer.n_convolution, len(data_X), 1))  # use the max pool contributor position
-                    lvec = layer.nwectors_cache.reshape((layer.nw, layer.output_size, layer.n_convolution, 1))
-
                     if prev_layer.apply_convolution:
-                        # todo
-                        pass
+                        d2 = np.zeros((layer.n_convolution, len(data_X), prev_n_out, 1))
+                        dr = np.zeros((layer.n_convolution, layer.nr, len(data_X), prev_n_out, 1))
+                        for c in range(layer.n_convolution):
+                            for a in range(len(data_X)):
+                                for r in range(layer.nr):
+                                    dtmp = prev_layer.positions_cache[r] - lpos[r][j][c][a]
+                                    d2[c][a] += dtmp ** 2
+                                    dr[c][r][a] += dtmp
+                                for w in range(layer.nw):
+                                    dot += prev_layer.nvectors_cache[w] * lvec[w][j][c]
+                        d = np.sqrt(d2)
 
                     else:
                         d2 = np.zeros((layer.n_convolution, len(data_X), prev_layer.output_size, 1))
@@ -284,8 +297,6 @@ class ParticleVectorNLocalConvolution4Network(object):
                         d = np.sqrt(d2)
 
                 else:
-                    lpos = layer.positions
-                    lvec = layer.nwectors
                     if prev_layer.apply_convolution:
                         d2 = np.zeros_like(prev_layer.positions_cache[0])
                         for r in range(layer.nr):
@@ -313,25 +324,48 @@ class ParticleVectorNLocalConvolution4Network(object):
                     next_delta = next_delta.transpose()
                     sigma_Z_l = trans_sigma_Z_l.transpose()
 
-                    ld_pot = (layer.d_potential(d) / d).reshape((layer.n_convolution, len(data_X), prev_layer.output_size))
-                    exp_dij = exp_dij.reshape((layer.n_convolution, len(data_X), prev_layer.output_size))
+                    ld_pot = (layer.d_potential(d) / d).reshape((layer.n_convolution, len(data_X), prev_n_out))
+                    exp_dij = exp_dij.reshape((layer.n_convolution, len(data_X), prev_n_out))
                     this_delta_j = this_delta_j.reshape((layer.n_convolution, len(data_X), 1))
-                    dr = dr.reshape((layer.n_convolution, layer.nr, len(data_X), prev_layer.output_size))
+                    dr = dr.reshape((layer.n_convolution, layer.nr, len(data_X), prev_n_out))
 
-                    for c in range(layer.n_convolution):
-                        next_delta += this_delta_j[c] * exp_dij[c] * sigma_Z_l
-                        atj = Al * this_delta_j[c]
-                        dq = (exp_dij[c] * atj).reshape((len(data_X), prev_layer.output_size, 1))
-                        v_tmp = (dq / dot).reshape((len(data_X), prev_layer.output_size))
+                    if prev_layer.apply_convolution:
+                        for c in range(layer.n_convolution):
+                            # todo: still not sure why the average works here... max pooling dependent input??
+                            next_delta += this_delta_j[c] * exp_dij[c] * sigma_Z_l / (layer.n_convolution * len(data_X))
 
-                        jcdot = 0.0
-                        for w in range(layer.nw):
-                            jcdot += prev_layer.nvectors[w] * lvec[w][j][c]
-                        p_tmp = -jcdot.flatten() * atj * ld_pot[c]  # only the dot for this j-th conv?
+                            atj = Al * this_delta_j[c]
+                            dq = (exp_dij[c] * atj).reshape((len(data_X), prev_n_out, 1))
+                            v_tmp = (dq / dot).reshape((len(data_X), prev_n_out))
 
-                        if prev_layer.apply_convolution:
-                            pass
-                        else:
+                            jcdot = 0.0
+                            for w in range(layer.nw):
+                                jcdot += prev_layer.nvectors_cache[w] * lvec[w][j][c]
+                            p_tmp = -jcdot.flatten() * atj * ld_pot[c]  # only the dot for this j-th conv?
+
+                            for r in range(layer.nr):
+                                tr = dr[c][r] * p_tmp
+                                dc_dr[l][r][j] += np.sum(tr)
+                                dc_dr[l - 1][r] -= np.sum(np.sum(tr, axis=0).reshape((len(prev_layer.positions[0]), -1)), axis=1)
+
+                            for w in range(layer.nw):
+                                tv = v_tmp * prev_layer.nvectors_cache[w].flatten()
+                                dc_dm[l][w][j] += np.sum(tv)
+                                tv = v_tmp * layer.nwectors[w][j]
+                                dc_dn[l - 1][w] += np.sum(np.sum(tv, axis=0).reshape((len(prev_layer.nvectors[0]), -1)), axis=1)
+
+                    else:
+                        for c in range(layer.n_convolution):
+                            next_delta += this_delta_j[c] * exp_dij[c] * sigma_Z_l
+                            atj = Al * this_delta_j[c]
+                            dq = (exp_dij[c] * atj).reshape((len(data_X), prev_n_out, 1))
+                            v_tmp = (dq / dot).reshape((len(data_X), prev_n_out))
+
+                            jcdot = 0.0
+                            for w in range(layer.nw):
+                                jcdot += prev_layer.nvectors[w] * lvec[w][j][c]
+                            p_tmp = -jcdot.flatten() * atj * ld_pot[c]  # only the dot for this j-th conv?
+
                             for r in range(layer.nr):
                                 tr = dr[c][r] * p_tmp
                                 dc_dr[l][r][j] += np.sum(tr)

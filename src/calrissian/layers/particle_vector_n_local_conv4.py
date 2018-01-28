@@ -12,6 +12,7 @@ class ParticleVectorNLocalConvolution4Input(object):
         self.nw = nw
         self.nr = nr
         self.apply_convolution = False  # no conv here, just for consistency in gradient
+        self.n_convolution = 1
 
         # Positions
         self.positions = []
@@ -76,7 +77,7 @@ class ParticleVectorNLocalConvolution4(object):
                 self.int_to_combo.append((ix, iy, 0))
                 # for iz, nz in enumerate(n_steps):
                 #     int_to_combo.append((ix, iy, iz))
-        self.n_convolution = len(self.int_to_combo)
+        self.n_convolution = len(self.int_to_combo) if apply_convolution else 1
 
         # Weight initialization
         g = np.sqrt(2.0 / (input_size + output_size))
@@ -193,7 +194,7 @@ class ParticleVectorNLocalConvolution4(object):
                 dot = 0.0
                 for v in range(self.nv):
                     dot += r_nvectors[v] * self.nwectors[v][j]  # input vector dot
-                dot_atrans = dot.reshape((self.input_size, 1)) * atrans  # cache outside the loops
+                dot_atrans = dot.reshape((len(r_nvectors[0]), 1)) * atrans  # cache outside the loops
                 tmp_zj_xyz = np.ones((self.n_convolution, len(a_in))) * self.b[0][j]
 
                 ii = 0
