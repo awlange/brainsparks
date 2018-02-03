@@ -16,6 +16,7 @@ class ParticleVectorNSGD3(Optimizer):
                  cost_freq=2, position_grad=True, n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1,
                  alpha_decay=None,
                  fixed_input=False, fixed_output=False,
+                 fixed_layers=None,
                  noise_input=-1.0):
         """
         :param alpha: learning rate
@@ -35,6 +36,7 @@ class ParticleVectorNSGD3(Optimizer):
         self.alpha_decay = alpha_decay
         self.fixed_input = fixed_input
         self.fixed_output = fixed_output
+        self.fixed_layers = fixed_layers if fixed_layers is not None else []
         self.noise_input = noise_input
         self.adagrad_n = 0
 
@@ -274,12 +276,13 @@ class ParticleVectorNSGD3(Optimizer):
             self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
             layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
 
-            for r in range(layer.nr):
-                self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
-                if self.fixed_output and l == len(network.layers)-1:
-                    pass
-                else:
-                    layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
+            if l not in self.fixed_layers:
+                for r in range(layer.nr):
+                    self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
+                    if self.fixed_output and l == len(network.layers)-1:
+                        pass
+                    else:
+                        layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)
 
             for v in range(layer.nv):
                 self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
