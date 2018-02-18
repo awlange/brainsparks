@@ -161,9 +161,9 @@ class Potential(object):
     # Gaussian - short range
 
     def gaussian_short(self, x):
-        a = 1.0/np.sqrt(0.1)
+        a = 1.0 / (2 * (5 * 0.2 / (2 * 2))**2)
         return np.exp(-a * x*x)
 
     def d_gaussian_short(self, x):
-        a = 1.0/np.sqrt(0.1)
+        a = 1.0 / (2 * (5 * 0.2 / (2 * 2))**2)
         return -2.0 * a * x * np.exp(-a * x*x)
