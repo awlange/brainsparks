@@ -51,13 +51,11 @@ class Particle3(object):
         for j in range(self.output_size):
             dx = self.rx_inp - self.rx_pos_out[j]
             dy = self.ry_inp - self.ry_pos_out[j]
-            # potential = np.exp(-(dx**2 + dy**2))
             r = np.sqrt(dx ** 2 + dy ** 2)
             potential = self.potential(r)
 
             dx = self.rx_inp - self.rx_neg_out[j]
             dy = self.ry_inp - self.ry_neg_out[j]
-            # potential -= np.exp(-(dx**2 + dy**2))
             r = np.sqrt(dx ** 2 + dy ** 2)
             potential -= self.potential(r)
 
@@ -75,13 +73,11 @@ class Particle3(object):
         for j in range(self.output_size):
             dx = self.rx_inp - self.rx_pos_out[j]
             dy = self.ry_inp - self.ry_pos_out[j]
-            # potential = np.exp(-(dx**2 + dy**2))
             r = np.sqrt(dx ** 2 + dy ** 2)
             potential = self.potential(r)
 
             dx = self.rx_inp - self.rx_neg_out[j]
             dy = self.ry_inp - self.ry_neg_out[j]
-            # potential -= np.exp(-(dx**2 + dy**2))
             r = np.sqrt(dx ** 2 + dy ** 2)
             potential -= self.potential(r)
 

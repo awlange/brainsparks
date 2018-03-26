@@ -16,9 +16,9 @@ class ParticleInput(object):
         # self.rz = np.random.uniform(-s, s, output_size)
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        # self.rz = np.random.normal(0.0, s, output_size)
+        self.rz = np.random.normal(0.0, s, output_size)
 
-        self.rz = np.zeros(output_size)
+        # self.rz = np.zeros(output_size)
 
         # Phase
         if t is not None:
@@ -77,9 +77,9 @@ class Particle(object):
         # self.rz = np.random.uniform(-s, s, output_size)
         self.rx = np.random.normal(0.0, s, output_size)
         self.ry = np.random.normal(0.0, s, output_size)
-        # self.rz = np.random.normal(0.0, s, output_size)
+        self.rz = np.random.normal(0.0, s, output_size)
 
-        self.rz = np.zeros(output_size)
+        # self.rz = np.zeros(output_size)
 
         # Phase
         if t is not None:
