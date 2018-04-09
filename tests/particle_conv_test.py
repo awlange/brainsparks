@@ -7,16 +7,17 @@ from src.calrissian.layers.particle_conv import ParticleConv
 from src.calrissian.layers.particle_conv import ParticleConvInput
 
 import numpy as np
+import time
 
 
 def main():
 
-    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22]])
-    train_Y = np.asarray([[1.0], [0.0]])
+    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22], [0.45, -0.54]])
+    train_Y = np.asarray([[1.0], [0.0], [0.0]])
 
     net = ParticleConvNetwork(cost="mse", particle_input=ParticleConvInput(2, nr=3))
-    net.append(ParticleConv(2, 3, activation="sigmoid", nr=3, nc=4))
-    net.append(ParticleConv(3, 1, activation="sigmoid", nr=3, nc=4))
+    net.append(ParticleConv(5, activation="sigmoid", nr=3, nc=4))
+    net.append(ParticleConv(1, activation="sigmoid", nr=3, nc=4))
 
     print(net.particle_input.get_rxyz())
 
@@ -27,20 +28,22 @@ def main():
 
 def main2():
 
-    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22]])
-    train_Y = np.asarray([[1.0], [0.0]])
+    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22], [0.45, -0.54]])
+    train_Y = np.asarray([[1.0], [0.0], [0.0]])
 
     net = ParticleConvNetwork(cost="mse", particle_input=ParticleConvInput(2, nr=3))
-    net.append(ParticleConv(2, 3, activation="sigmoid", nr=3, nc=4))
-    net.append(ParticleConv(3, 1, activation="sigmoid", nr=3, nc=4))
+    net.append(ParticleConv(5, activation="sigmoid", nr=3, nc=4))
+    net.append(ParticleConv(1, activation="sigmoid", nr=3, nc=4))
 
     print(net.cost_gradient(train_X, train_Y))
 
 
 def fd():
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+    ts = time.time()
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
 
     nc = 4
     nr = 3
@@ -152,6 +155,8 @@ def fd():
 
     diff_r = np.sum([np.sum(np.abs(fd_r[i] - dr[i])) for i in range(len(dr))])
     print("diff r: {}".format(diff_r))
+
+    print("time: {}".format(time.time() - ts))
 
 
 if __name__ == "__main__":

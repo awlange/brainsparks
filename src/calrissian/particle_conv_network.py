@@ -156,34 +156,28 @@ class ParticleConvNetwork(object):
 
         next_delta = np.zeros((len(prev_layer.r), len(data_X)))
 
-        # Position gradient
+        # Interaction gradient
         for j in range(layer.output_size):
             trans_delta_L_j = trans_delta_L[j]
             trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) \
                 else np.ones((prev_layer.output_size, len(data_X)))
 
+            qj = layer.q[j]
             for i in range(prev_layer.output_size):
-                for c in range(layer.nc):
+                delta_r = prev_layer.r[i] - layer.rb[j]
+                r = np.sqrt(np.sum(delta_r * delta_r, axis=1))
+                exp_dij = layer.potential(r)
+                potential = np.sum(qj * exp_dij)
+                next_delta[i] += potential * trans_delta_L_j * trans_sigma_Z_l[i]
 
-                    qjc = layer.q[j][c]
-                    delta_r = prev_layer.r[i] - layer.rb[j][c]
-                    r = np.sqrt(np.sum(delta_r * delta_r))
-                    exp_dij = layer.potential(r)
+                # Charge gradient
+                sum_atj = np.sum(Al_trans[i] * trans_delta_L_j)
+                dc_dq[l][j] += sum_atj * exp_dij
 
-                    next_delta[i] += qjc * exp_dij * trans_delta_L_j * trans_sigma_Z_l[i]
-
-                    # Charge gradient
-                    atj = Al_trans[i] * trans_delta_L_j
-                    dq = exp_dij * atj
-                    dc_dq[l][j][c] += np.sum(dq)
-
-                    # Position gradient
-                    tmp = -qjc * atj * layer.d_potential(r) / r
-
-                    for ir in range(len(delta_r)):
-                        val = np.sum(delta_r[ir] * tmp)
-                        dc_drb[l][j][c][ir] += val
-                        dc_dr[l - 1][i][ir] -= val
+                # Position gradient
+                tmp = (-qj * layer.d_potential(r) / r).reshape((-1, 1)) * delta_r
+                dc_drb[l][j] += sum_atj * tmp
+                dc_dr[l-1][i] -= np.sum(sum_atj * tmp, axis=0)
 
         l = -1
         while -l < len(self.layers):
@@ -205,32 +199,26 @@ class ParticleConvNetwork(object):
             for di, data in enumerate(data_X):
                 dc_db[l] += trans_delta[di]
 
-            # Position gradient
+            # Interaction gradient
             for j in range(layer.output_size):
                 this_delta_j = this_delta[j]
 
+                qj = layer.q[j]
                 for i in range(prev_layer.output_size):
-                    for c in range(layer.nc):
+                    delta_r = prev_layer.r[i] - layer.rb[j]
+                    r = np.sqrt(np.sum(delta_r * delta_r, axis=1))
+                    exp_dij = layer.potential(r)
+                    potential = np.sum(qj * exp_dij)
+                    next_delta[i] += potential * this_delta_j * trans_sigma_Z_l[i]
 
-                        qjc = layer.q[j][c]
-                        delta_r = prev_layer.r[i] - layer.rb[j][c]
-                        r = np.sqrt(np.sum(delta_r * delta_r))
-                        exp_dij = layer.potential(r)
+                    # Charge gradient
+                    sum_atj = np.sum(Al_trans[i] * this_delta_j)
+                    dc_dq[l][j] += sum_atj * exp_dij
 
-                        next_delta[i] += qjc * exp_dij * this_delta_j * trans_sigma_Z_l[i]
-
-                        # Charge gradient
-                        atj = Al_trans[i] * this_delta_j
-                        dq = exp_dij * atj
-                        dc_dq[l][j][c] += np.sum(dq)
-
-                        # Position gradient
-                        tmp = -qjc * atj * layer.d_potential(r) / r
-
-                        for ir in range(len(delta_r)):
-                            val = np.sum(delta_r[ir] * tmp)
-                            dc_drb[l][j][c][ir] += val
-                            dc_dr[l - 1][i][ir] -= val
+                    # Position gradient
+                    tmp = (-qj * layer.d_potential(r) / r).reshape((-1, 1)) * delta_r
+                    dc_drb[l][j] += sum_atj * tmp
+                    dc_dr[l - 1][i] -= np.sum(sum_atj * tmp, axis=0)
 
         return dc_db, dc_dq, dc_drb, dc_dr
 

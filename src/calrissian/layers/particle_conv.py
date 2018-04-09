@@ -31,7 +31,7 @@ class ParticleConv(object):
     def __init__(self, output_size=0, rand="uniform",
                  activation="sigmoid", potential="gaussian",
                  nr=3, nc=1,
-                 s=1.0, b=1.0):
+                 s=1.0, q=1.0, b=1.0):
         self.output_size = output_size
         self.activation_name = activation.lower()
         self.activation = Activation.get(activation)
@@ -50,9 +50,9 @@ class ParticleConv(object):
         # Coefficients
         self.q = None
         if rand == "uniform":
-            self.q = np.random.uniform(-s, s, (output_size, nc))
+            self.q = np.random.uniform(-q, q, (output_size, nc))
         else:
-            self.q = np.random.normal(0.0, s, (output_size, nc))
+            self.q = np.random.normal(0.0, q, (output_size, nc))
 
         # Positions
         self.r = None  # output positions
@@ -77,13 +77,12 @@ class ParticleConv(object):
         atrans = a_in.transpose()
         z = np.zeros((self.output_size, len(a_in)))
 
+        w_ji = np.zeros(len(r_in))
         for j in range(self.output_size):
-            w_ji = np.zeros((1, len(atrans)))
-            for i in range(len(atrans)):
-                for c in range(self.nc):
-                    delta_r = r_in[i] - self.rb[j][c]
-                    d = np.sqrt(np.sum(delta_r * delta_r))
-                    w_ji[0][i] += self.q[j][c] * self.potential(d)
+            for i in range(len(r_in)):
+                delta_r = r_in[i] - self.rb[j]
+                d = np.sqrt(np.sum(delta_r * delta_r, axis=1))
+                w_ji[i] = np.sum(self.q[j] * self.potential(d))
 
             z[j] = self.b[0][j] + w_ji.dot(atrans)
 
