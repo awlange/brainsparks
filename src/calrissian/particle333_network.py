@@ -121,59 +121,22 @@ class Particle333Network(object):
             A.append(a)
             sigma_Z.append(layer.compute_da(z))
 
-        delta_L = self.cost_d_function(data_Y, A[-1], sigma_Z[-1])
-
-        for di, data in enumerate(data_X):
-            dc_db[-1] += delta_L[di]
-
-        l = -1
-        layer = self.layers[l]
-
-        Al = A[l-1]
-        Al_trans = Al.transpose()
-        trans_delta_L = delta_L.transpose()
         trans_sigma_Z = []
         for sz in sigma_Z:
             trans_sigma_Z.append(np.asarray(sz).transpose())
 
-        next_delta = np.zeros((layer.input_size, len(data_X)))
-
-        # Interaction gradient
-        for j in range(layer.output_size):
-            qj = layer.q[j]
-            trans_delta_L_j = trans_delta_L[j]
-            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((layer.input_size, len(data_X)))
-
-            sum_atj = np.sum(Al_trans * trans_delta_L_j, axis=1).reshape((-1, 1))
-
-            for c in range(layer.nc):
-                delta_r = layer.r_inp - layer.r_out[j][c]
-                r = np.sqrt(np.sum(delta_r * delta_r, axis=1)).reshape((-1, 1))
-                potential = layer.potential(r)
-
-                # Next delta
-                next_delta += (qj[c] * trans_delta_L_j) * potential * trans_sigma_Z_l
-
-                # Charge gradient
-                dc_dq[l][j][c] += np.sum(potential * sum_atj)
-
-                # Position gradient
-                dx = delta_r * layer.d_potential(r) / r
-                tmp = -qj[c] * sum_atj * dx
-
-                dc_dr_out[l][j][c] += np.sum(tmp, axis=0)
-                dc_dr_inp[l] -= tmp
-
-        l = -1
+        # Gradient backpropagating through layers
+        next_delta = None
+        l = 0
         while -l < len(self.layers):
             l -= 1
-            # Gradient computation
             layer = self.layers[l]
-
-            Al = A[l-1]
-            Al_trans = Al.transpose()
+            Al_trans = A[l-1].transpose()
 
             this_delta = next_delta
+            if l == -1:
+                this_delta = self.cost_d_function(data_Y, A[-1], sigma_Z[-1]).transpose()
+
             next_delta = np.zeros((layer.input_size, len(data_X)))
             trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((layer.input_size, len(data_X)))
 

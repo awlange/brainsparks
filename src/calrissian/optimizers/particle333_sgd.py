@@ -11,7 +11,7 @@ class Particle333SGD(Optimizer):
     """
 
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, n_threads=1, chunk_size=10, epsilon=10e-8, gamma2=0.1, alpha_decay=None):
+                 cost_freq=2, epsilon=10e-8, gamma2=0.1, alpha_decay=None, fixed_input=False,):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -27,6 +27,7 @@ class Particle333SGD(Optimizer):
         self.verbosity = verbosity
         self.cost_freq = cost_freq
         self.alpha_decay = alpha_decay
+        self.fixed_input = fixed_input
 
         self.residual = 0.0
 
@@ -132,8 +133,9 @@ class Particle333SGD(Optimizer):
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
             layer.q -= self.alpha * self.dc_dq[l]
-            layer.r_inp -= self.alpha * self.dc_dr_inp[l]
             layer.r_out -= self.alpha * self.dc_dr_out[l]
+            if not (self.fixed_input and l == 0):
+                layer.r_inp -= self.alpha * self.dc_dr_inp[l]
 
     def weight_update_steepest_descent_with_momentum(self, network):
         """
@@ -159,8 +161,9 @@ class Particle333SGD(Optimizer):
 
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
-            layer.r_inp += self.vel_r_inp[l]
             layer.r_out += self.vel_r_out[l]
+            if not (self.fixed_input and l == 0):
+                layer.r_inp += self.vel_r_inp[l]
 
     def weight_update_rmsprop(self, network):
         """
@@ -191,6 +194,7 @@ class Particle333SGD(Optimizer):
 
             layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             layer.q -= alpha * self.dc_dq[l] / np.sqrt(self.ms_dq[l] + epsilon)
-            layer.r_inp -= alpha * self.dc_dr_inp[l] / np.sqrt(self.ms_dr_inp[l] + epsilon)
             layer.r_out -= alpha * self.dc_dr_out[l] / np.sqrt(self.ms_dr_out[l] + epsilon)
+            if not (self.fixed_input and l == 0):
+                layer.r_inp -= alpha * self.dc_dr_inp[l] / np.sqrt(self.ms_dr_inp[l] + epsilon)
 
