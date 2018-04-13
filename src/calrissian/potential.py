@@ -68,12 +68,25 @@ class Potential(object):
 
         raise NameError("Potential name {} is not implemented.".format(name))
 
+    @staticmethod
+    def get_dz(name):
+        nl = name.lower()
+        if nl == "identity":
+            return Potential().dz_identity
+        if nl == "gaussian":
+            return Potential().dz_gaussian
+
+        raise NameError("Potential name {} is not implemented.".format(name))
+
     # Identity
 
     def identity(self, x, zeta=1.0):
         return np.ones(x.shape)
 
     def d_identity(self, x, zeta=1.0):
+        return np.zeros(x.shape)
+
+    def dz_identity(self, x, zeta=1.0):
         return np.zeros(x.shape)
 
     # Linear
@@ -87,10 +100,13 @@ class Potential(object):
     # Gaussian
 
     def gaussian(self, x, zeta=1.0):
-        return np.exp(-zeta * x*x)
+        return np.exp(-(zeta * x)**2)
 
     def d_gaussian(self, x, zeta=1.0):
-        return -2.0 * zeta * x * np.exp(-zeta * x*x)
+        return -2.0 * zeta * zeta * x * np.exp(-(zeta * x)**2)
+
+    def dz_gaussian(self, x, zeta=1.0):
+        return -2.0 * zeta * x * x * np.exp(-(zeta * x)**2)
 
     # Exponential
 

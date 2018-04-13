@@ -42,23 +42,27 @@ class Particle333SGD(Optimizer):
         # Weight gradients, to keep around for a step
         self.dc_db = None
         self.dc_dq = None
+        self.dc_dz = None
         self.dc_dr_inp = None
         self.dc_dr_out = None
 
         # Velocities
         self.vel_b = None
         self.vel_q = None
+        self.vel_z = None
         self.vel_r_inp = None
         self.vel_r_out = None
 
         # Mean squares
         self.ms_db = None
         self.ms_dq = None
+        self.ms_dz = None
         self.ms_dr_inp = None
         self.ms_dr_out = None
 
         self.ms_b = None
         self.ms_q = None
+        self.ms_z = None
         self.ms_r_inp = None
         self.ms_r_out = None
 
@@ -92,7 +96,7 @@ class Particle333SGD(Optimizer):
                 mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
-                self.dc_db, self.dc_dq, self.dc_dr_inp, self.dc_dr_out = network.cost_gradient(mini_X, mini_Y)
+                self.dc_db, self.dc_dq, self.dc_dz, self.dc_dr_inp, self.dc_dr_out = network.cost_gradient(mini_X, mini_Y)
                 
                 # Update weights and biases
                 self.weight_update_func(network)
@@ -133,6 +137,7 @@ class Particle333SGD(Optimizer):
         for l, layer in enumerate(network.layers):
             layer.b -= self.alpha * self.dc_db[l]
             layer.q -= self.alpha * self.dc_dq[l]
+            layer.zeta -= self.alpha * self.dc_dz[l]
             layer.r_out -= self.alpha * self.dc_dr_out[l]
             if not (self.fixed_input and l == 0):
                 layer.r_inp -= self.alpha * self.dc_dr_inp[l]
@@ -145,22 +150,26 @@ class Particle333SGD(Optimizer):
         if self.vel_b is None or self.vel_q is None:
             self.vel_b = []
             self.vel_q = []
+            self.vel_z = []
             self.vel_r_inp = []
             self.vel_r_out = []
             for l, layer in enumerate(network.layers):
                 self.vel_b.append(np.zeros(layer.b.shape))
                 self.vel_q.append(np.zeros(layer.q.shape))
+                self.vel_z.append(np.zeros(layer.zeta.shape))
                 self.vel_r_inp.append(np.zeros(layer.r_inp.shape))
                 self.vel_r_out.append(np.zeros(layer.r_out.shape))
 
         for l, layer in enumerate(network.layers):
             self.vel_b[l] = -self.alpha * self.dc_db[l] + self.beta * self.vel_b[l]
             self.vel_q[l] = -self.alpha * self.dc_dq[l] + self.beta * self.vel_q[l]
+            self.vel_z[l] = -self.alpha * self.dc_dz[l] + self.beta * self.vel_z[l]
             self.vel_r_inp[l] = -self.alpha * self.dc_dr_inp[l] + self.beta * self.vel_r_inp[l]
             self.vel_r_out[l] = -self.alpha * self.dc_dr_out[l] + self.beta * self.vel_r_out[l]
 
             layer.b += self.vel_b[l]
             layer.q += self.vel_q[l]
+            layer.zeta += self.vel_z[l]
             layer.r_out += self.vel_r_out[l]
             if not (self.fixed_input and l == 0):
                 layer.r_inp += self.vel_r_inp[l]
@@ -178,22 +187,26 @@ class Particle333SGD(Optimizer):
         if self.ms_db is None or self.ms_dq is None:
             self.ms_db = []
             self.ms_dq = []
+            self.ms_dz = []
             self.ms_dr_inp = []
             self.ms_dr_out = []
             for l, layer in enumerate(network.layers):
                 self.ms_db.append(np.zeros(layer.b.shape))
                 self.ms_dq.append(np.zeros(layer.q.shape))
+                self.ms_dz.append(np.zeros(layer.zeta.shape))
                 self.ms_dr_inp.append(np.zeros(layer.r_inp.shape))
                 self.ms_dr_out.append(np.zeros(layer.r_out.shape))
 
         for l, layer in enumerate(network.layers):
             self.ms_db[l] = gamma * self.ms_db[l] + one_m_gamma * (self.dc_db[l] * self.dc_db[l])
             self.ms_dq[l] = gamma * self.ms_dq[l] + one_m_gamma * (self.dc_dq[l] * self.dc_dq[l])
+            self.ms_dz[l] = gamma * self.ms_dz[l] + one_m_gamma * (self.dc_dz[l] * self.dc_dz[l])
             self.ms_dr_inp[l] = gamma * self.ms_dr_inp[l] + one_m_gamma * (self.dc_dr_inp[l] * self.dc_dr_inp[l])
             self.ms_dr_out[l] = gamma * self.ms_dr_out[l] + one_m_gamma * (self.dc_dr_out[l] * self.dc_dr_out[l])
 
             layer.b -= alpha * self.dc_db[l] / np.sqrt(self.ms_db[l] + epsilon)
             layer.q -= alpha * self.dc_dq[l] / np.sqrt(self.ms_dq[l] + epsilon)
+            layer.zeta -= alpha * self.dc_dz[l] / np.sqrt(self.ms_dz[l] + epsilon)
             layer.r_out -= alpha * self.dc_dr_out[l] / np.sqrt(self.ms_dr_out[l] + epsilon)
             if not (self.fixed_input and l == 0):
                 layer.r_inp -= alpha * self.dc_dr_inp[l] / np.sqrt(self.ms_dr_inp[l] + epsilon)

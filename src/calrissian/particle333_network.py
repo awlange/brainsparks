@@ -103,6 +103,7 @@ class Particle333Network(object):
         # Output gradients
         dc_db = []
         dc_dq = []
+        dc_dz = []
         dc_dr_inp = []
         dc_dr_out = []
 
@@ -110,6 +111,7 @@ class Particle333Network(object):
         for l, layer in enumerate(self.layers):
             dc_db.append(np.zeros(layer.b.shape))
             dc_dq.append(np.zeros(layer.q.shape))
+            dc_dz.append(np.zeros(layer.zeta.shape))
             dc_dr_inp.append(np.zeros_like(layer.r_inp))
             dc_dr_out.append(np.zeros_like(layer.r_out))
 
@@ -148,6 +150,7 @@ class Particle333Network(object):
             # Interaction gradient
             for j in range(layer.output_size):
                 qj = layer.q[j]
+                zj = layer.zeta[j]
                 this_delta_j = this_delta[j]
 
                 sum_atj = np.sum(Al_trans * this_delta_j, axis=1).reshape((-1, 1))
@@ -155,7 +158,7 @@ class Particle333Network(object):
                 for c in range(layer.nc):
                     delta_r = layer.r_inp - layer.r_out[j][c]
                     r = np.sqrt(np.sum(delta_r * delta_r, axis=1)).reshape((-1, 1))
-                    potential = layer.potential(r)
+                    potential = layer.potential(r, zeta=zj[c])
 
                     # Next delta
                     next_delta += (qj[c] * this_delta_j) * potential * trans_sigma_Z_l
@@ -163,14 +166,16 @@ class Particle333Network(object):
                     # Charge gradient
                     dc_dq[l][j][c] += np.sum(potential * sum_atj)
 
-                    # Position gradient
-                    dx = delta_r * layer.d_potential(r) / r
-                    tmp = -qj[c] * sum_atj * dx
+                    # Width gradient
+                    tmp = qj[c] * sum_atj * layer.dz_potential(r, zeta=zj[c])
+                    dc_dz[l][j][c] += np.sum(tmp, axis=0)
 
+                    # Position gradient
+                    tmp = -qj[c] * sum_atj * delta_r * layer.d_potential(r, zeta=zj[c]) / r
                     dc_dr_out[l][j][c] += np.sum(tmp, axis=0)
                     dc_dr_inp[l] -= tmp
 
-        return dc_db, dc_dq, dc_dr_inp, dc_dr_out
+        return dc_db, dc_dq, dc_dz, dc_dr_inp, dc_dr_out
 
     def fit(self, data_X, data_Y, optimizer):
         """

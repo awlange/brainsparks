@@ -12,7 +12,11 @@ class Particle333(object):
 
     def __init__(self, input_size=1, output_size=1, activation="sigmoid", potential="gaussian",
                  nr=3, nc=1, rand="uniform",
-                 s=1.0, q=1.0, b=1.0):
+                 s=1.0, q=1.0, b=1.0, z=1.0,
+                 apply_convolution=False,
+                 n_filters=0, n_conv_x=1, n_conv_y=1,
+                 delta_x=0.0, delta_y=0.0
+                 ):
 
         self.input_size = input_size
         self.output_size = output_size
@@ -21,8 +25,16 @@ class Particle333(object):
         self.d_activation = Activation.get_d(activation)
         self.potential = Potential.get(potential)
         self.d_potential = Potential.get_d(potential)
+        self.dz_potential = Potential.get_dz(potential)
         self.nr = nr
         self.nc = nc
+
+        self.apply_convolution = apply_convolution
+        self.n_filter = n_filters
+        self.n_conv_x = n_conv_x
+        self.n_conv_y = n_conv_y
+        self.delta_x = delta_x
+        self.delta_y = delta_y
 
         # Weight initialization
         if rand == "uniform":
@@ -36,6 +48,13 @@ class Particle333(object):
             self.q = np.random.uniform(-q, q, (output_size, nc))
         else:
             self.q = np.random.normal(0.0, q, (output_size, nc))
+
+        # Widths
+        self.zeta = np.ones((output_size, nc))  # in the potential, these are squared so that they are always positive
+        if rand == "uniform":
+            self.zeta = np.random.uniform(-z, z, (output_size, nc))
+        else:
+            self.zeta = np.random.normal(1.0, z, (output_size, nc))
 
         # Positions
         self.r_inp = None  # input positions
@@ -60,7 +79,7 @@ class Particle333(object):
             for c in range(self.nc):
                 delta_r = self.r_inp - self.r_out[j][c]
                 r = np.sqrt(np.sum(delta_r * delta_r, axis=1))
-                potential += self.q[j][c] * self.potential(r)
+                potential += self.q[j][c] * self.potential(r, zeta=self.zeta[j][c])
             z[j] = self.b[0][j] + potential.dot(atrans)
         return z.transpose()
 

@@ -38,7 +38,7 @@ def fd():
     net.append(Particle333(5, 6, activation="sigmoid", nr=nr, nc=nc))
     net.append(Particle333(6, 3, activation="softmax", nr=nr, nc=nc))
 
-    db, dq, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
+    db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
     h = 0.001
 
@@ -80,6 +80,28 @@ def fd():
 
     print("numerical q")
     for x in fd_q:
+        print(x)
+        
+    print("analytic zeta")
+    for x in dz:
+        print(x)
+
+    fd_zeta = []
+    for l in range(len(net.layers)):
+        lzeta = np.zeros_like(dz[l])
+        for i in range(len(net.layers[l].zeta)):
+            for c in range(nc):
+                orig = net.layers[l].zeta[i][c]
+                net.layers[l].zeta[i][c] += h
+                fp = net.cost(train_X, train_Y)
+                net.layers[l].zeta[i][c] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lzeta[i][c] = (fp - fm) / (2*h)
+                net.layers[l].zeta[i][c] = orig
+        fd_zeta.append(lzeta)
+
+    print("numerical zeta")
+    for x in fd_zeta:
         print(x)
 
     print("analytic r_inp")
@@ -133,6 +155,9 @@ def fd():
 
     diff_q = np.sum([np.sum(np.abs(fd_q[i] - dq[i])) for i in range(len(dq))])
     print("diff q: {}".format(diff_q))
+    
+    diff_zeta = np.sum([np.sum(np.abs(fd_zeta[i] - dz[i])) for i in range(len(dz))])
+    print("diff zeta: {}".format(diff_zeta))
 
     diff_r_inp = np.sum([np.sum(np.abs(fd_r_inp[i] - dr_inp[i])) for i in range(len(dr_inp))])
     print("diff r_inp: {}".format(diff_r_inp))
