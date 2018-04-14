@@ -23,6 +23,25 @@ def main():
     print(net.cost_gradient(train_X, train_Y))
 
 
+def main2():
+
+    train_X = np.random.normal(0.0, 0.1, (3, 16))
+    train_Y = np.random.normal(0.0, 0.1, (3, 1))
+
+    nr = 3
+    nc = 3
+
+    net = Particle333Network(cost="mse")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(4, 4, 1),
+                           output_shape=(2, 2, 3),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5)))
+
+    print(net.predict(train_X))
+
+
 def fd():
 
     ts = time.time()
@@ -174,4 +193,5 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    fd()
+    main2()
+    # fd()
