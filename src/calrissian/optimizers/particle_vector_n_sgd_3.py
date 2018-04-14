@@ -200,11 +200,10 @@ class ParticleVectorNSGD3(Optimizer):
                 layer.nwectors[w] -= self.alpha * self.dc_dm[l+1][w]
 
         layer = network.particle_input
-        l = -1
-        for v in range(layer.nv):
-            layer.nvectors[v] -= self.alpha * self.dc_dn[l+1][v]
-
         if not self.fixed_input:
+            l = -1
+            for v in range(layer.nv):
+                layer.nvectors[v] -= self.alpha * self.dc_dn[l + 1][v]
             for r in range(layer.nr):
                 layer.positions[r] -= self.alpha * self.dc_dr[l+1][r]
 
@@ -242,11 +241,11 @@ class ParticleVectorNSGD3(Optimizer):
                 layer.nwectors[w] += self.vel_dm[l + 1][w]
 
         layer = network.particle_input
-        l = -1
-        for v in range(layer.nv):
-            self.vel_dn[l + 1][v] = beta * self.vel_dn[l + 1][v] - alpha * self.dc_dn[l + 1][v]
-            layer.nvectors[v] += self.vel_dn[l + 1][v]
         if not self.fixed_input:
+            l = -1
+            for v in range(layer.nv):
+                self.vel_dn[l + 1][v] = beta * self.vel_dn[l + 1][v] - alpha * self.dc_dn[l + 1][v]
+                layer.nvectors[v] += self.vel_dn[l + 1][v]
             for r in range(layer.nr):
                 self.vel_dr[l + 1][r] = beta * self.vel_dr[l + 1][r] - alpha * self.dc_dr[l + 1][r]
                 layer.positions[r] += self.vel_dr[l + 1][r]
@@ -294,11 +293,11 @@ class ParticleVectorNSGD3(Optimizer):
         # Input layer
         layer = network.particle_input
         l = -1
-        for v in range(layer.nv):
-            self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
-            layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
-
         if not self.fixed_input:
+            for v in range(layer.nv):
+                self.ms_dn[l + 1][v] = gamma * self.ms_dn[l + 1][v] + one_m_gamma * (
+                    self.dc_dn[l + 1][v] * self.dc_dn[l + 1][v])
+                layer.nvectors[v] -= alpha * self.dc_dn[l + 1][v] / np.sqrt(self.ms_dn[l + 1][v] + epsilon)
             for r in range(layer.nr):
                 self.ms_dr[l + 1][r] = gamma * self.ms_dr[l + 1][r] + one_m_gamma * (self.dc_dr[l + 1][r] * self.dc_dr[l + 1][r])
                 layer.positions[r] -= alpha * self.dc_dr[l + 1][r] / np.sqrt(self.ms_dr[l + 1][r] + epsilon)

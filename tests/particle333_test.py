@@ -1,0 +1,197 @@
+"""
+Script entry point
+"""
+
+from src.calrissian.particle333_network import Particle333Network
+from src.calrissian.layers.particle333 import Particle333
+
+import numpy as np
+import time
+
+
+def main():
+
+    train_X = np.asarray([[0.45, 3.33], [0.0, 2.22], [0.45, -0.54]])
+    train_Y = np.asarray([[1.0], [0.0], [0.0]])
+
+    net = Particle333Network(cost="mse")
+    net.append(Particle333(2, 5, activation="sigmoid", nr=4, nc=6))
+    net.append(Particle333(5, 1, activation="sigmoid", nr=4, nc=6))
+
+    print(net.predict(train_X))
+    print(net.cost(train_X, train_Y))
+    print(net.cost_gradient(train_X, train_Y))
+
+
+def main2():
+
+    train_X = np.random.normal(0.0, 0.1, (3, 16))
+    train_Y = np.random.normal(0.0, 0.1, (3, 1))
+
+    nr = 3
+    nc = 3
+
+    net = Particle333Network(cost="mse")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(4, 4, 1),
+                           output_shape=(2, 2, 3),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5)))
+
+    print(net.predict(train_X))
+
+
+def fd():
+
+    ts = time.time()
+
+    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
+    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+
+    nc = 4
+    nr = 3
+
+    net = Particle333Network(cost="categorical_cross_entropy")
+    net.append(Particle333(2, 5, activation="sigmoid", nr=nr, nc=nc))
+    net.append(Particle333(5, 6, activation="sigmoid", nr=nr, nc=nc))
+    net.append(Particle333(6, 3, activation="softmax", nr=nr, nc=nc))
+
+    db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
+
+    h = 0.001
+
+    print("analytic b")
+    print(db)
+
+    fd_b = []
+    for l in range(len(net.layers)):
+        lb = np.zeros_like(db[l])
+        for b in range(len(net.layers[l].b[0])):
+            orig = net.layers[l].b[0][b]
+            net.layers[l].b[0][b] += h
+            fp = net.cost(train_X, train_Y)
+            net.layers[l].b[0][b] -= 2*h
+            fm = net.cost(train_X, train_Y)
+            lb[0][b] = (fp - fm) / (2*h)
+            net.layers[l].b[0][b] = orig
+        fd_b.append(lb)
+    print("numerical b")
+    print(fd_b)
+
+    print("analytic q")
+    for x in dq:
+        print(x)
+
+    fd_q = []
+    for l in range(len(net.layers)):
+        lq = np.zeros_like(dq[l])
+        for i in range(len(net.layers[l].q)):
+            for c in range(nc):
+                orig = net.layers[l].q[i][c]
+                net.layers[l].q[i][c] += h
+                fp = net.cost(train_X, train_Y)
+                net.layers[l].q[i][c] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lq[i][c] = (fp - fm) / (2*h)
+                net.layers[l].q[i][c] = orig
+        fd_q.append(lq)
+
+    print("numerical q")
+    for x in fd_q:
+        print(x)
+        
+    print("analytic zeta")
+    for x in dz:
+        print(x)
+
+    fd_zeta = []
+    for l in range(len(net.layers)):
+        lzeta = np.zeros_like(dz[l])
+        for i in range(len(net.layers[l].zeta)):
+            for c in range(nc):
+                orig = net.layers[l].zeta[i][c]
+                net.layers[l].zeta[i][c] += h
+                fp = net.cost(train_X, train_Y)
+                net.layers[l].zeta[i][c] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lzeta[i][c] = (fp - fm) / (2*h)
+                net.layers[l].zeta[i][c] = orig
+        fd_zeta.append(lzeta)
+
+    print("numerical zeta")
+    for x in fd_zeta:
+        print(x)
+
+    print("analytic r_inp")
+    for x in dr_inp:
+        print(x)
+
+    fd_r_inp = []
+    for l in range(len(dr_inp)):
+        lr = np.zeros_like(dr_inp[l])
+        layer = net.layers[l]
+        for i in range(len(layer.r_inp)):
+            for r in range(nr):
+                orig = layer.r_inp[i][r]
+                layer.r_inp[i][r] += h
+                fp = net.cost(train_X, train_Y)
+                layer.r_inp[i][r] -= 2*h
+                fm = net.cost(train_X, train_Y)
+                lr[i][r] = (fp - fm) / (2*h)
+                layer.r_inp[i][r] = orig
+        fd_r_inp.append(lr)
+
+    print("numerical r")
+    for x in fd_r_inp:
+        print(x)
+
+    print("analytic r_out")
+    for x in dr_out:
+        print(x)
+
+    fd_r_out = []
+    for l in range(len(net.layers)):
+        lr_out = np.zeros_like(dr_out[l])
+        for i in range(len(net.layers[l].r_out)):
+            for c in range(nc):
+                for r in range(nr):
+                    orig = net.layers[l].r_out[i][c][r]
+                    net.layers[l].r_out[i][c][r] += h
+                    fp = net.cost(train_X, train_Y)
+                    net.layers[l].r_out[i][c][r] -= 2*h
+                    fm = net.cost(train_X, train_Y)
+                    lr_out[i][c][r] = (fp - fm) / (2*h)
+                    net.layers[l].r_out[i][c][r] = orig
+        fd_r_out.append(lr_out)
+
+    print("numerical r_out")
+    for x in fd_r_out:
+        print(x)
+
+    diff_b = np.sum([np.sum(np.abs(fd_b[i] - db[i])) for i in range(len(db))])
+    print("diff b: {}".format(diff_b))
+
+    diff_q = np.sum([np.sum(np.abs(fd_q[i] - dq[i])) for i in range(len(dq))])
+    print("diff q: {}".format(diff_q))
+    
+    diff_zeta = np.sum([np.sum(np.abs(fd_zeta[i] - dz[i])) for i in range(len(dz))])
+    print("diff zeta: {}".format(diff_zeta))
+
+    diff_r_inp = np.sum([np.sum(np.abs(fd_r_inp[i] - dr_inp[i])) for i in range(len(dr_inp))])
+    print("diff r_inp: {}".format(diff_r_inp))
+
+    diff_r = np.sum([np.sum(np.abs(fd_r_out[i] - dr_out[i])) for i in range(len(dr_out))])
+    print("diff r_out: {}".format(diff_r))
+
+    print("time: {}".format(time.time() - ts))
+
+
+if __name__ == "__main__":
+
+    # Ensure same seed
+    np.random.seed(100)
+
+    # main()
+    main2()
+    # fd()

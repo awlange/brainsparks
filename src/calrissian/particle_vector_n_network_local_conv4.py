@@ -198,7 +198,7 @@ class ParticleVectorNLocalConvolution4Network(object):
             dot = 0.0
             for v in range(layer.nv):
                 dot += prev_layer.nvectors[v] * layer.nwectors[v][j]
-            exp_dij = layer.potential(d) * dot
+            exp_dij = layer.potential(d, layer.zeta) * dot
 
             # Next delta
             next_delta += trans_delta_L_j * exp_dij * trans_sigma_Z_l
@@ -206,7 +206,7 @@ class ParticleVectorNLocalConvolution4Network(object):
             dq = exp_dij * atj
 
             # Position gradient
-            tmp = -dot * atj * layer.d_potential(d) / d
+            tmp = -dot * atj * layer.d_potential(d, layer.zeta) / d
             for r in range(layer.nr):
                 tr = dr[r] * tmp
                 dc_dr[l][r][j] += np.sum(tr)
@@ -316,7 +316,7 @@ class ParticleVectorNLocalConvolution4Network(object):
                         for w in range(layer.nw):
                             dot += prev_layer.nvectors[w] * lvec[w][j]
 
-                exp_dij = layer.potential(d) * dot
+                exp_dij = layer.potential(d, layer.zeta) * dot
 
                 # Next delta
                 if layer.apply_convolution:
@@ -324,7 +324,7 @@ class ParticleVectorNLocalConvolution4Network(object):
                     next_delta = next_delta.transpose()
                     sigma_Z_l = trans_sigma_Z_l.transpose()
 
-                    ld_pot = (layer.d_potential(d) / d).reshape((layer.n_convolution, len(data_X), prev_n_out))
+                    ld_pot = (layer.d_potential(d, layer.zeta) / d).reshape((layer.n_convolution, len(data_X), prev_n_out))
                     exp_dij = exp_dij.reshape((layer.n_convolution, len(data_X), prev_n_out))
                     this_delta_j = this_delta_j.reshape((layer.n_convolution, len(data_X), 1))
                     dr = dr.reshape((layer.n_convolution, layer.nr, len(data_X), prev_n_out))
@@ -386,7 +386,7 @@ class ParticleVectorNLocalConvolution4Network(object):
                     atj = Al_trans * this_delta_j
                     dq = exp_dij * atj
 
-                    p_tmp = -dot * atj * layer.d_potential(d) / d
+                    p_tmp = -dot * atj * layer.d_potential(d, layer.zeta) / d
                     v_tmp = dq / dot
 
                     if prev_layer.apply_convolution:

@@ -47,7 +47,7 @@ class ParticleVectorNLocalConvolution4(object):
     def __init__(self, input_size=0, output_size=0, nr=3, nv=3, nw=3, activation="sigmoid", potential="gaussian",
                  sr=1.0, sv=1.0, q=None, b=None, boff=0.0, uniform=False, p_dropout=-1.0, sigma_r=-1.0,
                  delta_r=0.0, apply_convolution=False, n_steps=None, srl=None, 
-                 pool_size=None, pool_stride=None):
+                 pool_size=None, pool_stride=None, zeta=1.0):
         self.input_size = input_size
         self.output_size = output_size
         self.nr = nr
@@ -63,6 +63,7 @@ class ParticleVectorNLocalConvolution4(object):
         self.sigma_r = sigma_r
         self.delta_r = delta_r
         self.apply_convolution = apply_convolution
+        self.zeta = zeta
 
         # Max pooling params
         self.pool_size = pool_size if pool_size is not None else [1, 1, 1]  # [size x for pool, size y for pool, size z for pool]
@@ -217,7 +218,7 @@ class ParticleVectorNLocalConvolution4(object):
                                     ddy = (r_positions[1] - (pr1 + py * self.pool_stride[1]))**2
                                     ddz = (r_positions[2] - (pr2 + pz * self.pool_stride[2]))**2
                                     d = np.sqrt(ddx + ddy + ddz)
-                                    w_ji = self.potential(d)
+                                    w_ji = self.potential(d, self.zeta)
                                     pool_dots[jj] = w_ji.dot(dot_atrans)
                                     jj += 1
 
@@ -259,7 +260,7 @@ class ParticleVectorNLocalConvolution4(object):
                 dot = 0.0
                 for v in range(self.nv):
                     dot += r_nvectors[v] * self.nwectors[v][j]
-                w_ji = self.potential(d) * dot
+                w_ji = self.potential(d, self.zeta) * dot
                 z[j] = self.b[0][j] + w_ji.dot(atrans)
 
         return z.transpose()
@@ -291,7 +292,7 @@ class ParticleVectorNLocalConvolution4(object):
             dot = 0.0
             for v in range(self.nv):
                 dot += r_nvectors[v] * self.nwectors[v][j]
-            w_ji = self.potential(d) * dot
+            w_ji = self.potential(d, self.zeta) * dot
             for i in range(self.input_size):
                 w[i][j] = w_ji[i]
 
