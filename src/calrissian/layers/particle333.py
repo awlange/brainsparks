@@ -17,7 +17,9 @@ class Particle333(object):
                  input_shape=(1, 1, 1),   # n_x, n_y, n_channel
                  output_shape=(1, 1, 1),  # n_x, n_y, n_channel
                  input_delta=(1.0, 1.0, 1.0),   # delta_x, delta_y, delta_channel
-                 output_delta=(1.0, 1.0, 1.0)   # delta_x, delta_y, delta_channel
+                 output_delta=(1.0, 1.0, 1.0),  # delta_x, delta_y, delta_channel
+                 output_pool_shape=(1, 1, 1),  # max pooling
+                 output_pool_delta=(1.0, 1.0, 1.0)
                  ):
 
         self.input_size = input_size  # with conv, this is the number of input channels
@@ -36,6 +38,8 @@ class Particle333(object):
         self.output_shape = output_shape
         self.input_delta = input_delta
         self.output_delta = output_delta
+        self.output_pool_shape = output_pool_shape
+        self.output_pool_delta = output_pool_delta
 
         if self.apply_convolution:
             self.input_size = self.input_shape[2]
@@ -72,6 +76,9 @@ class Particle333(object):
             self.r_out = np.random.normal(0.0, s, (self.output_size, nc, nr))
             self.r_inp = np.random.normal(0.0, s, (self.input_size, nr))
 
+        # pooling cache to help with gradient
+        self.z_pool_max_cache = None
+
         self.w = None
 
     def feed_forward(self, a_in):
@@ -95,6 +102,7 @@ class Particle333(object):
     def compute_z_convolution(self, a_in):
         atrans = a_in.transpose()
         z = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], len(a_in)))
+        self.z_pool_max_cache = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], len(a_in)), dtype=np.int32)
 
         for j in range(self.output_size):
             z[j] += self.b[0][j]
@@ -103,27 +111,42 @@ class Particle333(object):
             for jy in range(self.output_shape[1]):
                 for jx in range(self.output_shape[0]):
 
-                    for c in range(self.nc):
-                        rjc = self.r_out[j][c]
-                        rjc_x = rjc[0] + jx * self.output_delta[0]
-                        rjc_y = rjc[1] + jy * self.output_delta[1]
+                    z_pool = np.zeros((self.output_pool_shape[1] * self.output_pool_shape[0], len(a_in)))
 
-                        for i in range(self.input_size):
-                            for iy in range(self.input_shape[1]):
-                                ri_y = self.r_inp[i][1] + iy * self.input_delta[1]
-                                for ix in range(self.input_shape[0]):
-                                    ri_x = self.r_inp[i][0] + ix * self.input_delta[0]
+                    for pool_jy in range(self.output_pool_shape[1]):
+                        for pool_jx in range(self.output_pool_shape[0]):
 
-                                    dx = ri_x - rjc_x
-                                    dy = ri_y - rjc_y
-                                    dz = self.r_inp[i][2] - rjc[2]
-                                    r = np.sqrt(dx*dx + dy*dy + dz*dz)
-                                    potential = self.q[j][c] * self.potential(r, zeta=self.zeta[j][c])
+                            for c in range(self.nc):
+                                rjc = self.r_out[j][c]
+                                rjc_x = rjc[0] + jx * self.output_delta[0] + pool_jx * self.output_pool_delta[0]
+                                rjc_y = rjc[1] + jy * self.output_delta[1] + pool_jy * self.output_pool_delta[1]
 
-                                    # Assumption: data is organized with x being fast (columns), y being slow indexes (rows)
-                                    z[j][jy][jx] += potential * atrans[iy*self.input_shape[0] + ix]
+                                for i in range(self.input_size):
+                                    for iy in range(self.input_shape[1]):
+                                        ri_y = self.r_inp[i][1] + iy * self.input_delta[1]
+                                        for ix in range(self.input_shape[0]):
+                                            ri_x = self.r_inp[i][0] + ix * self.input_delta[0]
 
-        z = z.reshape((self.output_shape[2] * self.output_shape[0] * self.output_shape[1], len(a_in)))
+                                            ioff = i*self.input_shape[1]*self.input_shape[0] + iy*self.input_shape[0] + ix
+
+                                            dx = ri_x - rjc_x
+                                            dy = ri_y - rjc_y
+                                            dz = self.r_inp[i][2] - rjc[2]
+                                            r = np.sqrt(dx*dx + dy*dy + dz*dz)
+                                            potential = self.potential(r, zeta=self.zeta[j][c])
+
+                                            # Assumption: data is organized with x being fast (columns),
+                                            # y being slow indexes (rows)
+                                            z_pool[pool_jy * self.output_pool_shape[0] + pool_jx] += self.q[j][c] * potential * atrans[ioff]
+                                            # z[j][jy][jx] += self.q[j][c] * potential * atrans[ioff]
+
+                    # # Apply max pooling
+                    pool_maxes = np.argmax(z_pool, axis=0)
+                    for p, pval in enumerate(pool_maxes):
+                        self.z_pool_max_cache[j][jy][jx][p] = pval
+                        z[j][jy][jx][p] += z_pool[pval][p]
+
+        z = z.reshape((self.output_shape[2] * self.output_shape[1] * self.output_shape[0], len(a_in)))
 
         return z.transpose()
 
