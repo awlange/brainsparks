@@ -140,7 +140,18 @@ class Particle333Network(object):
                 this_delta = self.cost_d_function(data_Y, A[-1], sigma_Z[-1]).transpose()
 
             next_delta = np.zeros((layer.input_size, len(data_X)))
-            trans_sigma_Z_l = trans_sigma_Z[l-1] if -(l-1) <= len(self.layers) else np.ones((layer.input_size, len(data_X)))
+            if layer.apply_convolution:
+                # need to do it for each particle in the filter grid
+                next_delta = np.zeros((layer.input_shape[2]*layer.input_shape[1]*layer.input_shape[0], len(data_X)))
+
+            trans_sigma_Z_l = None
+            if -(l - 1) <= len(self.layers):
+                trans_sigma_Z_l = trans_sigma_Z[l - 1]
+            else:
+                if layer.apply_convolution:
+                    trans_sigma_Z_l = np.ones((layer.input_shape[2]*layer.input_shape[1]*layer.input_shape[0], len(data_X)))
+                else:
+                    trans_sigma_Z_l = np.ones((layer.input_size, len(data_X)))
 
             if not layer.apply_convolution:
                 # Bias gradient
@@ -179,8 +190,6 @@ class Particle333Network(object):
             else:
                 # Interaction gradient for convolution layer
                 trans_delta = this_delta.transpose()
-
-                j_filter_size = layer.output_shape[1] * layer.output_shape[0]
                 len_data = len(data_X)
 
                 for j in range(layer.output_size):
@@ -198,7 +207,6 @@ class Particle333Network(object):
                             j_pool_offsets = layer.z_pool_max_cache[j][jy][jx]
 
                             this_delta_j = this_delta[joff]
-                            # sum_atj = np.sum(Al_trans * this_delta_j, axis=1).reshape((-1, 1))
                             atj = Al_trans * this_delta_j
 
                             for di in range(len_data):
@@ -231,7 +239,7 @@ class Particle333Network(object):
                                                 potential = layer.potential(r, zeta=zj[c])
 
                                                 # Next delta
-                                                next_delta[i] += (qj[c] * this_delta_j) * potential * trans_sigma_Z_l[i]
+                                                next_delta[ioff][di] += (qj[c] * this_delta_j[di]) * potential * trans_sigma_Z_l[ioff][di]
 
                                                 # Charge gradient
                                                 dc_dq[l][j][c] += potential * atj[ioff][di]

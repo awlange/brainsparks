@@ -109,6 +109,20 @@ def fd():
         nr = 3
         nc = 2
 
+        # working!
+        # net = Particle333Network(cost="mse")
+        # net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        #                        apply_convolution=True,
+        #                        input_shape=(4, 4, 1),
+        #                        output_shape=(3, 3, 2),
+        #                        input_delta=(0.5, 0.5, 0.5),
+        #                        output_delta=(0.5, 0.5, 0.5),
+        #                        output_pool_shape=(2, 3, 1),
+        #                        output_pool_delta=(0.1, 0.1, 0.1)
+        #                        ))
+        # net.append(Particle333(3*3*2, 1, activation="sigmoid", nr=nr, nc=nc))
+
+        # working too!
         net = Particle333Network(cost="mse")
         net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
                                apply_convolution=True,
@@ -116,16 +130,19 @@ def fd():
                                output_shape=(3, 3, 2),
                                input_delta=(0.5, 0.5, 0.5),
                                output_delta=(0.5, 0.5, 0.5),
-                               output_pool_shape=(2, 2, 1),
+                               output_pool_shape=(2, 3, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        # net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
-        #                        apply_convolution=True,
-        #                        input_shape=(4, 4, 3),
-        #                        output_shape=(2, 2, 2),
-        #                        input_delta=(0.5, 0.5, 0.5),
-        #                        output_delta=(0.5, 0.5, 0.5)))
-        net.append(Particle333(3*3*2, 1, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                               apply_convolution=True,
+                               input_shape=(3, 3, 2),
+                               output_shape=(3, 3, 1),
+                               input_delta=(0.5, 0.5, 0.5),
+                               output_delta=(0.2, 0.2, 0.2),
+                               output_pool_shape=(1, 1, 1),
+                               output_pool_delta=(0.1, 0.1, 0.1)
+                               ))
+        net.append(Particle333(3*3*1, 1, activation="sigmoid", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
