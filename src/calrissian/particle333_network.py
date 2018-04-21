@@ -209,6 +209,7 @@ class Particle333Network(object):
                             this_delta_j = this_delta[joff]
                             atj = Al_trans * this_delta_j
 
+                            # TODO: can this loop be swapped into th innermost so that we don't recompute the potential?
                             for di in range(len_data):
                                 # Bias gradient
                                 dc_db[l][0][j] += trans_delta[di][joff]

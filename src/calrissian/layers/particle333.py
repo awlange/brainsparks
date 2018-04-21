@@ -99,11 +99,21 @@ class Particle333(object):
             z[j] = self.b[0][j] + potential.dot(atrans)
         return z.transpose()
 
-    def compute_z_convolution(self, a_in):
-        atrans = a_in.transpose()
-        z = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], len(a_in)))
-        self.z_pool_max_cache = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], len(a_in)), dtype=np.int32)
+    def compute_z_convolution_original(self, a_in):
+        """
+        Original version - keeping around for verification
+        """
 
+        atrans = a_in.transpose()
+        n_data = len(a_in)
+        z = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], n_data))
+        self.z_pool_max_cache = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], n_data), dtype=np.int32)
+
+
+        # potential_matrix = np.zeros((self.output_size * self.nc * self.output_shape[1] * self.output_shape[0] * self.output_pool_shape[1] * self.output_pool_shape[0],
+        #                              self.input_size * self.input_shape[1] * self.input_shape[0]))
+
+        # joff = -1
         for j in range(self.output_size):
             z[j] += self.b[0][j]
 
@@ -117,6 +127,7 @@ class Particle333(object):
                         for pool_jx in range(self.output_pool_shape[0]):
 
                             for c in range(self.nc):
+                                # joff += 1
                                 rjc = self.r_out[j][c]
                                 rjc_x = rjc[0] + jx * self.output_delta[0] + pool_jx * self.output_pool_delta[0]
                                 rjc_y = rjc[1] + jy * self.output_delta[1] + pool_jy * self.output_pool_delta[1]
@@ -135,10 +146,11 @@ class Particle333(object):
                                             r = np.sqrt(dx*dx + dy*dy + dz*dz)
                                             potential = self.potential(r, zeta=self.zeta[j][c])
 
+                                            # potential_matrix[joff][ioff] = potential
+
                                             # Assumption: data is organized with x being fast (columns),
                                             # y being slow indexes (rows)
                                             z_pool[pool_jy * self.output_pool_shape[0] + pool_jx] += self.q[j][c] * potential * atrans[ioff]
-                                            # z[j][jy][jx] += self.q[j][c] * potential * atrans[ioff]
 
                     # # Apply max pooling
                     pool_maxes = np.argmax(z_pool, axis=0)
@@ -146,8 +158,81 @@ class Particle333(object):
                         self.z_pool_max_cache[j][jy][jx][p] = pval
                         z[j][jy][jx][p] += z_pool[pval][p]
 
-        z = z.reshape((self.output_shape[2] * self.output_shape[1] * self.output_shape[0], len(a_in)))
+        z = z.reshape((self.output_size * self.output_shape[1] * self.output_shape[0], n_data))
+        return z.transpose()
 
+    def compute_z_convolution(self, a_in):
+        """
+        Vectorized version
+        """
+        atrans = a_in.transpose()
+        n_data = len(a_in)
+        z = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], n_data))
+        self.z_pool_max_cache = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], n_data),
+                                         dtype=np.int32)
+
+        pout_size = self.output_size * self.nc * self.output_shape[1] * self.output_shape[0] * self.output_pool_shape[1] * self.output_pool_shape[0]
+        pin_size = self.input_size * self.input_shape[1] * self.input_shape[0]
+        positions_output = np.zeros((self.nr, 1, pout_size))
+        positions_input = np.zeros((self.nr, 1, pin_size))
+        zeta_matrix = np.ones((pout_size, pin_size))
+
+        joff = -1
+        for j in range(self.output_size):
+            for jy in range(self.output_shape[1]):
+                for jx in range(self.output_shape[0]):
+                    for pool_jy in range(self.output_pool_shape[1]):
+                        for pool_jx in range(self.output_pool_shape[0]):
+                            for c in range(self.nc):
+                                rjc = self.r_out[j][c]
+                                zjc = self.zeta[j][c]
+
+                                joff += 1
+                                positions_output[0][0][joff] = rjc[0] + jx * self.output_delta[0] + pool_jx * self.output_pool_delta[0]
+                                positions_output[1][0][joff] = rjc[1] + jy * self.output_delta[1] + pool_jy * self.output_pool_delta[1]
+                                positions_output[2][0][joff] = rjc[2]
+                                zeta_matrix[joff] *= zjc
+
+        ioff = -1
+        for i in range(self.input_size):
+            for iy in range(self.input_shape[1]):
+                for ix in range(self.input_shape[0]):
+                    ioff += 1
+                    positions_input[0][0][ioff] = self.r_inp[i][0] + ix * self.input_delta[0]
+                    positions_input[1][0][ioff] = self.r_inp[i][1] + iy * self.input_delta[1]
+                    positions_input[2][0][ioff] = self.r_inp[i][2]
+
+        matrix_dx = positions_output[0].transpose() - positions_input[0]
+        matrix_dy = positions_output[1].transpose() - positions_input[1]
+        matrix_dz = positions_output[2].transpose() - positions_input[2]
+        r_matrix = np.sqrt(matrix_dx**2 + matrix_dy**2 + matrix_dz**2)
+        potential_matrix = self.potential(r_matrix, zeta=zeta_matrix)  # agrees with first version
+
+        # reduce matrix across c basis functions, weight by the c basis charges
+        tmp = []
+        for j in range(self.output_size):
+            tmp.append(np.tile(self.q[j], self.output_shape[1] * self.output_shape[0] * self.output_pool_shape[1] * self.output_pool_shape[0]))
+        tiled_basis_weights = np.asarray(tmp).reshape((-1, 1))
+        potential_matrix = potential_matrix * tiled_basis_weights
+        potential_matrix = potential_matrix.reshape((-1, self.nc, pin_size)).sum(axis=1)
+
+        # weight by input, sum on input - matrix product
+        matrix = potential_matrix.dot(atrans)
+
+        # apply max pooling
+        pool_maxes = np.argmax(matrix.reshape((-1, self.output_pool_shape[1] * self.output_pool_shape[0], n_data)), axis=1)
+
+        joff = -1
+        for j in range(self.output_size):
+            z[j] += self.b[0][j]  # add the bias here
+            for jy in range(self.output_shape[1]):
+                for jx in range(self.output_shape[0]):
+                    joff += 1
+                    for p, pmax in enumerate(pool_maxes[joff]):
+                        self.z_pool_max_cache[j][jy][jx][p] = pmax
+                        z[j][jy][jx][p] += matrix[joff * self.output_pool_shape[1] * self.output_pool_shape[0] + pmax][p]
+
+        z = z.reshape((self.output_size * self.output_shape[1] * self.output_shape[0], n_data))
         return z.transpose()
 
     def compute_a(self, z):
