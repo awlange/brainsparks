@@ -25,7 +25,7 @@ def main():
 
 def main2():
 
-    train_X = np.random.normal(0.0, 0.1, (3, 16))
+    train_X = np.random.normal(0.0, 0.1, (3, 4*4))
     train_Y = np.random.normal(0.0, 0.1, (3, 1))
 
     nr = 3
@@ -38,24 +38,132 @@ def main2():
                            output_shape=(2, 2, 3),
                            input_delta=(0.5, 0.5, 0.5),
                            output_delta=(0.5, 0.5, 0.5)))
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(2, 2, 3),
+                           output_shape=(2, 2, 1),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5)))
+    net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
 
     print(net.predict(train_X))
+    print(net.cost(train_X, train_Y))
+
+
+def main3():
+
+    train_X = np.random.normal(0.0, 0.1, (3, 4*4))
+    train_Y = np.random.normal(0.0, 0.1, (3, 1))
+
+    nr = 3
+    nc = 3
+
+    net = Particle333Network(cost="mse")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(4, 4, 1),
+                           output_shape=(2, 2, 3),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5),
+                           output_pool_shape=(2, 2, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(2, 2, 3),
+                           output_shape=(2, 2, 1),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5)))
+    net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
+
+    print(net.predict(train_X))
+    print(net.cost(train_X, train_Y))
+
+
+def main4():
+
+    train_X = np.random.normal(0.0, 0.1, (1, 4*4))
+    train_Y = np.random.normal(0.0, 0.1, (1, 1))
+
+    nr = 3
+    nc = 1
+
+    net = Particle333Network(cost="mse")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(4, 4, 1),
+                           output_shape=(1, 1, 1),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5)))
+    net.append(Particle333(1, 1, activation="sigmoid", nr=nr, nc=nc))
+
+    print(net.predict(train_X))
+    print(net.cost(train_X, train_Y))
 
 
 def fd():
 
     ts = time.time()
 
-    train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
-    train_Y = np.asarray([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+    train_X = None
+    train_Y = None
+    nc = None
+    nr = None
+    net = None
 
-    nc = 4
-    nr = 3
+    if False:
+        train_X = np.asarray([[0.2, -0.3], [0.1, -0.9], [0.1, 0.05], [0.2, -0.3], [0.1, -0.9], [0.1, 0.05]])
+        train_Y = np.asarray(
+            [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
 
-    net = Particle333Network(cost="categorical_cross_entropy")
-    net.append(Particle333(2, 5, activation="sigmoid", nr=nr, nc=nc))
-    net.append(Particle333(5, 6, activation="sigmoid", nr=nr, nc=nc))
-    net.append(Particle333(6, 3, activation="softmax", nr=nr, nc=nc))
+        nc = 4
+        nr = 3
+
+        net = Particle333Network(cost="categorical_cross_entropy")
+        net.append(Particle333(2, 5, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(5, 6, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(6, 3, activation="softmax", nr=nr, nc=nc))
+    else:
+        train_X = np.random.normal(0.0, 1.0, (3, 4 * 4))
+        train_Y = np.random.choice([0.0, 1.0], (3, 1))
+
+        nr = 3
+        nc = 2
+
+        # working!
+        # net = Particle333Network(cost="mse")
+        # net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        #                        apply_convolution=True,
+        #                        input_shape=(4, 4, 1),
+        #                        output_shape=(3, 3, 2),
+        #                        input_delta=(0.5, 0.5, 0.5),
+        #                        output_delta=(0.5, 0.5, 0.5),
+        #                        output_pool_shape=(2, 3, 1),
+        #                        output_pool_delta=(0.1, 0.1, 0.1)
+        #                        ))
+        # net.append(Particle333(3*3*2, 1, activation="sigmoid", nr=nr, nc=nc))
+
+        # working too!
+        net = Particle333Network(cost="mse")
+        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                               apply_convolution=True,
+                               input_shape=(4, 4, 1),
+                               output_shape=(3, 3, 2),
+                               input_delta=(0.5, 0.5, 0.5),
+                               output_delta=(0.5, 0.5, 0.5),
+                               output_pool_shape=(2, 3, 1),
+                               output_pool_delta=(0.1, 0.1, 0.1)
+                               ))
+        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                               apply_convolution=True,
+                               input_shape=(3, 3, 2),
+                               output_shape=(3, 3, 1),
+                               input_delta=(0.5, 0.5, 0.5),
+                               output_delta=(0.2, 0.2, 0.2),
+                               output_pool_shape=(1, 1, 1),
+                               output_pool_delta=(0.1, 0.1, 0.1)
+                               ))
+        net.append(Particle333(3*3*1, 1, activation="sigmoid", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
@@ -193,5 +301,7 @@ if __name__ == "__main__":
     np.random.seed(100)
 
     # main()
-    main2()
-    # fd()
+    # main2()
+    # main3()
+    # main4()
+    fd()
