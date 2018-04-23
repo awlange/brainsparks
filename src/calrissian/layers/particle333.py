@@ -76,7 +76,12 @@ class Particle333(object):
             self.r_out = np.random.normal(0.0, s, (self.output_size, nc, nr))
             self.r_inp = np.random.normal(0.0, s, (self.input_size, nr))
 
-        # pooling cache to help with gradient
+        # cachin to help with gradient
+        self.matrix_dx = None
+        self.matrix_dy = None
+        self.matrix_dz = None
+        self.r_matrix = None
+        self.potential_matrix_cache = None
         self.z_pool_max_cache = None
 
         self.w = None
@@ -206,7 +211,7 @@ class Particle333(object):
         matrix_dy = positions_output[1].transpose() - positions_input[1]
         matrix_dz = positions_output[2].transpose() - positions_input[2]
         r_matrix = np.sqrt(matrix_dx**2 + matrix_dy**2 + matrix_dz**2)
-        potential_matrix = self.potential(r_matrix, zeta=zeta_matrix)  # agrees with first version
+        potential_matrix = self.potential(r_matrix, zeta=zeta_matrix)
 
         # reduce matrix across c basis functions, weight by the c basis charges
         tmp = []
@@ -215,6 +220,13 @@ class Particle333(object):
         tiled_basis_weights = np.asarray(tmp).reshape((-1, 1))
         potential_matrix = potential_matrix * tiled_basis_weights
         potential_matrix = potential_matrix.reshape((-1, self.nc, pin_size)).sum(axis=1)
+
+        # caching for gradient ?
+        # self.matrix_dx = matrix_dx
+        # self.matrix_dy = matrix_dy
+        # self.matrix_dz = matrix_dz
+        # self.r_matrix = r_matrix
+        # self.potential_matrix_cache = potential_matrix
 
         # weight by input, sum on input - matrix product
         matrix = potential_matrix.dot(atrans)

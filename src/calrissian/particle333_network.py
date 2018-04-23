@@ -187,7 +187,11 @@ class Particle333Network(object):
                         dc_dr_out[l][j][c] += np.sum(tmp, axis=0)
                         dc_dr_inp[l] -= tmp
 
-            else:
+            elif False:
+                """
+                Original working version
+                """
+
                 # Interaction gradient for convolution layer
                 trans_delta = this_delta.transpose()
                 len_data = len(data_X)
@@ -209,7 +213,7 @@ class Particle333Network(object):
                             this_delta_j = this_delta[joff]
                             atj = Al_trans * this_delta_j
 
-                            # TODO: can this loop be swapped into th innermost so that we don't recompute the potential?
+                            # TODO: can this loop be swapped into the innermost so that we don't recompute the potential?
                             for di in range(len_data):
                                 # Bias gradient
                                 dc_db[l][0][j] += trans_delta[di][joff]
@@ -261,6 +265,110 @@ class Particle333Network(object):
                                                 dc_dr_inp[l][i][0] -= tdx
                                                 dc_dr_inp[l][i][1] -= tdy
                                                 dc_dr_inp[l][i][2] -= tdz
+
+            else:
+                """
+                Vectorized version - not yet working
+                """
+                # Interaction gradient for convolution layer
+                len_data = len(data_X)
+
+                # recompute potentials like in forward propagation
+                pout_size = layer.output_size * layer.nc * layer.output_shape[1] * layer.output_shape[0] * layer.output_pool_shape[1] * layer.output_pool_shape[0]
+                pin_size = layer.input_size * layer.input_shape[1] * layer.input_shape[0]
+                positions_output = np.zeros((layer.nr, 1, pout_size))
+                positions_input = np.zeros((layer.nr, 1, pin_size))
+                zeta_matrix = np.ones((pout_size, pin_size))
+
+                joff = -1
+                for j in range(layer.output_size):
+                    for jy in range(layer.output_shape[1]):
+                        for jx in range(layer.output_shape[0]):
+                            for pool_jy in range(layer.output_pool_shape[1]):
+                                for pool_jx in range(layer.output_pool_shape[0]):
+                                    for c in range(layer.nc):
+                                        rjc = layer.r_out[j][c]
+                                        zjc = layer.zeta[j][c]
+
+                                        joff += 1
+                                        positions_output[0][0][joff] = rjc[0] + jx * layer.output_delta[0] + pool_jx * layer.output_pool_delta[0]
+                                        positions_output[1][0][joff] = rjc[1] + jy * layer.output_delta[1] + pool_jy * layer.output_pool_delta[1]
+                                        positions_output[2][0][joff] = rjc[2]
+                                        zeta_matrix[joff] *= zjc
+
+                ioff = -1
+                for i in range(layer.input_size):
+                    for iy in range(layer.input_shape[1]):
+                        for ix in range(layer.input_shape[0]):
+                            ioff += 1
+                            positions_input[0][0][ioff] = layer.r_inp[i][0] + ix * layer.input_delta[0]
+                            positions_input[1][0][ioff] = layer.r_inp[i][1] + iy * layer.input_delta[1]
+                            positions_input[2][0][ioff] = layer.r_inp[i][2]
+
+                matrix_dx = positions_output[0].transpose() - positions_input[0]
+                matrix_dy = positions_output[1].transpose() - positions_input[1]
+                matrix_dz = positions_output[2].transpose() - positions_input[2]
+                r_matrix = np.sqrt(matrix_dx ** 2 + matrix_dy ** 2 + matrix_dz ** 2)
+                potential_matrix = layer.potential(r_matrix, zeta=zeta_matrix)
+                dz_potential_matrix = layer.dz_potential(r_matrix, zeta=zeta_matrix)
+                d_potential_matrix = layer.d_potential(r_matrix, zeta=zeta_matrix) / r_matrix  # divide d_potential_matrix by distances r_matrix for convenience and speed here
+
+                # bias gradient
+                chunk_size = layer.output_shape[1]*layer.output_shape[0]
+                for j in range(layer.output_size):
+                    dc_db[l][0][j] = this_delta[j*chunk_size:(j+1)*chunk_size].sum()
+
+                # Helper arrays for this layer
+                dc_dr_inp_dx = np.zeros(layer.input_size)
+                dc_dr_inp_dy = np.zeros(layer.input_size)
+                dc_dr_inp_dz = np.zeros(layer.input_size)
+
+                trans_next_delta = next_delta.transpose()
+                sigma_Z_l = trans_sigma_Z_l.transpose()
+
+                joff = -1
+                pool_size = layer.output_pool_shape[1] * layer.output_pool_shape[0]
+                for j in range(layer.output_size):
+                    qj = layer.q[j]
+                    for jy in range(layer.output_shape[1]):
+                        for jx in range(layer.output_shape[0]):
+
+                            joff += 1
+                            this_delta_j = this_delta[joff]
+                            atj = Al_trans * this_delta_j
+                            trans_atj = atj.transpose()
+                            j_pool_offsets = layer.z_pool_max_cache[j][jy][jx]
+
+                            for di in range(len_data):
+                                offset = joff * pool_size * layer.nc + j_pool_offsets[di] * layer.nc
+                                for c in range(layer.nc):
+                                    # Next layer delta - easier to do in transpose
+                                    trans_next_delta[di] += (qj[c] * this_delta_j[di]) * potential_matrix[offset + c] * sigma_Z_l[di]
+
+                                    # Charge gradient
+                                    dc_dq[l][j][c] += potential_matrix[offset + c].dot(trans_atj[di])
+
+                                    # Width gradient
+                                    dc_dz[l][j][c] += qj[c] * (dz_potential_matrix[offset + c].dot(trans_atj[di]))
+
+                                    # Position gradient
+                                    tdx = qj[c] * ((d_potential_matrix[offset + c] * matrix_dx[offset + c]) * (trans_atj[di]))
+                                    tdy = qj[c] * ((d_potential_matrix[offset + c] * matrix_dy[offset + c]) * (trans_atj[di]))
+                                    tdz = qj[c] * ((d_potential_matrix[offset + c] * matrix_dz[offset + c]) * (trans_atj[di]))
+
+                                    dc_dr_out[l][j][c][0] += tdx.sum()
+                                    dc_dr_out[l][j][c][1] += tdy.sum()
+                                    dc_dr_out[l][j][c][2] += tdz.sum()
+                                    dc_dr_inp_dx -= tdx.reshape((layer.input_size, -1)).sum(axis=1)
+                                    dc_dr_inp_dy -= tdy.reshape((layer.input_size, -1)).sum(axis=1)
+                                    dc_dr_inp_dz -= tdz.reshape((layer.input_size, -1)).sum(axis=1)
+
+                for i in range(layer.input_size):
+                    dc_dr_inp[l][i][0] += dc_dr_inp_dx[i]
+                    dc_dr_inp[l][i][1] += dc_dr_inp_dy[i]
+                    dc_dr_inp[l][i][2] += dc_dr_inp_dz[i]
+
+                next_delta = trans_next_delta.transpose()
 
         return dc_db, dc_dq, dc_dz, dc_dr_inp, dc_dr_out
 
