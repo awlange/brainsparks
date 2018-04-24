@@ -4,6 +4,7 @@ Script entry point
 
 from src.calrissian.particle333_network import Particle333Network
 from src.calrissian.layers.particle333 import Particle333
+from src.calrissian.optimizers.particle333_sgd import Particle333SGD
 
 import numpy as np
 import time
@@ -163,7 +164,8 @@ def fd():
                                output_pool_shape=(1, 1, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(3*3*1, 1, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(3*3*1, 4, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
@@ -295,6 +297,54 @@ def fd():
     print("time: {}".format(time.time() - ts))
 
 
+def sgd():
+
+    ts = time.time()
+
+    ndata = 500
+    train_X = np.random.normal(0.0, 1.0, (ndata, 12 * 12))
+    train_Y = np.random.choice([0.0, 1.0], (ndata, 2))
+
+    nr = 3
+    nc = 2
+
+    net = Particle333Network(cost="categorical_cross_entropy")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(12, 12, 1),
+                           output_shape=(6, 6, 4),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5),
+                           output_pool_shape=(2, 3, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(6, 6, 4),
+                           output_shape=(3, 3, 2),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.2, 0.2, 0.2),
+                           output_pool_shape=(1, 1, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(3 * 3 * 2, 10, activation="sigmoid", nr=nr, nc=nc))
+    net.append(Particle333(10, 2, activation="softmax", nr=nr, nc=nc))
+
+    mbs = 20
+    nt = 2
+    cs = mbs // nt
+
+    sgd = Particle333SGD(n_epochs=1, mini_batch_size=mbs, verbosity=1, weight_update="sd",
+                         alpha=0.01, beta=0.8, gamma=0.95,
+                         cost_freq=1, fixed_input=True,
+                         n_threads=nt, chunk_size=cs
+                         )
+
+    sgd.optimize(net, train_X, train_Y)
+
+    print("time: {}".format(time.time() - ts))
+
+
 if __name__ == "__main__":
 
     # Ensure same seed
@@ -304,4 +354,5 @@ if __name__ == "__main__":
     # main2()
     # main3()
     # main4()
-    fd()
+    # fd()
+    sgd()

@@ -12,7 +12,7 @@ class Particle333(object):
 
     def __init__(self, input_size=1, output_size=1, activation="sigmoid", potential="gaussian",
                  nr=3, nc=1, rand="uniform",
-                 s=1.0, q=1.0, b=1.0, z=1.0,
+                 s=1.0, q=1.0, b=1.0, z=1.0, zoff=1.0,
                  apply_convolution=False,
                  input_shape=(1, 1, 1),   # n_x, n_y, n_channel
                  output_shape=(1, 1, 1),  # n_x, n_y, n_channel
@@ -63,7 +63,7 @@ class Particle333(object):
         if rand == "uniform":
             self.zeta = np.random.uniform(-z, z, (self.output_size, nc))
         else:
-            self.zeta = np.random.normal(1.0, z, (self.output_size, nc))
+            self.zeta = np.random.normal(zoff, z, (self.output_size, nc))
 
         # Positions
         # With convolution, these are the positions of the anchors
