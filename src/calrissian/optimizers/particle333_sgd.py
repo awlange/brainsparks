@@ -143,7 +143,7 @@ class Particle333SGD(Optimizer):
                 mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
-                if self.n_threads > 0:
+                if self.n_threads > 1:
                     self.cost_gradient_parallel(network, mini_X, mini_Y)
                 else:
                     self.dc_db, self.dc_dq, self.dc_dz, self.dc_dr_inp, self.dc_dr_out = network.cost_gradient(mini_X, mini_Y)
