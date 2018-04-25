@@ -1,9 +1,8 @@
 from .cost import Cost
 
-from .layers.particle3 import Particle3
-
 import numpy as np
 import json
+import os
 
 
 class Particle333Network(object):
@@ -15,6 +14,17 @@ class Particle333Network(object):
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
         self.regularizer = regularizer
+
+        # references to data
+        self.ref_data_X = None
+        self.ref_data_Y = None
+
+        # thread partitioned gradients
+        self.thread_dc_db = None
+        self.thread_dc_dq = None
+        self.thread_dc_dz = None
+        self.thread_dc_dr_inp = None
+        self.thread_dc_dr_out = None
 
     def append(self, layer):
         """
@@ -82,14 +92,6 @@ class Particle333Network(object):
             c += self.regularizer.cost(self.layers)
 
         return c
-
-    def cost_gradient_thread(self, data_XYt):
-        """
-        Wrapper for multithreaded call
-        :param data_XY:
-        :return:
-        """
-        return self.cost_gradient(data_XYt[0], data_XYt[1], thread_scale=data_XYt[2])
 
     def cost_gradient(self, data_X, data_Y, thread_scale=1):
         """
@@ -274,7 +276,7 @@ class Particle333Network(object):
 
             else:
                 """
-                Vectorized version - not yet working
+                Vectorized version
                 """
                 # Interaction gradient for convolution layer
                 len_data = len(data_X)

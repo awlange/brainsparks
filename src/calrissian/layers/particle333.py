@@ -221,13 +221,6 @@ class Particle333(object):
         potential_matrix = potential_matrix * tiled_basis_weights
         potential_matrix = potential_matrix.reshape((-1, self.nc, pin_size)).sum(axis=1)
 
-        # caching for gradient ?
-        # self.matrix_dx = matrix_dx
-        # self.matrix_dy = matrix_dy
-        # self.matrix_dz = matrix_dz
-        # self.r_matrix = r_matrix
-        # self.potential_matrix_cache = potential_matrix
-
         # weight by input, sum on input - matrix product
         matrix = potential_matrix.dot(atrans)
 

@@ -3,14 +3,27 @@ from .optimizer import Optimizer
 import numpy as np
 import time
 import sys
+import os
 
-from multiprocessing import Pool
+
+def sgd_cost_gradient_thread(indexes_ranges):
+    """
+    Wrapper for multithreaded call
+    """
+    # print('parent process: {} process id: {}'.format(os.getppid(), os.getpid()))
+
+    index_from, index_to, thread_scale, thread_id, network = indexes_ranges
+    data_X = network.ref_data_X[index_from:index_to, :]
+    data_Y = network.ref_data_Y[index_from:index_to, :]
+    return network.cost_gradient(data_X, data_Y, thread_scale=thread_scale)
 
 
 class Particle333SGD(Optimizer):
     """
     Stochastic gradient descent optimization
     """
+
+    global global_lock
 
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
                  cost_freq=2, epsilon=10e-8, gamma2=0.1, alpha_decay=None, fixed_input=False,
@@ -72,20 +85,22 @@ class Particle333SGD(Optimizer):
         self.n_threads = n_threads
         self.chunk_size = chunk_size
         self.pool = None
+        self.manager = None
 
     def cost_gradient_parallel(self, network, data_X, data_Y):
-        if self.pool is None:
-            self.pool = Pool(processes=self.n_threads)
+        # send only the index ranges to the threads; make a reference to the data on the network object
+        network.ref_data_X = data_X
+        network.ref_data_Y = data_Y
 
-        data_XY_list = []
+        index_ranges = []
         offset = 0
+        thread_id = 0
         while offset < len(data_X):
-            data_X_sub = data_X[offset:(offset+self.chunk_size), :]
-            data_Y_sub = data_Y[offset:(offset+self.chunk_size), :]
-            data_XY_list.append((data_X_sub, data_Y_sub, self.n_threads))
+            index_ranges.append((offset, offset+self.chunk_size, self.n_threads, thread_id, network))
             offset += self.chunk_size
+            thread_id += 1
 
-        result = self.pool.map(network.cost_gradient_thread, data_XY_list, chunksize=1)
+        result = self.pool.map(sgd_cost_gradient_thread, index_ranges, chunksize=1)
 
         for t, result_t in enumerate(result):
             tmp_dc_db = result_t[0]
@@ -113,10 +128,12 @@ class Particle333SGD(Optimizer):
                 for l, tmp_r in enumerate(tmp_dc_dr_out):
                     self.dc_dr_out[l] += tmp_r
 
-    def optimize(self, network, data_X, data_Y):
+    def optimize(self, network, data_X, data_Y, pool=None):
         """
         :return: optimized network
         """
+        self.pool = pool
+
         optimize_start_time = time.time()
 
         indexes = np.arange(len(data_X))
