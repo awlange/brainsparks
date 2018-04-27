@@ -4,9 +4,13 @@ Script entry point
 
 from src.calrissian.particle333_network import Particle333Network
 from src.calrissian.layers.particle333 import Particle333
+from src.calrissian.optimizers.particle333_sgd import Particle333SGD
+from multiprocessing import Pool
 
 import numpy as np
 import time
+import pandas as pd
+import pickle
 
 
 def main():
@@ -163,7 +167,8 @@ def fd():
                                output_pool_shape=(1, 1, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(3*3*1, 1, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(3*3*1, 4, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
@@ -295,6 +300,150 @@ def fd():
     print("time: {}".format(time.time() - ts))
 
 
+def sgd(pool=None):
+
+    ts = time.time()
+
+    ndata = 500
+    train_X = np.random.normal(0.0, 1.0, (ndata, 12 * 12))
+    train_Y = np.random.choice([0.0, 1.0], (ndata, 2))
+
+    nr = 3
+    nc = 2
+
+    net = Particle333Network(cost="categorical_cross_entropy")
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(12, 12, 1),
+                           output_shape=(6, 6, 4),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.5, 0.5, 0.5),
+                           output_pool_shape=(2, 3, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+                           apply_convolution=True,
+                           input_shape=(6, 6, 4),
+                           output_shape=(3, 3, 2),
+                           input_delta=(0.5, 0.5, 0.5),
+                           output_delta=(0.2, 0.2, 0.2),
+                           output_pool_shape=(1, 1, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(3 * 3 * 2, 10, activation="sigmoid", nr=nr, nc=nc))
+    net.append(Particle333(10, 2, activation="softmax", nr=nr, nc=nc))
+
+    mbs = 20
+    nt = 2
+    cs = mbs // nt
+
+    sgd = Particle333SGD(n_epochs=1, mini_batch_size=mbs, verbosity=1, weight_update="sd",
+                         alpha=0.01, beta=0.8, gamma=0.95,
+                         cost_freq=1, fixed_input=True,
+                         n_threads=nt, chunk_size=cs
+                         )
+
+    sgd.optimize(net, train_X, train_Y, pool=pool)
+
+    print("time: {}".format(time.time() - ts))
+
+
+def mnist(pool=None):
+    raw_data_train = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_train.csv", header=None)
+    raw_data_test = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_test.csv", header=None)
+
+    # In[7]:
+
+    # Prepare data
+    denom = 255.0
+    # denom = 1.0
+    X = np.asarray(raw_data_train.iloc[:,1:] / denom)  # scaled values in range [0:1]
+    X_test = np.asarray(raw_data_test.iloc[:,1:] / denom)
+
+    # Z-score centering
+    m = X.mean()
+    s = X.std()
+    X = (X - m) / s
+    X_test = (X_test - m) / s
+
+    # length ten categorical vector
+    Y = []
+    for val in raw_data_train.iloc[:,0]:
+        y = np.zeros(10)
+        y[val] = 1.0
+        Y.append(y)
+    Y = np.asarray(Y)
+
+    Y_test = []
+    for val in raw_data_test.iloc[:,0]:
+        y = np.zeros(10)
+        y[val] = 1.0
+        Y_test.append(y)
+    Y_test = np.asarray(Y_test)
+
+    # Data subset
+    # n_sub = len(X)
+    n_sub = 100
+    X_sub = X[:n_sub, :]
+    Y_sub = Y[:n_sub, :]
+    X_other = X[n_sub:, :]
+    Y_other = Y[n_sub:, :]
+
+    s = 0.1
+    q = 0.1
+    b = 0.1
+    z = 0.1
+    p = "gaussian"
+    rand = "normal"
+
+    nr = 3
+    nc = 4
+
+    net = Particle333Network(cost="categorical_cross_entropy")
+    net.append(Particle333(activation="tanh", nr=nr, nc=nc,
+                           s=0.1, q=0.1, b=b,
+                           z=z, zoff=4.0,
+                           potential=p, rand=rand,
+                           apply_convolution=True,
+                           input_shape=(28, 28, 1),
+                           output_shape=(10, 10, 10),
+                           input_delta=(0.1, 0.1, 0.1),
+                           output_delta=(0.2, 0.2, 0.2),
+                           output_pool_shape=(2, 2, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(activation="tanh", nr=nr, nc=nc,
+                           s=0.1, q=0.1, b=b,
+                           z=z, zoff=4.0,
+                           potential=p, rand=rand,
+                           apply_convolution=True,
+                           input_shape=(10, 10, 10),
+                           output_shape=(7, 7, 10),
+                           input_delta=(0.1, 0.1, 0.1),
+                           output_delta=(0.2, 0.2, 0.2),
+                           output_pool_shape=(2, 2, 1),
+                           output_pool_delta=(0.1, 0.1, 0.1)
+                           ))
+    net.append(Particle333(7*7*10, 100, activation="tanh", potential=p, rand=rand, s=1.0, q=0.1, b=b, z=z, zoff=1.0, nr=nr, nc=nc))
+    net.append(Particle333(100, 10, activation="softmax", potential=p, rand=rand, s=1.0, q=0.1, b=b, z=z, zoff=1.0, nr=nr, nc=nc))
+
+    # input position to be fixed at the origin
+    net.layers[0].r_inp = np.zeros_like(net.layers[0].r_inp)
+
+    n = 0
+    mbs = 4
+    nt = 2
+    cs = mbs // nt
+
+    sgd = Particle333SGD(n_epochs=1, mini_batch_size=mbs, verbosity=1, weight_update="rmsprop",
+                         alpha=0.01, beta=0.8, gamma=0.95,
+                         cost_freq=1, fixed_input=True,
+                         n_threads=nt, chunk_size=cs
+                        )
+
+    sgd.optimize(net, X_sub, Y_sub, pool=pool)
+
+
 if __name__ == "__main__":
 
     # Ensure same seed
@@ -303,5 +452,8 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    # main4()
-    fd()
+    main4()
+    # fd()
+
+    # sgd(pool=Pool(processes=2))
+    # mnist(pool=Pool(processes=2))

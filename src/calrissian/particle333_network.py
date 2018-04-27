@@ -1,9 +1,8 @@
 from .cost import Cost
 
-from .layers.particle3 import Particle3
-
 import numpy as np
 import json
+import os
 
 
 class Particle333Network(object):
@@ -15,6 +14,17 @@ class Particle333Network(object):
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
         self.regularizer = regularizer
+
+        # references to data
+        self.ref_data_X = None
+        self.ref_data_Y = None
+
+        # thread partitioned gradients
+        self.thread_dc_db = None
+        self.thread_dc_dq = None
+        self.thread_dc_dz = None
+        self.thread_dc_dr_inp = None
+        self.thread_dc_dr_out = None
 
     def append(self, layer):
         """
@@ -83,15 +93,7 @@ class Particle333Network(object):
 
         return c
 
-    def cost_gradient_thread(self, data_XY):
-        """
-        Wrapper for multithreaded call
-        :param data_XY:
-        :return:
-        """
-        return self.cost_gradient(data_XY[0], data_XY[1])
-
-    def cost_gradient(self, data_X, data_Y):
+    def cost_gradient(self, data_X, data_Y, thread_scale=1):
         """
         Computes the gradient of the cost with respect to each weight and bias in the network
 
@@ -138,6 +140,12 @@ class Particle333Network(object):
             this_delta = next_delta
             if l == -1:
                 this_delta = self.cost_d_function(data_Y, A[-1], sigma_Z[-1]).transpose()
+
+                # IMPORTANT:
+                # For threaded calls, we need to divide the cost gradient by the number threads to account for the mean being
+                # taken in the cost function. When data is split, the mean denominator is off by a factor of the number of threads.
+                if thread_scale > 1:
+                    this_delta /= thread_scale
 
             next_delta = np.zeros((layer.input_size, len(data_X)))
             if layer.apply_convolution:
@@ -268,7 +276,7 @@ class Particle333Network(object):
 
             else:
                 """
-                Vectorized version - not yet working
+                Vectorized version
                 """
                 # Interaction gradient for convolution layer
                 len_data = len(data_X)

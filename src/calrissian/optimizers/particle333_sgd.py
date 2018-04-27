@@ -3,6 +3,19 @@ from .optimizer import Optimizer
 import numpy as np
 import time
 import sys
+import os
+
+
+def sgd_cost_gradient_thread(indexes_ranges):
+    """
+    Wrapper for multithreaded call
+    """
+    # print('parent process: {} process id: {}'.format(os.getppid(), os.getpid()))
+
+    index_from, index_to, thread_scale, thread_id, network = indexes_ranges
+    data_X = network.ref_data_X[index_from:index_to, :]
+    data_Y = network.ref_data_Y[index_from:index_to, :]
+    return network.cost_gradient(data_X, data_Y, thread_scale=thread_scale)
 
 
 class Particle333SGD(Optimizer):
@@ -10,8 +23,11 @@ class Particle333SGD(Optimizer):
     Stochastic gradient descent optimization
     """
 
+    global global_lock
+
     def __init__(self, alpha=0.01, beta=0.0, gamma=0.9, n_epochs=1, mini_batch_size=1, verbosity=2, weight_update="sd",
-                 cost_freq=2, epsilon=10e-8, gamma2=0.1, alpha_decay=None, fixed_input=False,):
+                 cost_freq=2, epsilon=10e-8, gamma2=0.1, alpha_decay=None, fixed_input=False,
+                 n_threads=1, chunk_size=1):
         """
         :param alpha: learning rate
         :param beta: momentum damping (viscosity)
@@ -66,10 +82,58 @@ class Particle333SGD(Optimizer):
         self.ms_r_inp = None
         self.ms_r_out = None
 
-    def optimize(self, network, data_X, data_Y):
+        self.n_threads = n_threads
+        self.chunk_size = chunk_size
+        self.pool = None
+        self.manager = None
+
+    def cost_gradient_parallel(self, network, data_X, data_Y):
+        # send only the index ranges to the threads; make a reference to the data on the network object
+        network.ref_data_X = data_X
+        network.ref_data_Y = data_Y
+
+        index_ranges = []
+        offset = 0
+        thread_id = 0
+        while offset < len(data_X):
+            index_ranges.append((offset, offset+self.chunk_size, self.n_threads, thread_id, network))
+            offset += self.chunk_size
+            thread_id += 1
+
+        result = self.pool.map(sgd_cost_gradient_thread, index_ranges, chunksize=1)
+
+        for t, result_t in enumerate(result):
+            tmp_dc_db = result_t[0]
+            tmp_dc_dq = result_t[1]
+            tmp_dc_dz = result_t[2]
+            tmp_dc_dr_inp = result_t[3]
+            tmp_dc_dr_out = result_t[4]
+
+            if t == 0:
+                self.dc_db = tmp_dc_db
+                self.dc_dq = tmp_dc_dq
+                self.dc_dz = tmp_dc_dz
+                self.dc_dr_inp = tmp_dc_dr_inp
+                self.dc_dr_out = tmp_dc_dr_out
+
+            else:
+                for l, tmp_b in enumerate(tmp_dc_db):
+                    self.dc_db[l] += tmp_b
+                for l, tmp_q in enumerate(tmp_dc_dq):
+                    self.dc_dq[l] += tmp_q
+                for l, tmp_z in enumerate(tmp_dc_dz):
+                    self.dc_dz[l] += tmp_z
+                for l, tmp_r in enumerate(tmp_dc_dr_inp):
+                    self.dc_dr_inp[l] += tmp_r
+                for l, tmp_r in enumerate(tmp_dc_dr_out):
+                    self.dc_dr_out[l] += tmp_r
+
+    def optimize(self, network, data_X, data_Y, pool=None):
         """
         :return: optimized network
         """
+        self.pool = pool
+
         optimize_start_time = time.time()
 
         indexes = np.arange(len(data_X))
@@ -96,7 +160,10 @@ class Particle333SGD(Optimizer):
                 mini_Y = shuffle_Y[m*self.mini_batch_size:(m+1)*self.mini_batch_size]
 
                 # Compute gradient for mini-batch
-                self.dc_db, self.dc_dq, self.dc_dz, self.dc_dr_inp, self.dc_dr_out = network.cost_gradient(mini_X, mini_Y)
+                if self.n_threads > 1:
+                    self.cost_gradient_parallel(network, mini_X, mini_Y)
+                else:
+                    self.dc_db, self.dc_dq, self.dc_dz, self.dc_dr_inp, self.dc_dr_out = network.cost_gradient(mini_X, mini_Y)
                 
                 # Update weights and biases
                 self.weight_update_func(network)
