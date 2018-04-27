@@ -12,7 +12,10 @@ class Particle333(object):
 
     def __init__(self, input_size=1, output_size=1, activation="sigmoid", potential="gaussian",
                  nr=3, nc=1, rand="uniform",
-                 s=1.0, q=1.0, b=1.0, z=1.0, zoff=1.0,
+                 s=1.0, soff=0.0,
+                 q=1.0, qoff=0.0,
+                 b=1.0, boff=0.0,
+                 z=1.0, zoff=1.0,
                  apply_convolution=False,
                  input_shape=(1, 1, 1),   # n_x, n_y, n_channel
                  output_shape=(1, 1, 1),  # n_x, n_y, n_channel
@@ -49,14 +52,14 @@ class Particle333(object):
         if rand == "uniform":
             self.b = np.random.uniform(-b, b, (1, self.output_size))
         else:
-            self.b = np.random.normal(0.0, b, (1, self.output_size))
+            self.b = np.random.normal(boff, b, (1, self.output_size))
 
         # Coefficients
         self.q = None
         if rand == "uniform":
             self.q = np.random.uniform(-q, q, (self.output_size, nc))
         else:
-            self.q = np.random.normal(0.0, q, (self.output_size, nc))
+            self.q = np.random.normal(qoff, q, (self.output_size, nc))
 
         # Widths
         self.zeta = np.ones((self.output_size, nc))  # in the potential, these are squared so that they are always positive
@@ -73,8 +76,8 @@ class Particle333(object):
             self.r_out = np.random.uniform(-s, s, (self.output_size, nc, nr))
             self.r_inp = np.random.uniform(-s, s, (self.input_size, nr))
         else:
-            self.r_out = np.random.normal(0.0, s, (self.output_size, nc, nr))
-            self.r_inp = np.random.normal(0.0, s, (self.input_size, nr))
+            self.r_out = np.random.normal(soff, s, (self.output_size, nc, nr))
+            self.r_inp = np.random.normal(soff, s, (self.input_size, nr))
 
         # cachin to help with gradient
         self.matrix_dx = None

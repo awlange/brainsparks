@@ -10,6 +10,7 @@ from multiprocessing import Pool
 import numpy as np
 import time
 import pandas as pd
+import pickle
 
 
 def main():
@@ -451,8 +452,8 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    # main4()
+    main4()
     # fd()
 
     # sgd(pool=Pool(processes=2))
-    mnist(pool=Pool(processes=2))
+    # mnist(pool=Pool(processes=2))
