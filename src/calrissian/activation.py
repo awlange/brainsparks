@@ -33,6 +33,8 @@ class Activation(object):
             return Activation().softplus
         if nl == "atomic_softmax":
             return Activation().atomic_softmax
+        if nl == "elu":
+            return Activation().elu
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -59,6 +61,8 @@ class Activation(object):
             return Activation().d_softmax
         if nl == "softplus":
             return Activation().d_softplus
+        if nl == "elu":
+            return Activation().d_elu
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -167,3 +171,11 @@ class Activation(object):
 
     def d_softplus(self, x):
         return Activation().sigmoid(x)
+
+    # Exponential linear unit
+
+    def elu(self, x):
+        return np.piecewise(x, [x < 0.0, x >= 0], [np.exp(x) - 1.0, x])
+
+    def d_elu(self, x):
+        return np.piecewise(x, [x < 0.0, x >= 0], [np.exp(x), 1.0])
