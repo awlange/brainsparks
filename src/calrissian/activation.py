@@ -175,7 +175,7 @@ class Activation(object):
     # Exponential linear unit
 
     def elu(self, x):
-        return np.piecewise(x, [x < 0.0, x >= 0], [np.exp(x) - 1.0, x])
+        return np.piecewise(x, [x < 0.0, x >= 0], [lambda x: np.exp(x) - 1.0, lambda x: x])
 
     def d_elu(self, x):
-        return np.piecewise(x, [x < 0.0, x >= 0], [np.exp(x), 1.0])
+        return np.piecewise(x, [x < 0.0, x >= 0], [lambda x: np.exp(x), lambda x: 1.0])
