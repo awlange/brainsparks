@@ -54,6 +54,8 @@ class Particle333SGD(Optimizer):
             self.weight_update_func = self.weight_update_steepest_descent_with_momentum
         elif weight_update == "rmsprop":
             self.weight_update_func = self.weight_update_rmsprop
+        elif weight_update == "adam":
+            self.weight_update_func = self.weight_update_adam
 
         # Weight gradients, to keep around for a step
         self.dc_db = None
@@ -76,11 +78,15 @@ class Particle333SGD(Optimizer):
         self.ms_dr_inp = None
         self.ms_dr_out = None
 
-        self.ms_b = None
-        self.ms_q = None
-        self.ms_z = None
-        self.ms_r_inp = None
-        self.ms_r_out = None
+        self.m_db = None
+        self.m_dq = None
+        self.m_dz = None
+        self.m_dr_inp = None
+        self.m_dr_out = None
+
+        # exponentiated gammas - to the zeroth power to start
+        self.gamma_t = 1.0
+        self.gamma2_t = 1.0
 
         self.n_threads = n_threads
         self.chunk_size = chunk_size
@@ -278,3 +284,65 @@ class Particle333SGD(Optimizer):
             if not (self.fixed_input and l == 0):
                 layer.r_inp -= alpha * self.dc_dr_inp[l] / np.sqrt(self.ms_dr_inp[l] + epsilon)
 
+    def weight_update_adam(self, network):
+        """
+        Update weights and biases according to ADAM
+        """
+        gamma = self.gamma
+        one_m_gamma = 1.0 - gamma
+        gamma2 = self.gamma2
+        one_m_gamma2 = 1.0 - gamma2
+        alpha = self.alpha
+        epsilon = self.epsilon  # small number to avoid division by zero
+
+        # update exponentiated gammas
+        self.gamma_t *= gamma
+        self.gamma2_t *= gamma2
+        factor_1 = 1.0 / (1.0 - self.gamma_t)
+        factor_2 = 1.0 / (1.0 - self.gamma2_t)
+
+        # Initialize RMS to zero
+        if self.ms_db is None or self.ms_dq is None:
+            self.ms_db = []
+            self.ms_dq = []
+            self.ms_dz = []
+            self.ms_dr_inp = []
+            self.ms_dr_out = []
+            for l, layer in enumerate(network.layers):
+                self.ms_db.append(np.zeros(layer.b.shape))
+                self.ms_dq.append(np.zeros(layer.q.shape))
+                self.ms_dz.append(np.zeros(layer.zeta.shape))
+                self.ms_dr_inp.append(np.zeros(layer.r_inp.shape))
+                self.ms_dr_out.append(np.zeros(layer.r_out.shape))
+
+            self.m_db = []
+            self.m_dq = []
+            self.m_dz = []
+            self.m_dr_inp = []
+            self.m_dr_out = []
+            for l, layer in enumerate(network.layers):
+                self.m_db.append(np.zeros(layer.b.shape))
+                self.m_dq.append(np.zeros(layer.q.shape))
+                self.m_dz.append(np.zeros(layer.zeta.shape))
+                self.m_dr_inp.append(np.zeros(layer.r_inp.shape))
+                self.m_dr_out.append(np.zeros(layer.r_out.shape))
+
+        for l, layer in enumerate(network.layers):
+            self.ms_db[l] = gamma2 * self.ms_db[l] + one_m_gamma2 * (self.dc_db[l] * self.dc_db[l])
+            self.ms_dq[l] = gamma2 * self.ms_dq[l] + one_m_gamma2 * (self.dc_dq[l] * self.dc_dq[l])
+            self.ms_dz[l] = gamma2 * self.ms_dz[l] + one_m_gamma2 * (self.dc_dz[l] * self.dc_dz[l])
+            self.ms_dr_inp[l] = gamma2 * self.ms_dr_inp[l] + one_m_gamma2 * (self.dc_dr_inp[l] * self.dc_dr_inp[l])
+            self.ms_dr_out[l] = gamma2 * self.ms_dr_out[l] + one_m_gamma2 * (self.dc_dr_out[l] * self.dc_dr_out[l])
+
+            self.m_db[l] = gamma * self.m_db[l] + one_m_gamma * (self.dc_db[l])
+            self.m_dq[l] = gamma * self.m_dq[l] + one_m_gamma * (self.dc_dq[l])
+            self.m_dz[l] = gamma * self.m_dz[l] + one_m_gamma * (self.dc_dz[l])
+            self.m_dr_inp[l] = gamma * self.m_dr_inp[l] + one_m_gamma * (self.dc_dr_inp[l])
+            self.m_dr_out[l] = gamma * self.m_dr_out[l] + one_m_gamma * (self.dc_dr_out[l])
+
+            layer.b -= alpha * (self.m_db[l] * factor_1) / (np.sqrt(self.ms_db[l] * factor_2) + epsilon)
+            layer.q -= alpha * (self.m_dq[l] * factor_1) / (np.sqrt(self.ms_dq[l] * factor_2) + epsilon)
+            layer.zeta -= alpha * (self.m_dz[l] * factor_1) / (np.sqrt(self.ms_dz[l] * factor_2) + epsilon)
+            layer.r_out -= alpha * (self.m_dr_out[l] * factor_1) / (np.sqrt(self.ms_dr_out[l] * factor_2) + epsilon)
+            if not (self.fixed_input and l == 0):
+                layer.r_inp -= alpha * (self.m_dr_inp[l] * factor_1) / (np.sqrt(self.ms_dr_inp[l] * factor_2) + epsilon)
