@@ -349,8 +349,8 @@ def sgd(pool=None):
 
 
 def mnist(pool=None):
-    raw_data_train = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_train.csv", header=None)
-    raw_data_test = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_test.csv", header=None)
+    raw_data_train = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_train.csv", header=None)
+    raw_data_test = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_test.csv", header=None)
 
     # In[7]:
 
@@ -432,7 +432,7 @@ def mnist(pool=None):
 
     n = 0
     mbs = 4
-    nt = 2
+    nt = 1
     cs = mbs // nt
 
     sgd = Particle333SGD(n_epochs=1, mini_batch_size=mbs, verbosity=1, weight_update="rmsprop",
@@ -452,8 +452,8 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    main4()
+    # main4()
     # fd()
 
     # sgd(pool=Pool(processes=2))
-    # mnist(pool=Pool(processes=2))
+    mnist(pool=Pool(processes=2))

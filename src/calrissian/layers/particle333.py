@@ -84,7 +84,8 @@ class Particle333(object):
         self.matrix_dy = None
         self.matrix_dz = None
         self.r_matrix = None
-        self.potential_matrix_cache = None
+        self.zeta_matrix = None
+        self.potential_matrix = None
         self.z_pool_max_cache = None
 
         self.w = None
@@ -215,6 +216,14 @@ class Particle333(object):
         matrix_dz = positions_output[2].transpose() - positions_input[2]
         r_matrix = np.sqrt(matrix_dx**2 + matrix_dy**2 + matrix_dz**2)
         potential_matrix = self.potential(r_matrix, zeta=zeta_matrix)
+
+        # cache
+        self.zeta_matrix = zeta_matrix
+        self.matrix_dx = matrix_dx
+        self.matrix_dy = matrix_dy
+        self.matrix_dz = matrix_dz
+        self.r_matrix = r_matrix
+        self.potential_matrix = potential_matrix
 
         # reduce matrix across c basis functions, weight by the c basis charges
         tmp = []
