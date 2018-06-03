@@ -7,13 +7,14 @@ import os
 
 class Particle333Network(object):
 
-    def __init__(self, cost="mse", regularizer=None):
+    def __init__(self, cost="mse", regularizer=None, lam=0.0):
         self.layers = []
         self.cost_name = cost
         self.cost_function = Cost.get(cost)
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
         self.regularizer = regularizer
+        self.lam = lam
 
         # references to data
         self.ref_data_X = None
@@ -86,12 +87,28 @@ class Particle333Network(object):
         :param data_Y:
         :return:
         """
-        c = self.cost_function(data_Y, self.predict(data_X))
+        cost = self.cost_function(data_Y, self.predict(data_X))
 
-        if self.regularizer is not None:
-            c += self.regularizer.cost(self.layers)
+        # Apply L2 regularization
+        if self.regularizer == "l2":
 
-        return c
+            reg_total = 0.0
+            for l, layer in enumerate(self.layers):
+                for j in range(layer.output_size):
+                    for c in range(layer.nc):
+                        reg_total += layer.q[j][c] * layer.q[j][c]
+                        reg_total += 1.0 / (layer.zeta[j][c] * layer.zeta[j][c])
+
+                        for i in range(layer.input_size):
+                            dx = layer.r_inp[i][0] - layer.r_out[j][c][0]
+                            dy = layer.r_inp[i][1] - layer.r_out[j][c][1]
+                            dz = layer.r_inp[i][2] - layer.r_out[j][c][2]
+                            dd = dx*dx + dy*dy + dz*dz
+                            reg_total += 1.0 / dd
+
+            cost += reg_total * self.lam
+
+        return cost
 
     def cost_gradient(self, data_X, data_Y, thread_scale=1):
         """
@@ -394,6 +411,29 @@ class Particle333Network(object):
                     dc_dr_inp[l][i][2] += dc_dr_inp_dz[i]
 
                 next_delta = trans_next_delta.transpose()
+
+        # Apply L2 regularization
+        if self.regularizer == "l2":
+            two_lam = 2.0 * self.lam
+            for l, layer in enumerate(self.layers):
+                for j in range(layer.output_size):
+                    for c in range(layer.nc):
+                        dc_dq[l][j][c] += two_lam * layer.q[j][c]
+                        dc_dz[l][j][c] += -two_lam / (layer.zeta[j][c] * layer.zeta[j][c] * layer.zeta[j][c])
+
+                        for i in range(layer.input_size):
+                            dx = layer.r_inp[i][0] - layer.r_out[j][c][0]
+                            dy = layer.r_inp[i][1] - layer.r_out[j][c][1]
+                            dz = layer.r_inp[i][2] - layer.r_out[j][c][2]
+                            dd = dx*dx + dy*dy + dz*dz
+                            tmp = two_lam / (dd * dd)
+
+                            dc_dr_out[l][j][c][0] += dx * tmp
+                            dc_dr_out[l][j][c][1] += dy * tmp
+                            dc_dr_out[l][j][c][2] += dz * tmp
+                            dc_dr_inp[l][i][0] -= dx * tmp
+                            dc_dr_inp[l][i][1] -= dy * tmp
+                            dc_dr_inp[l][i][2] -= dz * tmp
 
         return dc_db, dc_dq, dc_dz, dc_dr_inp, dc_dr_out
 

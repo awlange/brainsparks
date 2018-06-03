@@ -15,7 +15,7 @@ class Particle333(object):
                  s=1.0, soff=0.0,
                  q=1.0, qoff=0.0,
                  b=1.0, boff=0.0,
-                 z=1.0, zoff=1.0,
+                 z=0.1, zoff=1.0,
                  apply_convolution=False,
                  input_shape=(1, 1, 1),   # n_x, n_y, n_channel
                  output_shape=(1, 1, 1),  # n_x, n_y, n_channel

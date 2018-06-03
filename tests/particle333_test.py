@@ -148,9 +148,11 @@ def fd():
         # net.append(Particle333(3*3*2, 1, activation="sigmoid", nr=nr, nc=nc))
 
         # working too!
-        net = Particle333Network(cost="mse")
+        # net = Particle333Network(cost="mse")
+        net = Particle333Network(cost="mse", regularizer="l2", lam=0.01)
         net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
                                apply_convolution=True,
+                               rand="normal",
                                input_shape=(4, 4, 1),
                                output_shape=(3, 3, 2),
                                input_delta=(0.5, 0.5, 0.5),
@@ -160,6 +162,7 @@ def fd():
                                ))
         net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
                                apply_convolution=True,
+                               rand="normal",
                                input_shape=(3, 3, 2),
                                output_shape=(3, 3, 1),
                                input_delta=(0.5, 0.5, 0.5),
@@ -167,12 +170,12 @@ def fd():
                                output_pool_shape=(1, 1, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(3*3*1, 4, activation="sigmoid", nr=nr, nc=nc))
-        net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(3*3*1, 4, activation="sigmoid", rand="normal", nr=nr, nc=nc))
+        net.append(Particle333(4, 1, activation="sigmoid", rand="normal", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
-    h = 0.001
+    h = 0.0001
 
     print("analytic b")
     print(db)
@@ -453,7 +456,7 @@ if __name__ == "__main__":
     # main2()
     # main3()
     # main4()
-    # fd()
+    fd()
 
     # sgd(pool=Pool(processes=2))
-    mnist(pool=Pool(processes=2))
+    # mnist(pool=Pool(processes=2))
