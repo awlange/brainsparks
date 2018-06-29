@@ -148,9 +148,9 @@ def fd():
         # net.append(Particle333(3*3*2, 1, activation="sigmoid", nr=nr, nc=nc))
 
         # working too!
-        # net = Particle333Network(cost="mse")
-        net = Particle333Network(cost="mse", regularizer="l2", lam=0.01)
-        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        net = Particle333Network(cost="mse")
+        # net = Particle333Network(cost="mse", regularizer="l2", lam=0.01)
+        net.append(Particle333(activation="tanh", nr=nr, nc=nc,
                                apply_convolution=True,
                                rand="normal",
                                input_shape=(4, 4, 1),
@@ -160,7 +160,7 @@ def fd():
                                output_pool_shape=(2, 3, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        net.append(Particle333(activation="tanh", nr=nr, nc=nc,
                                apply_convolution=True,
                                rand="normal",
                                input_shape=(3, 3, 2),
@@ -170,7 +170,7 @@ def fd():
                                output_pool_shape=(1, 1, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(3*3*1, 4, activation="sigmoid", rand="normal", nr=nr, nc=nc))
+        net.append(Particle333(3*3*1, 4, activation="tanh", rand="normal", nr=nr, nc=nc, p_dropout=0.5))
         net.append(Particle333(4, 1, activation="sigmoid", rand="normal", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
@@ -386,7 +386,7 @@ def mnist(pool=None):
 
     # Data subset
     # n_sub = len(X)
-    n_sub = 100
+    n_sub = 50
     X_sub = X[:n_sub, :]
     Y_sub = Y[:n_sub, :]
     X_other = X[n_sub:, :]
@@ -400,7 +400,7 @@ def mnist(pool=None):
     rand = "normal"
 
     nr = 3
-    nc = 4
+    nc = 3
 
     net = Particle333Network(cost="categorical_cross_entropy")
     net.append(Particle333(activation="tanh", nr=nr, nc=nc,
@@ -434,7 +434,7 @@ def mnist(pool=None):
     net.layers[0].r_inp = np.zeros_like(net.layers[0].r_inp)
 
     n = 0
-    mbs = 4
+    mbs = 10
     nt = 1
     cs = mbs // nt
 
@@ -444,7 +444,10 @@ def mnist(pool=None):
                          n_threads=nt, chunk_size=cs
                         )
 
+    print("Starting opt...")
+    ts = time.time()
     sgd.optimize(net, X_sub, Y_sub, pool=pool)
+    print(time.time() - ts)
 
 
 if __name__ == "__main__":
@@ -460,3 +463,4 @@ if __name__ == "__main__":
 
     # sgd(pool=Pool(processes=2))
     # mnist(pool=Pool(processes=2))
+    # mnist(pool=None)

@@ -299,50 +299,50 @@ class Particle333Network(object):
                 len_data = len(data_X)
 
                 # recompute potentials like in forward propagation
-                # pout_size = layer.output_size * layer.nc * layer.output_shape[1] * layer.output_shape[0] * layer.output_pool_shape[1] * layer.output_pool_shape[0]
-                # pin_size = layer.input_size * layer.input_shape[1] * layer.input_shape[0]
-                # positions_output = np.zeros((layer.nr, 1, pout_size))
-                # positions_input = np.zeros((layer.nr, 1, pin_size))
-                # zeta_matrix = np.ones((pout_size, pin_size))
-                #
-                # joff = -1
-                # for j in range(layer.output_size):
-                #     for jy in range(layer.output_shape[1]):
-                #         for jx in range(layer.output_shape[0]):
-                #             for pool_jy in range(layer.output_pool_shape[1]):
-                #                 for pool_jx in range(layer.output_pool_shape[0]):
-                #                     for c in range(layer.nc):
-                #                         rjc = layer.r_out[j][c]
-                #                         zjc = layer.zeta[j][c]
-                #
-                #                         joff += 1
-                #                         positions_output[0][0][joff] = rjc[0] + jx * layer.output_delta[0] + pool_jx * layer.output_pool_delta[0]
-                #                         positions_output[1][0][joff] = rjc[1] + jy * layer.output_delta[1] + pool_jy * layer.output_pool_delta[1]
-                #                         positions_output[2][0][joff] = rjc[2]
-                #                         zeta_matrix[joff] *= zjc
-                #
-                # ioff = -1
-                # for i in range(layer.input_size):
-                #     for iy in range(layer.input_shape[1]):
-                #         for ix in range(layer.input_shape[0]):
-                #             ioff += 1
-                #             positions_input[0][0][ioff] = layer.r_inp[i][0] + ix * layer.input_delta[0]
-                #             positions_input[1][0][ioff] = layer.r_inp[i][1] + iy * layer.input_delta[1]
-                #             positions_input[2][0][ioff] = layer.r_inp[i][2]
-                #
-                # matrix_dx = positions_output[0].transpose() - positions_input[0]
-                # matrix_dy = positions_output[1].transpose() - positions_input[1]
-                # matrix_dz = positions_output[2].transpose() - positions_input[2]
-                # r_matrix = np.sqrt(matrix_dx ** 2 + matrix_dy ** 2 + matrix_dz ** 2)
-                # potential_matrix = layer.potential(r_matrix, zeta=zeta_matrix)
+                pout_size = layer.output_size * layer.nc * layer.output_shape[1] * layer.output_shape[0] * layer.output_pool_shape[1] * layer.output_pool_shape[0]
+                pin_size = layer.input_size * layer.input_shape[1] * layer.input_shape[0]
+                positions_output = np.zeros((layer.nr, 1, pout_size))
+                positions_input = np.zeros((layer.nr, 1, pin_size))
+                zeta_matrix = np.ones((pout_size, pin_size))
 
-                # Use cached data
-                matrix_dx = layer.matrix_dx
-                matrix_dy = layer.matrix_dy
-                matrix_dz = layer.matrix_dz
-                r_matrix = layer.r_matrix
-                potential_matrix = layer.potential_matrix
-                zeta_matrix = layer.zeta_matrix
+                joff = -1
+                for j in range(layer.output_size):
+                    for jy in range(layer.output_shape[1]):
+                        for jx in range(layer.output_shape[0]):
+                            for pool_jy in range(layer.output_pool_shape[1]):
+                                for pool_jx in range(layer.output_pool_shape[0]):
+                                    for c in range(layer.nc):
+                                        rjc = layer.r_out[j][c]
+                                        zjc = layer.zeta[j][c]
+
+                                        joff += 1
+                                        positions_output[0][0][joff] = rjc[0] + jx * layer.output_delta[0] + pool_jx * layer.output_pool_delta[0]
+                                        positions_output[1][0][joff] = rjc[1] + jy * layer.output_delta[1] + pool_jy * layer.output_pool_delta[1]
+                                        positions_output[2][0][joff] = rjc[2]
+                                        zeta_matrix[joff] *= zjc
+
+                ioff = -1
+                for i in range(layer.input_size):
+                    for iy in range(layer.input_shape[1]):
+                        for ix in range(layer.input_shape[0]):
+                            ioff += 1
+                            positions_input[0][0][ioff] = layer.r_inp[i][0] + ix * layer.input_delta[0]
+                            positions_input[1][0][ioff] = layer.r_inp[i][1] + iy * layer.input_delta[1]
+                            positions_input[2][0][ioff] = layer.r_inp[i][2]
+
+                matrix_dx = positions_output[0].transpose() - positions_input[0]
+                matrix_dy = positions_output[1].transpose() - positions_input[1]
+                matrix_dz = positions_output[2].transpose() - positions_input[2]
+                r_matrix = np.sqrt(matrix_dx ** 2 + matrix_dy ** 2 + matrix_dz ** 2)
+                potential_matrix = layer.potential(r_matrix, zeta=zeta_matrix)
+
+                # # Use cached data
+                # matrix_dx = layer.matrix_dx
+                # matrix_dy = layer.matrix_dy
+                # matrix_dz = layer.matrix_dz
+                # r_matrix = layer.r_matrix
+                # potential_matrix = layer.potential_matrix
+                # zeta_matrix = layer.zeta_matrix
 
                 dz_potential_matrix = layer.dz_potential(r_matrix, zeta=zeta_matrix)
                 d_potential_matrix = layer.d_potential(r_matrix, zeta=zeta_matrix) / r_matrix  # divide d_potential_matrix by distances r_matrix for convenience and speed here

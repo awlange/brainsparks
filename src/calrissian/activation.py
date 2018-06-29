@@ -35,6 +35,8 @@ class Activation(object):
             return Activation().atomic_softmax
         if nl == "elu":
             return Activation().elu
+        if nl == "cubic":
+            return Activation().cubic
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -63,6 +65,8 @@ class Activation(object):
             return Activation().d_softplus
         if nl == "elu":
             return Activation().d_elu
+        if nl == "cubic":
+            return Activation().d_cubic
 
         raise NameError("Activation name {} is not implemented.".format(name))
 
@@ -179,3 +183,12 @@ class Activation(object):
 
     def d_elu(self, x):
         return np.piecewise(x, [x < 0.0, x >= 0], [lambda x: np.exp(x), lambda x: 1.0])
+
+    # Cubic 
+
+    def cubic(self, x):
+        return 0.5*(x + np.tanh(x)) 
+
+    def d_cubic(self, x):
+        tx = np.tanh(x)
+        return 0.5*(1.0 + (1.0 - tx*tx))
