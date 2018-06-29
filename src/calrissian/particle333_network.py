@@ -7,13 +7,14 @@ import os
 
 class Particle333Network(object):
 
-    def __init__(self, cost="mse", regularizer=None):
+    def __init__(self, cost="mse", regularizer=None, lam=0.0):
         self.layers = []
         self.cost_name = cost
         self.cost_function = Cost.get(cost)
         self.cost_d_function = Cost.get_d(cost)
         self.lock_built = False
         self.regularizer = regularizer
+        self.lam = lam
 
         # references to data
         self.ref_data_X = None
@@ -86,12 +87,28 @@ class Particle333Network(object):
         :param data_Y:
         :return:
         """
-        c = self.cost_function(data_Y, self.predict(data_X))
+        cost = self.cost_function(data_Y, self.predict(data_X))
 
-        if self.regularizer is not None:
-            c += self.regularizer.cost(self.layers)
+        # Apply L2 regularization
+        if self.regularizer == "l2":
 
-        return c
+            reg_total = 0.0
+            for l, layer in enumerate(self.layers):
+                for j in range(layer.output_size):
+                    for c in range(layer.nc):
+                        reg_total += layer.q[j][c] * layer.q[j][c]
+                        reg_total += 1.0 / (layer.zeta[j][c] * layer.zeta[j][c])
+
+                        for i in range(layer.input_size):
+                            dx = layer.r_inp[i][0] - layer.r_out[j][c][0]
+                            dy = layer.r_inp[i][1] - layer.r_out[j][c][1]
+                            dz = layer.r_inp[i][2] - layer.r_out[j][c][2]
+                            dd = dx*dx + dy*dy + dz*dz
+                            reg_total += 1.0 / dd
+
+            cost += reg_total * self.lam
+
+        return cost
 
     def cost_gradient(self, data_X, data_Y, thread_scale=1):
         """
@@ -318,6 +335,15 @@ class Particle333Network(object):
                 matrix_dz = positions_output[2].transpose() - positions_input[2]
                 r_matrix = np.sqrt(matrix_dx ** 2 + matrix_dy ** 2 + matrix_dz ** 2)
                 potential_matrix = layer.potential(r_matrix, zeta=zeta_matrix)
+
+                # # Use cached data
+                # matrix_dx = layer.matrix_dx
+                # matrix_dy = layer.matrix_dy
+                # matrix_dz = layer.matrix_dz
+                # r_matrix = layer.r_matrix
+                # potential_matrix = layer.potential_matrix
+                # zeta_matrix = layer.zeta_matrix
+
                 dz_potential_matrix = layer.dz_potential(r_matrix, zeta=zeta_matrix)
                 d_potential_matrix = layer.d_potential(r_matrix, zeta=zeta_matrix) / r_matrix  # divide d_potential_matrix by distances r_matrix for convenience and speed here
 
@@ -349,9 +375,12 @@ class Particle333Network(object):
 
                             for di in range(len_data):
                                 offset = joff * pool_size * layer.nc + j_pool_offsets[di] * layer.nc
+                                delta_sigma = this_delta_j[di] * sigma_Z_l[di]
+
                                 for c in range(layer.nc):
                                     # Next layer delta - easier to do in transpose
-                                    trans_next_delta[di] += (qj[c] * this_delta_j[di]) * potential_matrix[offset + c] * sigma_Z_l[di]
+                                    # trans_next_delta[di] += (qj[c] * this_delta_j[di]) * potential_matrix[offset + c] * sigma_Z_l[di]
+                                    trans_next_delta[di] += (qj[c] * potential_matrix[offset + c]) * delta_sigma
 
                                     # Charge gradient
                                     dc_dq[l][j][c] += potential_matrix[offset + c].dot(trans_atj[di])
@@ -360,9 +389,14 @@ class Particle333Network(object):
                                     dc_dz[l][j][c] += qj[c] * (dz_potential_matrix[offset + c].dot(trans_atj[di]))
 
                                     # Position gradient
-                                    tdx = qj[c] * ((d_potential_matrix[offset + c] * matrix_dx[offset + c]) * (trans_atj[di]))
-                                    tdy = qj[c] * ((d_potential_matrix[offset + c] * matrix_dy[offset + c]) * (trans_atj[di]))
-                                    tdz = qj[c] * ((d_potential_matrix[offset + c] * matrix_dz[offset + c]) * (trans_atj[di]))
+                                    tmp = qj[c] * d_potential_matrix[offset + c] * trans_atj[di]
+                                    tdx = tmp * matrix_dx[offset + c]
+                                    tdy = tmp * matrix_dy[offset + c]
+                                    tdz = tmp * matrix_dz[offset + c]
+
+                                    # tdx = qj[c] * ((d_potential_matrix[offset + c] * matrix_dx[offset + c]) * (trans_atj[di]))
+                                    # tdy = qj[c] * ((d_potential_matrix[offset + c] * matrix_dy[offset + c]) * (trans_atj[di]))
+                                    # tdz = qj[c] * ((d_potential_matrix[offset + c] * matrix_dz[offset + c]) * (trans_atj[di]))
 
                                     dc_dr_out[l][j][c][0] += tdx.sum()
                                     dc_dr_out[l][j][c][1] += tdy.sum()
@@ -377,6 +411,29 @@ class Particle333Network(object):
                     dc_dr_inp[l][i][2] += dc_dr_inp_dz[i]
 
                 next_delta = trans_next_delta.transpose()
+
+        # Apply L2 regularization
+        if self.regularizer == "l2":
+            two_lam = 2.0 * self.lam
+            for l, layer in enumerate(self.layers):
+                for j in range(layer.output_size):
+                    for c in range(layer.nc):
+                        dc_dq[l][j][c] += two_lam * layer.q[j][c]
+                        dc_dz[l][j][c] += -two_lam / (layer.zeta[j][c] * layer.zeta[j][c] * layer.zeta[j][c])
+
+                        for i in range(layer.input_size):
+                            dx = layer.r_inp[i][0] - layer.r_out[j][c][0]
+                            dy = layer.r_inp[i][1] - layer.r_out[j][c][1]
+                            dz = layer.r_inp[i][2] - layer.r_out[j][c][2]
+                            dd = dx*dx + dy*dy + dz*dz
+                            tmp = two_lam / (dd * dd)
+
+                            dc_dr_out[l][j][c][0] += dx * tmp
+                            dc_dr_out[l][j][c][1] += dy * tmp
+                            dc_dr_out[l][j][c][2] += dz * tmp
+                            dc_dr_inp[l][i][0] -= dx * tmp
+                            dc_dr_inp[l][i][1] -= dy * tmp
+                            dc_dr_inp[l][i][2] -= dz * tmp
 
         return dc_db, dc_dq, dc_dz, dc_dr_inp, dc_dr_out
 

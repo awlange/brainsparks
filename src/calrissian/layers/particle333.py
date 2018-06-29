@@ -15,14 +15,15 @@ class Particle333(object):
                  s=1.0, soff=0.0,
                  q=1.0, qoff=0.0,
                  b=1.0, boff=0.0,
-                 z=1.0, zoff=1.0,
+                 z=0.1, zoff=1.0,
                  apply_convolution=False,
                  input_shape=(1, 1, 1),   # n_x, n_y, n_channel
                  output_shape=(1, 1, 1),  # n_x, n_y, n_channel
                  input_delta=(1.0, 1.0, 1.0),   # delta_x, delta_y, delta_channel
                  output_delta=(1.0, 1.0, 1.0),  # delta_x, delta_y, delta_channel
                  output_pool_shape=(1, 1, 1),  # max pooling
-                 output_pool_delta=(1.0, 1.0, 1.0)
+                 output_pool_delta=(1.0, 1.0, 1.0),
+                 p_dropout=-1.0
                  ):
 
         self.input_size = input_size  # with conv, this is the number of input channels
@@ -43,6 +44,9 @@ class Particle333(object):
         self.output_delta = output_delta
         self.output_pool_shape = output_pool_shape
         self.output_pool_delta = output_pool_delta
+
+        self.p_dropout = p_dropout
+        self.dropout_mask = None
 
         if self.apply_convolution:
             self.input_size = self.input_shape[2]
@@ -84,7 +88,8 @@ class Particle333(object):
         self.matrix_dy = None
         self.matrix_dz = None
         self.r_matrix = None
-        self.potential_matrix_cache = None
+        self.zeta_matrix = None
+        self.potential_matrix = None
         self.z_pool_max_cache = None
 
         self.w = None
@@ -94,7 +99,7 @@ class Particle333(object):
 
     def compute_z(self, a_in):
         if self.apply_convolution:
-            return self.compute_z_convolution(a_in)
+            return self.compute_z_convolution_original(a_in)
 
         atrans = a_in.transpose()
         z = np.zeros((self.output_size, len(a_in)))
@@ -173,6 +178,14 @@ class Particle333(object):
         """
         Vectorized version
         """
+        # # clear cache
+        # self.zeta_matrix = None
+        # self.matrix_dx = None
+        # self.matrix_dy = None
+        # self.matrix_dz = None
+        # self.r_matrix = None
+        # self.potential_matrix = None
+
         atrans = a_in.transpose()
         n_data = len(a_in)
         z = np.zeros((self.output_shape[2], self.output_shape[1], self.output_shape[0], n_data))
@@ -216,6 +229,14 @@ class Particle333(object):
         r_matrix = np.sqrt(matrix_dx**2 + matrix_dy**2 + matrix_dz**2)
         potential_matrix = self.potential(r_matrix, zeta=zeta_matrix)
 
+        # # cache
+        # self.zeta_matrix = zeta_matrix
+        # self.matrix_dx = matrix_dx
+        # self.matrix_dy = matrix_dy
+        # self.matrix_dz = matrix_dz
+        # self.r_matrix = r_matrix
+        # self.potential_matrix = potential_matrix
+
         # reduce matrix across c basis functions, weight by the c basis charges
         tmp = []
         for j in range(self.output_size):
@@ -243,11 +264,18 @@ class Particle333(object):
         z = z.reshape((self.output_size * self.output_shape[1] * self.output_shape[0], n_data))
         return z.transpose()
 
-    def compute_a(self, z):
-        return self.activation(z)
+    def compute_a(self, z, apply_dropout=False):
+        a = self.activation(z)
+        if apply_dropout and self.p_dropout > 0.0:
+            self.dropout_mask = np.random.binomial(1, self.p_dropout, a.shape)
+            a *= self.dropout_mask
+        return a
 
-    def compute_da(self, z):
-        return self.d_activation(z)
+    def compute_da(self, z, apply_dropout=False):
+        da = self.d_activation(z)
+        if apply_dropout and self.p_dropout > 0.0:
+            da *= self.dropout_mask
+        return da
 
     def compute_w(self):
         wt = np.zeros((self.output_size, self.input_size))

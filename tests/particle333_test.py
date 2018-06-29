@@ -149,8 +149,10 @@ def fd():
 
         # working too!
         net = Particle333Network(cost="mse")
-        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        # net = Particle333Network(cost="mse", regularizer="l2", lam=0.01)
+        net.append(Particle333(activation="tanh", nr=nr, nc=nc,
                                apply_convolution=True,
+                               rand="normal",
                                input_shape=(4, 4, 1),
                                output_shape=(3, 3, 2),
                                input_delta=(0.5, 0.5, 0.5),
@@ -158,8 +160,9 @@ def fd():
                                output_pool_shape=(2, 3, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(activation="sigmoid", nr=nr, nc=nc,
+        net.append(Particle333(activation="tanh", nr=nr, nc=nc,
                                apply_convolution=True,
+                               rand="normal",
                                input_shape=(3, 3, 2),
                                output_shape=(3, 3, 1),
                                input_delta=(0.5, 0.5, 0.5),
@@ -167,12 +170,12 @@ def fd():
                                output_pool_shape=(1, 1, 1),
                                output_pool_delta=(0.1, 0.1, 0.1)
                                ))
-        net.append(Particle333(3*3*1, 4, activation="sigmoid", nr=nr, nc=nc))
-        net.append(Particle333(4, 1, activation="sigmoid", nr=nr, nc=nc))
+        net.append(Particle333(3*3*1, 4, activation="tanh", rand="normal", nr=nr, nc=nc, p_dropout=0.5))
+        net.append(Particle333(4, 1, activation="sigmoid", rand="normal", nr=nr, nc=nc))
 
     db, dq, dz, dr_inp, dr_out = net.cost_gradient(train_X, train_Y)
 
-    h = 0.001
+    h = 0.0001
 
     print("analytic b")
     print(db)
@@ -349,8 +352,8 @@ def sgd(pool=None):
 
 
 def mnist(pool=None):
-    raw_data_train = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_train.csv", header=None)
-    raw_data_test = pd.read_csv("/Users/adrianlange/programming/personal/MNIST/data/mnist_test.csv", header=None)
+    raw_data_train = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_train.csv", header=None)
+    raw_data_test = pd.read_csv("/Users/adrianlange/programming/MNIST/data/mnist_test.csv", header=None)
 
     # In[7]:
 
@@ -383,7 +386,7 @@ def mnist(pool=None):
 
     # Data subset
     # n_sub = len(X)
-    n_sub = 100
+    n_sub = 50
     X_sub = X[:n_sub, :]
     Y_sub = Y[:n_sub, :]
     X_other = X[n_sub:, :]
@@ -397,7 +400,7 @@ def mnist(pool=None):
     rand = "normal"
 
     nr = 3
-    nc = 4
+    nc = 3
 
     net = Particle333Network(cost="categorical_cross_entropy")
     net.append(Particle333(activation="tanh", nr=nr, nc=nc,
@@ -431,8 +434,8 @@ def mnist(pool=None):
     net.layers[0].r_inp = np.zeros_like(net.layers[0].r_inp)
 
     n = 0
-    mbs = 4
-    nt = 2
+    mbs = 10
+    nt = 1
     cs = mbs // nt
 
     sgd = Particle333SGD(n_epochs=1, mini_batch_size=mbs, verbosity=1, weight_update="rmsprop",
@@ -441,7 +444,10 @@ def mnist(pool=None):
                          n_threads=nt, chunk_size=cs
                         )
 
+    print("Starting opt...")
+    ts = time.time()
     sgd.optimize(net, X_sub, Y_sub, pool=pool)
+    print(time.time() - ts)
 
 
 if __name__ == "__main__":
@@ -452,8 +458,9 @@ if __name__ == "__main__":
     # main()
     # main2()
     # main3()
-    main4()
-    # fd()
+    # main4()
+    fd()
 
     # sgd(pool=Pool(processes=2))
     # mnist(pool=Pool(processes=2))
+    # mnist(pool=None)
